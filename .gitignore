@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tests and tooling
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.hypothesis/
+
+# Python environments
+.venv/
+venv/
+env/
+.env
+
+# Nix / direnv
+.direnv/
+/result
+/result-*
+
+# Editors
+.vscode/
+.idea/
+.history/
+
+# Local agent state
+.codex/
+.claude/
+memory/
