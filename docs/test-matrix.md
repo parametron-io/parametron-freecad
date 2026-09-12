@@ -8,68 +8,69 @@ current suite was rerun or that overlapping counts should be summed.
 
 ## Command Rules
 
-This repository uses a Nix development shell. Current validation commands must
-use:
+Current validation commands are ordinary Python/test commands, run inside a
+Python/FreeCAD environment providing this package:
 
 ```bash
-nix develop --command <command>
+<command>
 ```
 
-Do not use host-environment Python or pytest commands for project validation
-unless explicitly requested for local comparison.
+This repository's `flake.nix` provides one reproducible such environment
+(`nix develop`); see [README.md](../README.md). Any equivalent environment
+satisfying the documented runtime and verification requirements may be used.
 
 ## Recommended Validation Commands
 
 Syntax/import check:
 
 ```bash
-nix develop --command python -m compileall parametron_freecad scripts tests
+python -m compileall parametron_freecad scripts tests
 ```
 
 Full suite (including real-FreeCAD tests when their environment is available):
 
 ```bash
-nix develop --command python -m pytest
+python -m pytest
 ```
 
 Focused headless/runtime checks:
 
 ```bash
-nix develop --command python -m pytest tests/test_headless_cli_arguments.py
-nix develop --command python -m pytest tests/test_headless_repeated_run.py
-nix develop --command python -m pytest tests/test_runtime_entrypoints.py
-nix develop --command python -m pytest tests/test_runtime_invocation.py
+python -m pytest tests/test_headless_cli_arguments.py
+python -m pytest tests/test_headless_repeated_run.py
+python -m pytest tests/test_runtime_entrypoints.py
+python -m pytest tests/test_runtime_invocation.py
 ```
 
 Focused manifest/result/artifact checks:
 
 ```bash
-nix develop --command python -m pytest tests/test_manifest_contract.py tests/test_manifest_v2_contract.py tests/test_manifest_loader.py tests/test_manifest_validation.py tests/test_manifest_v2_validation.py
-nix develop --command python -m pytest tests/test_result_writer.py
-nix develop --command python -m pytest tests/test_failure_output_contract.py tests/test_failure_result_writer.py tests/test_trace_output_contract.py
-nix develop --command python -m pytest tests/test_reference_traversal_output_contract.py
-nix develop --command python -m pytest tests/test_reference_traversal_request.py tests/test_reference_traversal.py
-nix develop --command python -m pytest tests/test_step_export.py tests/test_csv_export.py tests/test_pdf_export.py
+python -m pytest tests/test_manifest_contract.py tests/test_manifest_v2_contract.py tests/test_manifest_loader.py tests/test_manifest_validation.py tests/test_manifest_v2_validation.py
+python -m pytest tests/test_result_writer.py
+python -m pytest tests/test_failure_output_contract.py tests/test_failure_result_writer.py tests/test_trace_output_contract.py
+python -m pytest tests/test_reference_traversal_output_contract.py
+python -m pytest tests/test_reference_traversal_request.py tests/test_reference_traversal.py
+python -m pytest tests/test_step_export.py tests/test_csv_export.py tests/test_pdf_export.py
 ```
 
 Focused observation/reference-foundation checks:
 
 ```bash
-nix develop --command python -m pytest tests/test_reference_access.py tests/test_reference_observation.py
-nix develop --command python -m pytest tests/test_requested_scope_observation.py tests/test_observed_writer.py tests/test_observed_output_repeated_run.py
-nix develop --command python -m pytest tests/test_observation_request.py
+python -m pytest tests/test_reference_access.py tests/test_reference_observation.py
+python -m pytest tests/test_requested_scope_observation.py tests/test_observed_writer.py tests/test_observed_output_repeated_run.py
+python -m pytest tests/test_observation_request.py
 ```
 
 Focused aligned execute-plus-observation checks:
 
 ```bash
-nix develop --command python -m pytest tests/test_headless_cli_arguments.py tests/test_runtime_entrypoints.py tests/test_observed_writer.py tests/test_observation_request.py
+python -m pytest tests/test_headless_cli_arguments.py tests/test_runtime_entrypoints.py tests/test_observed_writer.py tests/test_observation_request.py
 ```
 
 Focused launcher checks:
 
 ```bash
-nix develop --command python -m pytest \
+python -m pytest \
   tests/test_launcher.py \
   tests/test_headless_invocation.py \
   tests/test_environment_contract.py
@@ -79,9 +80,8 @@ Real FreeCAD smoke is environment-gated. Strict smoke exercises the installed
 `parametron-freecad` wrapper:
 
 ```bash
-PARAMETRON_FREECAD_BIN=/path/to/freecadcmd nix develop --command python -m pytest tests/test_headless_invocation.py
-nix develop --command env \
-  PARAMETRON_FREECAD_STRICT_SMOKE=1 \
+PARAMETRON_FREECAD_BIN=/path/to/freecadcmd python -m pytest tests/test_headless_invocation.py
+env PARAMETRON_FREECAD_STRICT_SMOKE=1 \
   python -m pytest tests/test_headless_invocation.py -k 'smoke'
 ```
 

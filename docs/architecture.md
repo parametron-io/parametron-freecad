@@ -596,18 +596,21 @@ There is no active C++ runtime, native extension, or C++ build integration.
 
 ## Validation Boundary
 
-Project validation commands use the Nix development shell:
+Project validation commands are ordinary Python/test commands, run inside a
+Python/FreeCAD environment providing this package:
 
 ```bash
-nix develop --command python -m compileall parametron_freecad scripts tests
-nix develop --command python -m pytest
+python -m compileall parametron_freecad scripts tests
+python -m pytest
 ```
 
 Real FreeCAD smoke tests are environment-gated. Supported local smoke uses the
 installed wrapper:
 
 ```bash
-nix develop --command parametron-freecad smoke
+parametron-freecad smoke
 ```
 
-`PARAMETRON_FREECAD_BIN` overrides the underlying FreeCAD host when needed.
+`PARAMETRON_FREECAD_BIN` overrides the underlying FreeCAD host when needed. See
+[README.md](../README.md) for the optional Nix development shell that provides
+a reproducible environment satisfying these requirements.

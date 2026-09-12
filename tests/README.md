@@ -5,14 +5,19 @@
 Syntax and import check (from the repository root):
 
 ```
-nix develop --command python -m compileall parametron_freecad scripts tests
+python -m compileall parametron_freecad scripts tests
 ```
 
 Full test suite:
 
 ```
-nix develop --command python -m pytest
+python -m pytest
 ```
+
+These commands require a Python/FreeCAD environment providing this package
+(see the "FreeCAD dependency" section below). This repository's `flake.nix`
+provides one reproducible such environment (`nix develop`), but any equivalent
+environment satisfying the same requirements works.
 
 ## FreeCAD dependency
 
