@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "planHash": "349e2081f19cd8676b56d12a1507e98b466bb0de342c8138766610a0964632f5",
+  "adapter": "freecad",
+  "product": {
+    "id": "Box"
+  },
+  "inputs": {
+    "sourceModel": "input/box.FCStd"
+  },
+  "values": {
+    "height": 42,
+    "length": 35,
+    "width": 53
+  },
+  "parameterAssignments": [
+    {
+      "name": "length",
+      "value": 35,
+      "type": "number",
+      "unit": "mm"
+    },
+    {
+      "name": "width",
+      "value": 53,
+      "type": "number",
+      "unit": "mm"
+    },
+    {
+      "name": "height",
+      "value": 42,
+      "type": "number",
+      "unit": "mm"
+    }
+  ],
+  "outputs": [
+    {
+      "type": "step",
+      "filename": "Box.step",
+      "object": "Body"
+    }
+  ]
+}
