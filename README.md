@@ -37,7 +37,7 @@ deletion execution are not currently implemented. See the
 Supported local invocation:
 
 ```bash
-nix develop --command parametron-freecad smoke
+parametron-freecad smoke
 ```
 
 Execute shape:
@@ -84,17 +84,31 @@ failure behavior, and [contracts/](docs/contracts/) for exact schema semantics.
 
 ## Development and Validation
 
-This repository uses a Nix development shell. Use Nix-wrapped Python/test
-commands, for example:
+Once a Python/FreeCAD environment providing this package is available, the
+ordinary validation commands are:
 
 ```bash
-nix develop --command parametron-freecad smoke
-nix develop --command python -m compileall parametron_freecad scripts tests
-nix develop --command python -m pytest
+parametron-freecad smoke
+python -m compileall parametron_freecad scripts tests
+python -m pytest
 ```
 
-See [AGENTS.md](AGENTS.md) for required command rules and [docs/test-matrix.md](docs/test-matrix.md)
+See [tests/README.md](tests/README.md) for FreeCAD dependency notes and
+environment variables (`PARAMETRON_FREECAD_BIN`,
+`PARAMETRON_FREECAD_STRICT_SMOKE`), and [docs/test-matrix.md](docs/test-matrix.md)
 for current validation coverage.
+
+This repository includes a Nix flake that provides the reproducible
+development environment used by maintainers and CI:
+
+```bash
+nix develop
+```
+
+Nix is optional for contributors. Equivalent environments may be used as long
+as the documented runtime and verification requirements are satisfied.
+
+See [AGENTS.md](AGENTS.md) for required command rules.
 
 ## Documentation
 
