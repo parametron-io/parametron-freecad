@@ -108,8 +108,6 @@ nix develop
 Nix is optional for contributors. Equivalent environments may be used as long
 as the documented runtime and verification requirements are satisfied.
 
-See [AGENTS.md](AGENTS.md) for required command rules.
-
 ## Documentation
 
 - [docs/architecture.md](docs/architecture.md) - runtime architecture
