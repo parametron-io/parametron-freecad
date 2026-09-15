@@ -19,11 +19,11 @@ from parametron_freecad.observation.observed_contract import (
 
 
 class ObservedPayloadError(ValueError):
-    """Raised when data for parametron.observed.json is malformed."""
+    """Raised when data for prm.observed.json is malformed."""
 
 
 class ObservedWriteError(OSError):
-    """Raised when parametron.observed.json cannot be written."""
+    """Raised when prm.observed.json cannot be written."""
 
 
 def observed_json_path(output_directory: str | os.PathLike[str]) -> Path:
@@ -56,7 +56,7 @@ def build_observed_payload(
     working_copy_sha256: str,
     observation_data: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Build the canonical top-level parametron.observed.json payload.
+    """Build the canonical top-level prm.observed.json payload.
 
     observation_data must already contain observed values. This helper only
     applies the observed output contract shape and deterministic ordering.
@@ -89,7 +89,7 @@ def write_observed_json(
     working_copy_sha256: str,
     observation_data: Mapping[str, Any],
 ) -> None:
-    """Write canonical UTF-8 parametron.observed.json from observed data."""
+    """Write canonical UTF-8 prm.observed.json from observed data."""
     payload = build_observed_payload(
         working_copy_path=working_copy_path,
         working_copy_sha256=working_copy_sha256,

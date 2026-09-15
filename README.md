@@ -24,7 +24,7 @@ orchestration and durable product storage/indexing are outside this repository.
 - Optional non-recursive Link/XLink reference discovery for internal objects
   and Engine-mapped external targets, with deterministic raw schema-2 evidence,
   provenance, identity, deduplication, and controlled failures.
-- Canonical success and handled-failure `result.json` output, with path
+- Canonical success and handled-failure `prm.result.json` output, with path
   containment against the exact supplied working-copy root.
 
 Manifest schema 2.0 metadata and strict validation are implemented separately;
@@ -45,11 +45,11 @@ Execute shape:
 ```text
 parametron-freecad execute \
   --working-copy /run/product/_working/execution-a \
-  --manifest /run/product/_working/execution-a/export_manifest_v1.json \
-  --result /run/product/_working/execution-a/result.json \
+  --manifest /run/product/_working/execution-a/prm.export-manifest.json \
+  --result /run/product/_working/execution-a/prm.result.json \
   [--output-dir /run/product/_working/execution-a/outputs] \
-  [--observation-request /run/product/_working/execution-a/parametron.verification.json] \
-  [--reference-traversal-request /run/product/_working/execution-a/parametron.reference-traversal-request.json]
+  [--observation-request /run/product/_working/execution-a/prm.verification.json] \
+  [--reference-traversal-request /run/product/_working/execution-a/prm.reference-traversal-request.json]
 ```
 
 The supplied `--working-copy` directory is the runtime root. Its basename is not

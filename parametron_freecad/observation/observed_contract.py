@@ -1,4 +1,4 @@
-"""Phase 2 observed output contract metadata for parametron.observed.json."""
+"""Phase 2 observed output contract metadata for prm.observed.json."""
 
 from __future__ import annotations
 
@@ -233,7 +233,7 @@ class ObservationContract:
 
 @dataclass(frozen=True, slots=True)
 class ObservedContract:
-    """Supported v1 parametron.observed.json contract surfaces."""
+    """Supported v1 prm.observed.json contract surfaces."""
 
     filename: str
     schema_version: str
