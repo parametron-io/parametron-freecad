@@ -109,10 +109,10 @@ configured FreeCAD smoke behavior into a test failure.
 | Live-document observation orchestration | Covered | `tests/test_runtime_entrypoints.py` | Same open document; post-mutation/export observation; internal source digest. |
 | `_working` / supplied execution root | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_missing_working_copies.py`, `tests/test_file_argument_contract.py`, `tests/test_paths.py` | Supplied existing directory is authoritative; basename unrestricted; direct `_working` and nested `_working/<execution-id>` accepted; child containment preserved. |
 | Manifest path containment | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_missing_working_copies.py` | Checked before FreeCAD import. |
-| Result path containment | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_missing_working_copies.py` | Invalid result paths reject before file creation; safe path required for failed `result.json`. |
+| Result path containment | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_missing_working_copies.py` | Invalid result paths reject before file creation; safe path required for failed `prm.result.json`. |
 | `sourceDocument` containment | Covered | `tests/test_document_lifecycle.py`, `tests/test_headless_missing_working_copies.py`, `tests/test_headless_cli_arguments.py` | Traversal and symlink escapes rejected against the supplied root. |
-| FreeCAD-native manifest contract | Covered | `tests/test_manifest_contract.py` | Filename is `export_manifest_v1.json`. |
-| Manifest schema 2.0 contract metadata & strict validation | Covered | `tests/test_manifest_v2_contract.py`, `tests/test_manifest_v2_validation.py` | Schema 2.0 metadata defined; required core fields and optional `assemblyMutations`/`partMutations`; `{object, suppressed}`, `{object, visible}`, `{object}` shapes; shared section contract; parameter/output reuse; transport filename remains `export_manifest_v1.json`; immutability, import safety, and frozen tuples; strict Schema 2.0 validation implemented (`validate_export_manifest_v2`, `validate_export_manifest`); exact version dispatch (`"1.0"` vs `"2.0"`); strict JSON booleans; duplicate object rejection; suppression/visibility vs deletion conflict rejection; suppression + visibility allowed; cross-scope object conflict rejection; deterministic diagnostics; runtime remains V1-only and rejects schema 2.0 before document operations; native mutation execution is not implemented. |
+| FreeCAD-native manifest contract | Covered | `tests/test_manifest_contract.py` | Filename is `prm.export-manifest.json`. |
+| Manifest schema 2.0 contract metadata & strict validation | Covered | `tests/test_manifest_v2_contract.py`, `tests/test_manifest_v2_validation.py` | Schema 2.0 metadata defined; required core fields and optional `assemblyMutations`/`partMutations`; `{object, suppressed}`, `{object, visible}`, `{object}` shapes; shared section contract; parameter/output reuse; transport filename remains `prm.export-manifest.json`; immutability, import safety, and frozen tuples; strict Schema 2.0 validation implemented (`validate_export_manifest_v2`, `validate_export_manifest`); exact version dispatch (`"1.0"` vs `"2.0"`); strict JSON booleans; duplicate object rejection; suppression/visibility vs deletion conflict rejection; suppression + visibility allowed; cross-scope object conflict rejection; deterministic diagnostics; runtime remains V1-only and rejects schema 2.0 before document operations; native mutation execution is not implemented. |
 | Strict manifest loading | Covered | `tests/test_manifest_loader.py`, `tests/test_headless_malformed_manifests.py` | Duplicate keys and non-standard JSON constants rejected. |
 | Manifest structural validation | Covered | `tests/test_manifest_validation.py` | Exact field surfaces and supported formats. |
 | Engine dot-form manifest compatibility | Covered | `tests/test_engine_manifest_compat.py`, `tests/test_runtime_entrypoints.py`, `tests/fixtures/engine_generated/export_manifest.v1.json` | Transitional compatibility only. |
@@ -124,29 +124,29 @@ configured FreeCAD smoke behavior into a test failure.
 | STEP export | Covered | `tests/test_step_export.py`, `tests/test_headless_cli_arguments.py`, `tests/test_headless_repeated_run.py`, `tests/test_headless_unsupported_artifact_requests.py` | Exact `document.getObject(id)` lookup and one-object export; declared output path confined to working copy; no `document.Objects` fallback. |
 | CSV export | Covered | `tests/test_csv_export.py`, `tests/test_headless_unsupported_artifact_requests.py` | Spreadsheet-backed CSV behavior. |
 | PDF export | Covered | `tests/test_pdf_export.py`, `tests/test_headless_unsupported_artifact_requests.py` | TechDraw-backed PDF behavior. |
-| Success `result.json` | Covered | `tests/test_result_writer.py`, `tests/test_headless_repeated_run.py` | Structured success payloads only. |
+| Success `prm.result.json` | Covered | `tests/test_result_writer.py`, `tests/test_headless_repeated_run.py` | Structured success payloads only. |
 | Structured failure output shape helper | Covered | `tests/test_failure_output_contract.py` | Payload shape, constants, validation, canonical JSON, immutability, import safety. |
-| Structured failure result writer | Covered | `tests/test_failure_result_writer.py` | Canonical failed `result.json` writes, immutability, write-error handling. |
-| Structured failure emission / destination | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_malformed_manifests.py`, `tests/test_headless_unsupported_artifact_requests.py`, `tests/test_headless_missing_working_copies.py`, `tests/test_headless_repeated_run.py`, `tests/test_runtime_entrypoints.py`, `tests/test_runtime_invocation.py`, `tests/test_integration_rehearsal.py` | Safe result path + handled execute failure => failed `result.json`; argument/path failure => no `result.json`; repeated failure determinism; best-effort emission; `ResultWriteError` no-recursion. |
+| Structured failure result writer | Covered | `tests/test_failure_result_writer.py` | Canonical failed `prm.result.json` writes, immutability, write-error handling. |
+| Structured failure emission / destination | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_malformed_manifests.py`, `tests/test_headless_unsupported_artifact_requests.py`, `tests/test_headless_missing_working_copies.py`, `tests/test_headless_repeated_run.py`, `tests/test_runtime_entrypoints.py`, `tests/test_runtime_invocation.py`, `tests/test_integration_rehearsal.py` | Safe result path + handled execute failure => failed `prm.result.json`; argument/path failure => no `prm.result.json`; repeated failure determinism; best-effort emission; `ResultWriteError` no-recursion. |
 | Runtime trace output shape helper | Covered | `tests/test_trace_output_contract.py` | Payload/event shape, constants, validation, canonical JSON, immutability, import safety; no trace writer or runtime wiring. |
-| Deterministic execute repeated runs | Covered | `tests/test_headless_repeated_run.py` | Fake-FreeCAD byte-stability for success and handled failure `result.json`. |
-| Controlled malformed manifest failures | Covered | `tests/test_headless_malformed_manifests.py` | Failed `result.json` on handled execute failures; no artifact/document side effects. |
-| Controlled missing working-copy failures | Covered | `tests/test_headless_missing_working_copies.py` | Argument failures produce no `result.json`; execute failures with safe result path write failed `result.json`. |
-| Controlled unsupported artifact failures | Covered | `tests/test_headless_unsupported_artifact_requests.py` | Stop-on-first-failure behavior with failed `result.json` when result path is safe. |
+| Deterministic execute repeated runs | Covered | `tests/test_headless_repeated_run.py` | Fake-FreeCAD byte-stability for success and handled failure `prm.result.json`. |
+| Controlled malformed manifest failures | Covered | `tests/test_headless_malformed_manifests.py` | Failed `prm.result.json` on handled execute failures; no artifact/document side effects. |
+| Controlled missing working-copy failures | Covered | `tests/test_headless_missing_working_copies.py` | Argument failures produce no `prm.result.json`; execute failures with safe result path write failed `prm.result.json`. |
+| Controlled unsupported artifact failures | Covered | `tests/test_headless_unsupported_artifact_requests.py` | Stop-on-first-failure behavior with failed `prm.result.json` when result path is safe. |
 | Verification contract metadata | Covered | `tests/test_verification_contract.py` | Observation input contract foundation. |
 | Verification loading | Covered | `tests/test_verification_loader.py`, `tests/test_malformed_verification_contracts.py` | Strict load behavior. |
-| Observed output contract metadata | Covered | `tests/test_observed_contract.py` | `parametron.observed.json` foundation. |
+| Observed output contract metadata | Covered | `tests/test_observed_contract.py` | `prm.observed.json` foundation. |
 | Requested parameter observation | Covered | `tests/test_parameter_observation.py`, `tests/test_unavailable_requested_observations.py` | Exact `document.getObject` and property read. |
 | Requested metadata observation | Covered | `tests/test_metadata_observation.py`, `tests/test_unavailable_requested_observations.py` | Exact owner/key reads. |
 | Requested reference observation | Covered | `tests/test_reference_access.py`, `tests/test_reference_observation.py`, `tests/test_unavailable_requested_observations.py` | Existence check only; not traversal. |
 | Observation ordering | Covered | `tests/test_observation_ordering.py`, `tests/test_requested_scope_observation.py` | Deterministic ordering for already-built payloads. |
 | Observed JSON writing | Covered | `tests/test_observed_writer.py`, `tests/test_observed_output_repeated_run.py` | Canonical UTF-8 JSON with atomic destination replacement; no standalone CLI `observe`. |
-| Engine invocation surface | Covered | `tests/test_runtime_invocation.py`, `tests/test_invocation_contract.py` | Execute and observe modes; execute failures preserve entrypoint-written failed `result.json`. |
+| Engine invocation surface | Covered | `tests/test_runtime_invocation.py`, `tests/test_invocation_contract.py` | Execute and observe modes; execute failures preserve entrypoint-written failed `prm.result.json`. |
 | Normal planner-generated Engine-to-FreeCAD invocation | Indirectly covered | `https://github.com/parametron-io/parametron-engine/blob/main/docs/test-matrix.md` | FreeCAD-local tests cover the runtime boundary; Engine planner/executor integration coverage belongs to the Engine repository. |
 | File argument metadata | Covered | `tests/test_file_argument_contract.py`, `tests/test_invocation_contract.py` | Metadata only. |
 | Output file metadata | Covered | `tests/test_output_file_contract.py`, `tests/test_invocation_contract.py` | Metadata only. |
 | Engine-facing error classes | Covered | `tests/test_error_contract.py`, `tests/test_runtime_invocation.py` | In-process invocation errors. |
-| Fixture-based integration rehearsal helper | Covered | `tests/test_integration_rehearsal.py` | Local/test helper; handled execution failures write failed `result.json`. |
+| Fixture-based integration rehearsal helper | Covered | `tests/test_integration_rehearsal.py` | Local/test helper; handled execution failures write failed `prm.result.json`. |
 | Artifact byte comparison helper | Covered | `tests/test_artifact_comparison.py` | Exact byte comparison only. |
 | Raw reference traversal contract helper | Covered | `tests/test_reference_traversal_output_contract.py` | Contract/helper coverage includes semantic node/edge identity and identity-key deduplication; public total-order keys; item-level state metadata; aggregate-status metadata helper and exact public export; deterministic `succeeded`, `partial`, `failed` order and semantics; semantic completeness and item/aggregate separation; canonical JSON/repeated bytes, fresh nested structures, mutation isolation, blocked-FreeCAD import safety, caller-status and malformed-request compatibility, and unchanged schema/dataclasses. No actual runtime classification or status derivation, normalization, real traversal, diagnostics collection, runtime failure-path execution, or runtime wiring. Direct writer coverage is recorded separately. |
 | Reference traversal in-memory canonical serialization | Covered | `tests/test_reference_traversal_output_contract.py`, `tests/test_canonical_json.py` | Exact public export and keyword-only signature; payload-builder/canonical-helper byte equivalence; compact sorted-key UTF-8 bytes; no BOM or CRLF; exactly one trailing LF; direct non-ASCII, duplicate, and exact-string preservation; repeated and reordered-input byte equality under existing total orders; independent node/edge/diagnostic sequencing; validation propagation; mutation isolation; blocked-FreeCAD import safety; and no filesystem side effects. This covers pure bytes only, not writing or runtime emission. |
@@ -163,7 +163,7 @@ configured FreeCAD smoke behavior into a test failure.
 | Atomic traversal output replacement | Covered | `tests/test_reference_traversal_output_writer.py` | The 42 atomic-writer tests cover the public/import-safe `write_reference_traversal_output_atomically(...)` API; serializer exactly-once delegation and unchanged bytes; same-directory unique temporary files; write/close-before-`os.replace(...)` ordering; missing-target creation and existing-target replacement; repeated deterministic writes; preservation across resolver, serializer, temporary-file creation/wrapping, write, close, and replacement failures; cleanup and cleanup-failure precedence; chained writer errors; input non-mutation; and direct-writer independence. This is writer-unit, not runtime traversal, coverage. |
 | Containment-integrated traversal writing | Covered | `tests/test_reference_traversal_output_writer.py`, `tests/test_reference_traversal_output_contract.py` | The atomic writer delegates exactly once to the existing resolver using the exact supplied authoritative `working_copy`; safe arbitrary, direct `_working`, and nested `_working/<execution-id>` roots are represented, the basename remains unrestricted, and no ancestor widening occurs. No traversal entrypoint/runtime wiring is implied. |
 | Traversal request CLI path validation | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_file_argument_contract.py` | Optional invocation field and flag; empty/missing/directory/outside-root rejection; exact-root containment; `--output-dir` dependency; malformed/non-UTF-8 content is not read during argument validation. |
-| Traversal request entrypoint loading | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_reference_traversal_request.py` | Optional path is forwarded; strict loader runs exactly once after manifest/source validation and before FreeCAD/document operations; absence skips loading; direct entrypoint output-directory dependency; malformed requests preserve cause, emit a canonical failed raw traversal payload before FreeCAD resolution, and fail top-level `result.json` at `request_validation`; no CAD traversal runs. |
+| Traversal request entrypoint loading | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_reference_traversal_request.py` | Optional path is forwarded; strict loader runs exactly once after manifest/source validation and before FreeCAD/document operations; absence skips loading; direct entrypoint output-directory dependency; malformed requests preserve cause, emit a canonical failed raw traversal payload before FreeCAD resolution, and fail top-level `prm.result.json` at `request_validation`; no CAD traversal runs. |
 | Traversal request absence compatibility | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_runtime_invocation.py`, `tests/test_headless_cli_arguments.py`, `tests/test_step_export.py`, `tests/test_csv_export.py`, `tests/test_pdf_export.py` | Explicit regression proof preserves manifest load/validation, source resolution, document lifecycle, assignment, recompute, all export families, observation, success results, and exact Engine invocation fields/delegation when traversal is absent. |
 | Traversal request execution wiring and emission | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_headless_cli_arguments.py`, `tests/test_reference_traversal_output_writer.py` | Traversal runs after recompute and all STEP/CSV/PDF exports and before observation; `succeeded`/`partial` are atomically emitted to the canonical filename beneath the existing output directory, then continue; the exact working copy is the sole containment root; runtime/writer create no directories; failed traversal and controlled containment/write errors skip observation while completed exports remain. Stable `runtime_failure` stages cover traversal and output containment/write failures; malformed-request raw output is covered separately. |
 | Typed reference traversal callable boundary / discovery | Covered | `tests/test_reference_traversal.py` | Exact public signature; immutable four-field result; exact status vocabulary; representable partial/failed evidence; raw tuple type enforcement; chained public error; source-root and participating-object discovery; supported internal and Engine-mapped external relationships; unsupported-value-shape partial diagnostics; and FreeCAD-independent import. Serialization, writing, containment, Engine normalization, and durable storage behavior remain outside the callable. |
@@ -424,12 +424,6 @@ nix develop --command python -m pytest \
   tests/test_headless_invocation.py \
   tests/test_environment_contract.py
 # PASS, 48 launcher regression tests passed
-```
-
-```bash
-nix develop --command python -m pytest \
-  -k 'architecture_documentation_mentions_required_boundaries'
-# PASS, 1 architecture test passed, 2336 deselected
 ```
 
 ```bash
@@ -906,7 +900,7 @@ fixtures, property-sensitive identity, normalization, or Engine normalization.
 
 - module import safety and public API surface (`write_failure_result`,
   `FailureResultWriteError`)
-- canonical failed `result.json` writes with structured failure payload shape
+- canonical failed `prm.result.json` writes with structured failure payload shape
 - repeated writes produce byte-stable output
 - input `StructuredFailure` immutability
 - `FailureResultWriteError` on invalid payload or write failures
@@ -915,27 +909,27 @@ fixtures, property-sensitive identity, normalization, or Engine normalization.
 
 Headless and runtime tests distinguish:
 
-- safe result path + handled execute failure => failed `result.json`
-- no safe result path / argument failure => no `result.json`
+- safe result path + handled execute failure => failed `prm.result.json`
+- no safe result path / argument failure => no `prm.result.json`
 
 Evidence includes:
 
 - `tests/test_headless_cli_arguments.py` — CLI execute failures with safe result
   path, invalid result path rejection, and `ResultWriteError` no-recursion
 - `tests/test_headless_malformed_manifests.py` — malformed manifest failures write
-  failed `result.json`
+  failed `prm.result.json`
 - `tests/test_headless_unsupported_artifact_requests.py` — artifact export
-  failures write failed `result.json`
+  failures write failed `prm.result.json`
 - `tests/test_headless_missing_working_copies.py` — argument vs execute failure
-  split for `result.json` creation
+  split for `prm.result.json` creation
 - `tests/test_headless_repeated_run.py` — repeated handled failure determinism
 - `tests/test_runtime_entrypoints.py` — entrypoint stage attribution, best-effort
   emission, `ResultWriteError` no-recursion, failure-result write errors do not
   mask original failures
 - `tests/test_runtime_invocation.py` — invocation preserves entrypoint-written
-  failed `result.json`
+  failed `prm.result.json`
 - `tests/test_integration_rehearsal.py` — rehearsal helper handled execution
-  failures write failed `result.json`
+  failures write failed `prm.result.json`
 
 ## Focused Aligned Execute-Plus-Observation Coverage
 
@@ -1020,7 +1014,7 @@ Coverage:
 Coverage:
 
 - stage `observation`
-- structured failed `result.json`
+- structured failed `prm.result.json`
 - no success result after failure
 - guaranteed document cleanup
 - original cause preservation
@@ -1070,7 +1064,7 @@ Coverage:
 - save exceptions are wrapped in `DocumentSaveError` with original cause preserved
 - lifecycle ordering: assign -> recompute -> save -> exports -> traversal -> observation -> close
 - zero-derived-output execution (`outputs: []`) persists native document and produces `artifacts: []`
-- save failure emits structured failed `result.json` at stage `document_save` and short-circuits downstream stages
+- save failure emits structured failed `prm.result.json` at stage `document_save` and short-circuits downstream stages
 - observation uses the live persisted post-mutation document
 - real FreeCAD 1.1.1 persistence round-trip: creates fixture, applies `Probe.Value = 42`, saves via runtime entrypoint, closes, reopens in real FreeCAD, and verifies `Probe.Value == 42`
 
@@ -1324,7 +1318,7 @@ tests/test_manifest_v2_validation.py
 | Tested Surface | Expected Behavior |
 | --- | --- |
 | Schema version dispatch | Exact dispatch: `"1.0"` -> `validate_export_manifest_v1`, `"2.0"` -> `validate_export_manifest_v2`; missing version, non-string, whitespace-padded (`" 2.0 "`), numeric (`2.0`), unvetted (`"3.0"`, `"v2"`), and empty strings fail deterministically with `invalid_schema_version`; no trimming, case folding, numeric coercion, or fallback |
-| Schema 1.0 closure | Filename remains `export_manifest_v1.json`; schema version remains `"1.0"`; exact four top-level fields (`schemaVersion`, `sourceDocument`, `parameterAssignments`, `outputs`); `assemblyMutations` and `partMutations` rejected as unknown fields; existing V1 public surface and runtime execution preserved |
+| Schema 1.0 closure | Filename remains `prm.export-manifest.json`; schema version remains `"1.0"`; exact four top-level fields (`schemaVersion`, `sourceDocument`, `parameterAssignments`, `outputs`); `assemblyMutations` and `partMutations` rejected as unknown fields; existing V1 public surface and runtime execution preserved |
 | Schema 2.0 metadata exactness | Schema version is exactly `"2.0"`; required top-level fields match V1 core; optional top-level fields (`assemblyMutations`, `partMutations`) are exact; all-fields tuple preserves deterministic ordering |
 | Schema 2.0 positive cases | Minimal valid manifest (core fields with no mutation sections); empty mutation sections (`{}`); sparse mutation sections (e.g. suppression only, deletion only); full multi-scope and multi-family manifests; coexisting suppression and visibility on the same object |
 | Mutation section structure | Mutation sections must be JSON objects; allowed collections are strictly `suppression`, `visibility`, `deletion`; unknown collections (e.g. `parameters`, `properties`, `keep`, `actions`, `targets`) rejected with `unknown_mutation_collection`; non-array collections rejected with `invalid_mutation_collection_type` |

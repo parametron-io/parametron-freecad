@@ -1,4 +1,4 @@
-"""Runner-owned result.json writer for Phase 1 headless execute mode."""
+"""Runner-owned result JSON writer for headless execute mode."""
 
 from __future__ import annotations
 
@@ -17,11 +17,11 @@ RESULT_STATUS_SUCCEEDED = "succeeded"
 
 
 class ResultWriteError(OSError):
-    """Raised when result.json cannot be written."""
+    """Raised when result JSON cannot be written to the supplied destination."""
 
 
 def write_success_result(path: str | Path, outputs: list[dict[str, Any]]) -> None:
-    """Write a deterministic success result.json at path.
+    """Write deterministic success result JSON to the supplied path.
 
     outputs is the validated manifest outputs list; declaration order is preserved.
     Raises ResultWriteError on any file or serialization failure.

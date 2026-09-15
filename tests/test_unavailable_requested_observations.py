@@ -56,7 +56,7 @@ from parametron_freecad.observation.requested_scope_observation import (
 )
 
 
-OBSERVED_FILENAME = "parametron.observed.json"
+OBSERVED_FILENAME = "prm.observed.json"
 _WORKING_COPY_PATH = "/work/model.FCStd"
 _WORKING_COPY_SHA256 = "a" * 64
 

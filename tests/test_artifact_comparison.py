@@ -809,7 +809,7 @@ class TestBoundaryRegressions(unittest.TestCase):
             lp.write_bytes(b"x")
             rp.write_bytes(b"x")
             compare_artifact_files([_req(left_path=lp, right_path=rp)])
-            assert not (Path(tmp) / "parametron.observed.json").exists()
+            assert not (Path(tmp) / "prm.observed.json").exists()
 
     def test_no_extra_files_written(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

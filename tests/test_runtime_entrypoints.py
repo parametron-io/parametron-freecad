@@ -1551,7 +1551,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                     self.assertEqual(working_copy, working)
                     self.assertEqual(
                         output_path,
-                        output / "parametron.reference-traversal.json",
+                        output / "prm.reference-traversal.json",
                     )
                     self.assertEqual(
                         kwargs["boundary"], "reference_traversal_entrypoint"
@@ -1906,7 +1906,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             self.assertNotIn("observation", calls)
             self.assertNotIn("traversal-output", calls)
             self.assertFalse(
-                (output_directory / "parametron.reference-traversal.json").exists()
+                (output_directory / "prm.reference-traversal.json").exists()
             )
             self._assert_failed_result(
                 result,
@@ -2015,7 +2015,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                     _dependencies=dependencies,
                 )
 
-            traversal_path = output / "parametron.reference-traversal.json"
+            traversal_path = output / "prm.reference-traversal.json"
             self.assertEqual(
                 json.loads(traversal_path.read_text(encoding="utf-8")),
                 {
@@ -2190,7 +2190,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             )
             self.assertEqual(calls, [])
             payload = json.loads(
-                (output / "parametron.reference-traversal.json").read_text(
+                (output / "prm.reference-traversal.json").read_text(
                     encoding="utf-8"
                 )
             )
@@ -2318,7 +2318,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 },
             )
             self.assertFalse(
-                (output / "parametron.reference-traversal.json").exists()
+                (output / "prm.reference-traversal.json").exists()
             )
 
     def test_traversal_preserves_declared_exports_and_success_artifacts(self) -> None:
@@ -2563,7 +2563,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                     output_directory=output_directory,
                 )
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
         self.assertEqual(decoded["workingCopy"]["sha256"], caller_sha256)
@@ -2616,7 +2616,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                 output_directory=output_directory,
             )
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
             self.assertTrue(observed_path.exists())
@@ -2658,7 +2658,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                 verification_data,
                 **kwargs,
             )
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             first = observed_path.read_bytes()
 
             entrypoints.run_observation_entrypoint(
@@ -2724,7 +2724,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                 _dependencies=dependencies,
             )
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
         self.assertEqual(freecad.opened_paths, [str(source_path.resolve())])
@@ -2769,7 +2769,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                 resolve_freecad_module=resolve_freecad_module,
             )
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             observed_path_exists = observed_path.exists()
 
         self.assertEqual(resolver_calls, ["resolve"])
@@ -2798,7 +2798,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                     resolve_freecad_module=lambda: None,
                 )
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             observed_path_exists = observed_path.exists()
 
         self.assertEqual(str(excinfo.exception), "FreeCAD module is not available")
@@ -2828,7 +2828,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                     freecad_module=freecad,
                 )
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             observed_path_exists = observed_path.exists()
 
         self.assertIsInstance(
@@ -2874,7 +2874,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                     freecad_module=freecad,
                 )
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
         self.assertEqual(freecad.opened_paths, [str(source_path.resolve())])
@@ -2902,7 +2902,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                     freecad_module=freecad,
                 )
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             observed_path_exists = observed_path.exists()
 
         self.assertEqual(freecad.closed_names, ["FakeDoc"])
@@ -2960,7 +2960,7 @@ class RuntimeObservationEntrypointTests(unittest.TestCase):
                 freecad_module=freecad,
             )
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
         self.assertNotIn("decision", decoded)
@@ -3392,7 +3392,7 @@ class ExecuteObservationContractTests(unittest.TestCase):
                 )
             load_request.assert_not_called()
             self.assertEqual(calls, ["open", "assign", "recompute", "save", "step", "csv", "pdf", "close", "result"])
-            self.assertFalse((output / "parametron.observed.json").exists())
+            self.assertFalse((output / "prm.observed.json").exists())
 
     def test_observation_failures_close_document_write_structured_failure_and_preserve_cause(self) -> None:
         from parametron_freecad.runtime import entrypoints
@@ -3446,7 +3446,7 @@ class ExecuteObservationContractTests(unittest.TestCase):
             payload = json.loads(result.read_text(encoding="utf-8"))
             self.assertEqual(payload["status"], "failed")
             self.assertEqual(payload["failure"]["stage"], "observation")
-            self.assertFalse((output / "parametron.observed.json").exists())
+            self.assertFalse((output / "prm.observed.json").exists())
 
     def test_request_loading_and_source_hash_failures_are_structured_observation_failures(self) -> None:
         from parametron_freecad.runtime import entrypoints
@@ -3502,7 +3502,7 @@ class ExecuteObservationContractTests(unittest.TestCase):
                 self.assertEqual(calls, [])
                 payload = json.loads(result.read_text(encoding="utf-8"))
                 self.assertEqual(payload["failure"]["stage"], "observation")
-                self.assertFalse((output / "parametron.observed.json").exists())
+                self.assertFalse((output / "prm.observed.json").exists())
 
 
 if __name__ == "__main__":

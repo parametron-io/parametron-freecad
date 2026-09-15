@@ -88,7 +88,7 @@ class _FileArgumentContractTestCase(unittest.TestCase):
 class FileArgumentContractPublicSurfaceTests(_FileArgumentContractTestCase):
     def test_public_constants_and_singleton_version_are_exact(self) -> None:
         self.assertEqual(self.contract.FILE_ARGUMENT_CONTRACT_VERSION, "1.0")
-        self.assertEqual(self.contract.RESULT_JSON_FILENAME, "result.json")
+        self.assertEqual(self.contract.RESULT_JSON_FILENAME, "prm.result.json")
         self.assertEqual(self.contract.ENGINE_FILE_ARGUMENT_CONTRACT.version, "1.0")
 
     def test_all_exports_exist_and_include_expected_public_names(self) -> None:
@@ -311,7 +311,7 @@ class FileArgumentContractBoundaryTests(_FileArgumentContractTestCase):
         self.assertEqual(request.invocation_field, "reference_traversal_request")
         self.assertEqual(
             request.canonical_filename,
-            "parametron.reference-traversal-request.json",
+            "prm.reference-traversal-request.json",
         )
         self.assertIn("authoritative working copy", request.path_contract)
         self.assertIn("requires --output-dir", request.path_contract)
@@ -323,7 +323,7 @@ class FileArgumentContractBoundaryTests(_FileArgumentContractTestCase):
         self.assertIsNone(output.cli_flag)
         self.assertIsNone(output.invocation_field)
         self.assertEqual(
-            output.canonical_filename, "parametron.reference-traversal.json"
+            output.canonical_filename, "prm.reference-traversal.json"
         )
         self.assertIn("beneath the existing --output-dir", output.path_contract)
         self.assertIn("working copy", output.path_contract)
@@ -393,12 +393,12 @@ class FileArgumentContractAggregateTests(_FileArgumentContractTestCase):
         self.assertEqual(
             self.contract.FILE_ARGUMENT_CANONICAL_NAMES,
             (
-                "export_manifest_v1.json",
-                "result.json",
-                "parametron.verification.json",
-                "parametron.observed.json",
-                "parametron.reference-traversal-request.json",
-                "parametron.reference-traversal.json",
+                "prm.export-manifest.json",
+                "prm.result.json",
+                "prm.verification.json",
+                "prm.observed.json",
+                "prm.reference-traversal-request.json",
+                "prm.reference-traversal.json",
             ),
         )
 

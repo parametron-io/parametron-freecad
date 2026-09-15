@@ -156,7 +156,7 @@ class OutputFileContractResultJsonSpecTests(_OutputFileContractTestCase):
         self.assertEqual(self.spec.role, "runner_result")
 
     def test_result_json_canonical_filename_is_result_json(self) -> None:
-        self.assertEqual(self.spec.canonical_filename, "result.json")
+        self.assertEqual(self.spec.canonical_filename, "prm.result.json")
 
     def test_result_json_cardinality_is_one(self) -> None:
         self.assertEqual(self.spec.cardinality, self.contract.OUTPUT_FILE_CARDINALITY_ONE)
@@ -234,7 +234,7 @@ class OutputFileContractParametronObservedJsonSpecTests(_OutputFileContractTestC
         self.assertEqual(self.spec.role, "observed_output")
 
     def test_parametron_observed_json_canonical_filename(self) -> None:
-        self.assertEqual(self.spec.canonical_filename, "parametron.observed.json")
+        self.assertEqual(self.spec.canonical_filename, "prm.observed.json")
 
     def test_parametron_observed_json_cardinality_is_one(self) -> None:
         self.assertEqual(self.spec.cardinality, self.contract.OUTPUT_FILE_CARDINALITY_ONE)
@@ -242,7 +242,7 @@ class OutputFileContractParametronObservedJsonSpecTests(_OutputFileContractTestC
 
     def test_parametron_observed_json_path_source_references_output_directory(self) -> None:
         self.assertIn("output_directory", self.spec.path_source)
-        self.assertIn("parametron.observed.json", self.spec.path_source)
+        self.assertIn("prm.observed.json", self.spec.path_source)
 
     def test_parametron_observed_json_write_contract_excludes_cli_observation_mode(self) -> None:
         self.assertIn("no CLI observation mode is implied", self.spec.write_contract)
@@ -289,7 +289,7 @@ class OutputFileContractTupleGroupingTests(_OutputFileContractTestCase):
     def test_output_file_canonical_names_are_exact_and_ordered(self) -> None:
         self.assertEqual(
             self.contract.OUTPUT_FILE_CANONICAL_NAMES,
-            ("result.json", "parametron.observed.json"),
+            ("prm.result.json", "prm.observed.json"),
         )
 
     def test_declared_artifact_output_formats_are_exact_and_ordered(self) -> None:
