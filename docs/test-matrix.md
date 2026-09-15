@@ -142,7 +142,7 @@ configured FreeCAD smoke behavior into a test failure.
 | Observation ordering | Covered | `tests/test_observation_ordering.py`, `tests/test_requested_scope_observation.py` | Deterministic ordering for already-built payloads. |
 | Observed JSON writing | Covered | `tests/test_observed_writer.py`, `tests/test_observed_output_repeated_run.py` | Canonical UTF-8 JSON with atomic destination replacement; no standalone CLI `observe`. |
 | Engine invocation surface | Covered | `tests/test_runtime_invocation.py`, `tests/test_invocation_contract.py` | Execute and observe modes; execute failures preserve entrypoint-written failed `result.json`. |
-| Normal planner-generated Engine-to-FreeCAD invocation | Indirectly covered | `../parametron-engine/Docs/test-matrix.md` | FreeCAD-local tests cover the runtime boundary; Engine planner/executor integration coverage belongs to the Engine repository. |
+| Normal planner-generated Engine-to-FreeCAD invocation | Indirectly covered | `https://github.com/parametron-io/parametron-engine/blob/main/docs/test-matrix.md` | FreeCAD-local tests cover the runtime boundary; Engine planner/executor integration coverage belongs to the Engine repository. |
 | File argument metadata | Covered | `tests/test_file_argument_contract.py`, `tests/test_invocation_contract.py` | Metadata only. |
 | Output file metadata | Covered | `tests/test_output_file_contract.py`, `tests/test_invocation_contract.py` | Metadata only. |
 | Engine-facing error classes | Covered | `tests/test_error_contract.py`, `tests/test_runtime_invocation.py` | In-process invocation errors. |
@@ -1497,8 +1497,7 @@ nix develop --command python -m pytest
 ## Documentation-Only Validation
 
 For documentation-only changes, review the diff for current implementation and
-contract accuracy, check links and stale references, and run the applicable
-documentation tests when their asserted content changes.
+contract accuracy, and check links and stale references.
 
 ```bash
 git diff --check
