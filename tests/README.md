@@ -63,4 +63,3 @@ Optional environment-gated smoke tests use a real `freecadcmd` binary:
 - Headless controlled-failure: missing working copies (`test_headless_missing_working_copies.py`)
 - Headless deterministic repeated-run behavior (`test_headless_repeated_run.py`)
 - Headless controlled-failure: unsupported artifact requests (`test_headless_unsupported_artifact_requests.py`)
-- Architecture documentation guards (`test_architecture_documentation.py`)
