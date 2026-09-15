@@ -184,7 +184,7 @@ configured FreeCAD smoke behavior into a test failure.
 | External target approved-API probe and Engine mapping consumer | Covered | `tests/test_reference_traversal_request.py`, `tests/test_reference_traversal.py`, bounded-unit FreeCAD 1.1.1 command-host probes | The probe excludes relocation-dependent `Document.FileName`; schema-2 Engine mappings supply canonical identity for unique resolved and authorized missing evidence. Unmatched and absent source/property/mechanism cases do not fabricate evidence; ambiguity is controlled. |
 | Raw traversal output schema 2.0 | Covered | `tests/test_reference_traversal_output_v2.py`, `tests/test_runtime_entrypoints.py`, `tests/test_reference_traversal.py` | Exact payload fields/version, nullable provenance, empty rejection, ASCII/Unicode SHA-256 ID vectors and canonical preimage bytes, provenance-sensitive edge identity/order/deduplication, repeated reordered-input bytes, runtime success/failure v2 emission, typed v2 evidence, and unchanged schema-1 fields/bytes. |
 | Traversal schema-generation compatibility hardening | Covered | `tests/test_reference_traversal.py`, `tests/test_runtime_entrypoints.py`, `tests/test_reference_traversal_output_writer.py` | Cross-field schema-1/schema-2 mixtures are rejected through the chained typed error before adaptation; single non-empty evidence tuples remain valid without placeholders; direct legacy adaptation covers success, missing paths, and dangling endpoints; runtime entrypoint handling cannot leak adapter implementation exceptions; conflicting raw evidence with one complete schema-2 identity fails deterministic controlled emission. |
-| Supplied execution-root validation alignment | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_missing_working_copies.py`, `tests/test_file_argument_contract.py`, `tests/test_architecture_documentation.py`, `tests/test_reference_traversal_output_contract.py` | Execute path and traversal containment helper treat the exact supplied directory as authoritative; basename unrestricted; sibling/parent/symlink escapes rejected. |
+| Supplied execution-root validation alignment | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_missing_working_copies.py`, `tests/test_file_argument_contract.py`, `tests/test_reference_traversal_output_contract.py` | Execute path and traversal containment helper treat the exact supplied directory as authoritative; basename unrestricted; sibling/parent/symlink escapes rejected. |
 | Standalone headless `observe` rejection | Covered | negative coverage in `tests/test_headless_cli_arguments.py` | Currently rejected; observation is aligned onto `execute`. |
 | Component observation exclusion | Covered | `tests/test_engine_verification_compat.py`, `tests/test_engine_verification_expectations.py` | Not implemented; compatibility validation rejects enabled components and non-empty component expectations, while the lower-level helper omits components. |
 | Verification decision exclusion | Covered | negative coverage in `tests/test_engine_verification_compat.py`, `tests/test_observed_writer.py` | Engine-owned; FreeCAD emits raw observed facts only. |
@@ -332,7 +332,6 @@ Test files for the supplied execution-root contract:
 - `tests/test_headless_cli_arguments.py`
 - `tests/test_headless_missing_working_copies.py`
 - `tests/test_file_argument_contract.py`
-- `tests/test_architecture_documentation.py`
 
 ### Safe root acceptance
 
@@ -381,21 +380,18 @@ Coverage:
 - artifact sibling rejection
 - canonical root behavior
 
-### Contract metadata and architecture wording
+### Contract metadata
 
-`tests/test_file_argument_contract.py` /
-`tests/test_architecture_documentation.py`:
+`tests/test_file_argument_contract.py`:
 
 - `test_execute_cli_required_file_arguments_are_exact_and_ordered`
-- `test_architecture_documentation_mentions_required_boundaries`
 
 Coverage:
 
 - updated supplied-root contract metadata
-- installed `parametron-freecad` launcher wording
 
-These tests cover the FreeCAD supplied-root boundary without an Engine runtime
-dependency; they do not prove cross-repository planner/executor integration.
+This test covers the FreeCAD supplied-root boundary without an Engine runtime
+dependency; it does not prove cross-repository planner/executor integration.
 
 Recorded supplied-root validation:
 
@@ -1507,7 +1503,7 @@ documentation tests when their asserted content changes.
 ```bash
 git diff --check
 git status --short --branch
-git diff -- README.md AGENTS.md docs/architecture.md docs/test-matrix.md docs/runtime.md docs/contracts
+git diff -- README.md AGENTS.md docs/test-matrix.md
 git status --short
 ```
 

@@ -244,6 +244,12 @@ runtime paths without an explicit task requiring them.
 
 ## Documentation
 
+Current public FreeCAD adapter architecture, runtime, and contract
+documentation is maintained in `parametron-docs`; see the
+[FreeCAD adapter documentation](https://github.com/parametron-io/parametron-docs/tree/main/docs/engine/adapters/freecad).
+This repository documents implementation, schemas/validators, tests,
+fixtures, and repository-local development/testing guidance.
+
 Public documentation describes the current implemented FreeCAD runtime.
 
 It must not be used as a private development journal.

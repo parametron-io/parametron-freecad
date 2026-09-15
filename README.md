@@ -30,7 +30,7 @@ orchestration and durable product storage/indexing are outside this repository.
 Manifest schema 2.0 metadata and strict validation are implemented separately;
 execution rejects schema 2.0 manifests. Native suppression, visibility, and
 deletion execution are not currently implemented. See the
-[target-mutation contract](docs/contracts/target-mutations.md).
+[target-mutation contract](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/target-mutations.md).
 
 ## Headless usage
 
@@ -68,8 +68,10 @@ optional traversal, optional observation, document close, and success-result
 writing. A standalone external `observe` command is unsupported; a separate
 in-process observation callable accepts injected document state.
 
-See [runtime.md](docs/runtime.md) for lifecycle, containment, launcher, and
-failure behavior, and [contracts/](docs/contracts/) for exact schema semantics.
+See [runtime.md](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/runtime.md)
+for lifecycle, containment, launcher, and failure behavior, and
+[contracts/](https://github.com/parametron-io/parametron-docs/tree/main/docs/engine/adapters/freecad/contracts)
+for exact schema semantics.
 
 ## Repository layout
 
@@ -110,10 +112,15 @@ as the documented runtime and verification requirements are satisfied.
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md) - runtime architecture
-- [docs/runtime.md](docs/runtime.md) - runtime behavior
-- [docs/contracts/](docs/contracts/) - runtime and file contracts
-- [docs/test-matrix.md](docs/test-matrix.md) - validation matrix
+Current public FreeCAD adapter architecture, runtime, and contract
+documentation is maintained in `parametron-docs`:
+
+- [FreeCAD adapter architecture](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/architecture.md)
+- [FreeCAD runtime](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/runtime.md)
+- [FreeCAD contracts](https://github.com/parametron-io/parametron-docs/tree/main/docs/engine/adapters/freecad/contracts)
+
+Repository-local validation coverage is tracked in
+[docs/test-matrix.md](docs/test-matrix.md).
 
 Current work and status are tracked in GitHub Issues and the
 `Parametron Engineering` project.
