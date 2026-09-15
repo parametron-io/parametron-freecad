@@ -8,7 +8,7 @@ from dataclasses import dataclass
 # Filename and schema version
 # ---------------------------------------------------------------------------
 
-PARAMETRON_OBSERVED_FILENAME = "parametron.observed.json"
+PARAMETRON_OBSERVED_FILENAME = "prm.observed.json"
 PARAMETRON_OBSERVED_SCHEMA_VERSION = "1.0"
 
 # ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 # Filename and schema version
 # ---------------------------------------------------------------------------
 
-PARAMETRON_VERIFICATION_FILENAME = "parametron.verification.json"
+PARAMETRON_VERIFICATION_FILENAME = "prm.verification.json"
 PARAMETRON_VERIFICATION_SCHEMA_VERSION = "1.0"
 
 # ---------------------------------------------------------------------------

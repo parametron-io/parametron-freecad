@@ -11,9 +11,9 @@ from typing import Any, Iterable, NoReturn
 REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION = "1.0"
 REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION_V2 = "2.0"
 REFERENCE_TRAVERSAL_REQUEST_FILENAME = (
-    "parametron.reference-traversal-request.json"
+    "prm.reference-traversal-request.json"
 )
-REFERENCE_TRAVERSAL_OUTPUT_FILENAME = "parametron.reference-traversal.json"
+REFERENCE_TRAVERSAL_OUTPUT_FILENAME = "prm.reference-traversal.json"
 REFERENCE_TRAVERSAL_REQUEST_CLI_FLAG = "--reference-traversal-request"
 
 

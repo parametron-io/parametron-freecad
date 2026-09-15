@@ -33,7 +33,7 @@ FILE_ARGUMENT_STATUS_IMPLEMENTED = "implemented"
 FILE_ARGUMENT_STATUS_PLANNED = "planned"
 
 # result.json has no central filename constant elsewhere; define it here
-RESULT_JSON_FILENAME = "result.json"
+RESULT_JSON_FILENAME = "prm.result.json"
 
 
 @dataclass(frozen=True, slots=True)
