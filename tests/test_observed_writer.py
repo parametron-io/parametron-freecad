@@ -316,7 +316,7 @@ class TestCanonicalFileWriting(_WriterTestCase):
         payload = self.build(observation_data=observation_data)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "parametron.observed.json"
+            path = Path(tmp_dir) / "prm.observed.json"
             self._write(path, observation_data=observation_data)
             self.assertEqual(
                 path.read_bytes(),
@@ -325,7 +325,7 @@ class TestCanonicalFileWriting(_WriterTestCase):
 
     def test_output_is_utf8_with_single_trailing_newline(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "parametron.observed.json"
+            path = Path(tmp_dir) / "prm.observed.json"
             self._write(
                 path,
                 observation_data={
@@ -342,7 +342,7 @@ class TestCanonicalFileWriting(_WriterTestCase):
 
     def test_repeated_writes_with_equivalent_input_are_byte_identical(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "parametron.observed.json"
+            path = Path(tmp_dir) / "prm.observed.json"
 
             self._write(path, observation_data=_full_observation_data())
             first = path.read_bytes()
@@ -354,7 +354,7 @@ class TestCanonicalFileWriting(_WriterTestCase):
 
     def test_existing_output_is_overwritten_deterministically(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "parametron.observed.json"
+            path = Path(tmp_dir) / "prm.observed.json"
             path.write_text("stale data\nwith extra lines\n", encoding="utf-8")
 
             self._write(path, observation_data={"parameters": [_parameter_item()]})
@@ -366,7 +366,7 @@ class TestCanonicalFileWriting(_WriterTestCase):
 
     def test_returns_none(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "parametron.observed.json"
+            path = Path(tmp_dir) / "prm.observed.json"
             result = self.mod.write_observed_json(
                 path,
                 working_copy_path="/work/model.FCStd",
@@ -378,7 +378,7 @@ class TestCanonicalFileWriting(_WriterTestCase):
     def test_observed_json_path_uses_contract_filename(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = self.mod.observed_json_path(tmp_dir)
-            self.assertEqual(result, Path(tmp_dir) / "parametron.observed.json")
+            self.assertEqual(result, Path(tmp_dir) / "prm.observed.json")
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +424,7 @@ class TestWorkingCopyValidation(_WriterTestCase):
 class TestWriteFailureBehavior(_WriterTestCase):
     def test_temporary_file_is_created_in_destination_and_atomically_replaces_target(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            target = Path(tmp_dir) / "parametron.observed.json"
+            target = Path(tmp_dir) / "prm.observed.json"
             target.write_text("old-valid\n", encoding="utf-8")
             real_mkstemp = self.mod.tempfile.mkstemp
             created = []
@@ -447,7 +447,7 @@ class TestWriteFailureBehavior(_WriterTestCase):
 
     def test_serialization_failure_preserves_existing_target_and_cleans_temporary(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            target = Path(tmp_dir) / "parametron.observed.json"
+            target = Path(tmp_dir) / "prm.observed.json"
             original = b'{"valid":"old"}\n'
             target.write_bytes(original)
             temporary_paths = []
@@ -472,7 +472,7 @@ class TestWriteFailureBehavior(_WriterTestCase):
 
     def test_replacement_failure_preserves_target_and_cleans_complete_temporary(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            target = Path(tmp_dir) / "parametron.observed.json"
+            target = Path(tmp_dir) / "prm.observed.json"
             original = b'{"valid":"old"}\n'
             target.write_bytes(original)
             temporary_paths = []
@@ -504,7 +504,7 @@ class TestWriteFailureBehavior(_WriterTestCase):
 
     def test_missing_parent_directory_raises_observed_write_error(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "missing" / "parametron.observed.json"
+            path = Path(tmp_dir) / "missing" / "prm.observed.json"
             with self.assertRaises(self.mod.ObservedWriteError):
                 self.mod.write_observed_json(
                     path,
@@ -529,7 +529,7 @@ class TestWriteFailureBehavior(_WriterTestCase):
         item = _parameter_item()
         del item["value"]
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "parametron.observed.json"
+            path = Path(tmp_dir) / "prm.observed.json"
             with self.assertRaises(self.mod.ObservedPayloadError):
                 self.mod.write_observed_json(
                     path,
@@ -559,7 +559,7 @@ class TestInputMutation(_WriterTestCase):
         }
         before = copy.deepcopy(observation_data)
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "parametron.observed.json"
+            path = Path(tmp_dir) / "prm.observed.json"
             self.mod.write_observed_json(
                 path,
                 working_copy_path="/work/model.FCStd",
@@ -597,7 +597,7 @@ class TestScopeBoundary(_WriterTestCase):
     def test_writer_accepts_plain_data_without_any_document(self):
         # The writer takes already-observed mapping data, never a document.
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "parametron.observed.json"
+            path = Path(tmp_dir) / "prm.observed.json"
             self.mod.write_observed_json(
                 path,
                 working_copy_path="/work/model.FCStd",
@@ -616,7 +616,7 @@ class TestScopeBoundary(_WriterTestCase):
             return real_import(name, *args, **kwargs)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir) / "parametron.observed.json"
+            path = Path(tmp_dir) / "prm.observed.json"
             with mock.patch("builtins.__import__", side_effect=guarded_import):
                 self.mod.write_observed_json(
                     path,

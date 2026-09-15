@@ -428,7 +428,7 @@ class IntegrationRehearsalExecutionOnlyTests(unittest.TestCase):
     def test_no_observed_json_written(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             report, _, working_copy, _ = self._run_execution_only(tmp_dir)
-            observed_path = working_copy / "parametron.observed.json"
+            observed_path = working_copy / "prm.observed.json"
             observed_exists = observed_path.exists()
         self.assertFalse(observed_exists)
 
@@ -579,14 +579,14 @@ class IntegrationRehearsalExecutionAndObservationTests(unittest.TestCase):
     def test_observed_json_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             report, observed_output_directory = self._run_with_observation(tmp_dir)
-            observed_path = observed_output_directory / "parametron.observed.json"
+            observed_path = observed_output_directory / "prm.observed.json"
             observed_exists = observed_path.exists()
         self.assertTrue(observed_exists)
 
     def test_report_observed_output_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             report, observed_output_directory = self._run_with_observation(tmp_dir)
-            expected_path = (observed_output_directory / "parametron.observed.json").resolve()
+            expected_path = (observed_output_directory / "prm.observed.json").resolve()
         self.assertIsNotNone(report.observed_output_path)
         self.assertEqual(report.observed_output_path, expected_path)
 
@@ -601,26 +601,26 @@ class IntegrationRehearsalExecutionAndObservationTests(unittest.TestCase):
             report, _ = self._run_with_observation(tmp_dir)
         observed_outputs = [o for o in report.outputs if o.role == "observed"]
         self.assertEqual(len(observed_outputs), 1)
-        self.assertEqual(observed_outputs[0].name, "parametron.observed.json")
+        self.assertEqual(observed_outputs[0].name, "prm.observed.json")
 
     def test_observed_json_preserves_caller_working_copy_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             report, observed_output_directory = self._run_with_observation(tmp_dir)
-            observed_path = observed_output_directory / "parametron.observed.json"
+            observed_path = observed_output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
         self.assertEqual(decoded["workingCopy"]["path"], self._CALLER_WC_PATH)
 
     def test_observed_json_preserves_caller_sha256(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             report, observed_output_directory = self._run_with_observation(tmp_dir)
-            observed_path = observed_output_directory / "parametron.observed.json"
+            observed_path = observed_output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
         self.assertEqual(decoded["workingCopy"]["sha256"], self._CALLER_SHA256)
 
     def test_observed_json_has_only_implemented_surfaces(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             _, observed_output_directory = self._run_with_observation(tmp_dir)
-            observed_path = observed_output_directory / "parametron.observed.json"
+            observed_path = observed_output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
         observation = decoded.get("observation", {})
         # Engine verification shape requests metadata and references only
@@ -630,7 +630,7 @@ class IntegrationRehearsalExecutionAndObservationTests(unittest.TestCase):
     def test_observed_json_no_verification_decision_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             _, observed_output_directory = self._run_with_observation(tmp_dir)
-            observed_path = observed_output_directory / "parametron.observed.json"
+            observed_path = observed_output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
         self.assertNotIn("decision", decoded)
         self.assertNotIn("verification", decoded)
@@ -639,7 +639,7 @@ class IntegrationRehearsalExecutionAndObservationTests(unittest.TestCase):
     def test_observed_json_no_check_evaluation_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             _, observed_output_directory = self._run_with_observation(tmp_dir)
-            observed_path = observed_output_directory / "parametron.observed.json"
+            observed_path = observed_output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
         observation = decoded.get("observation", {})
         self.assertNotIn("checkResults", decoded)
@@ -649,7 +649,7 @@ class IntegrationRehearsalExecutionAndObservationTests(unittest.TestCase):
         # sha256 in observed JSON must equal the caller-supplied value, not computed
         with tempfile.TemporaryDirectory() as tmp_dir:
             _, observed_output_directory = self._run_with_observation(tmp_dir)
-            observed_path = observed_output_directory / "parametron.observed.json"
+            observed_path = observed_output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
         self.assertEqual(decoded["workingCopy"]["sha256"], self._CALLER_SHA256)
         # Explicitly not "a sha256 of the actual working copy contents"
@@ -768,7 +768,7 @@ class IntegrationRehearsalPreflightTests(unittest.TestCase):
     def test_invalid_manifest_compat_no_observed_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             request, _ = self._make_engine_invalid_manifest_request(tmp_dir)
-            observed_path = request.working_copy / "parametron.observed.json"
+            observed_path = request.working_copy / "prm.observed.json"
             with self.assertRaises(FixtureIntegrationRehearsalError):
                 run_fixture_integration_rehearsal(request)
             observed_exists = observed_path.exists()
@@ -1281,7 +1281,7 @@ class IntegrationRehearsalBoundaryTests(unittest.TestCase):
                     )
                 )
 
-            observed_path = observed_dir / "parametron.observed.json"
+            observed_path = observed_dir / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
         self.assertEqual(decoded["workingCopy"]["sha256"], caller_sha256)
@@ -1314,7 +1314,7 @@ class IntegrationRehearsalBoundaryTests(unittest.TestCase):
                 )
             )
 
-            observed_path = observed_dir / "parametron.observed.json"
+            observed_path = observed_dir / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
         self.assertNotIn("decision", decoded)
@@ -1348,7 +1348,7 @@ class IntegrationRehearsalBoundaryTests(unittest.TestCase):
                 )
             )
 
-            observed_path = observed_dir / "parametron.observed.json"
+            observed_path = observed_dir / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
         observation = decoded.get("observation", {})
@@ -1426,7 +1426,7 @@ class IntegrationRehearsalBoundaryTests(unittest.TestCase):
                 )
             )
 
-            observed_path = observed_dir / "parametron.observed.json"
+            observed_path = observed_dir / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
         self.assertNotIn("checks", decoded)

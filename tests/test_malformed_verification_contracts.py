@@ -211,7 +211,7 @@ class TestLoaderFailureSideEffects(_LoaderControlledFailureBase):
         self.assertNotIn("freecad", sys.modules)
 
     def test_loader_failure_creates_no_observed_output(self):
-        observed = self.tmp / "parametron.observed.json"
+        observed = self.tmp / "prm.observed.json"
         for content in ("{not valid json", "[]", '{"a": 1, "a": 2}'):
             with self.subTest(content=content):
                 with self.assertRaises(self.vl.VerificationLoadError):

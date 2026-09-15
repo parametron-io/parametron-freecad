@@ -50,7 +50,7 @@ class TestFilenameAndSchemaVersion(_ContractTestCase):
     def test_filename_and_schema_version_are_exact(self):
         self.assertEqual(
             self.vc.PARAMETRON_VERIFICATION_FILENAME,
-            "parametron.verification.json",
+            "prm.verification.json",
         )
         self.assertEqual(self.vc.PARAMETRON_VERIFICATION_SCHEMA_VERSION, "1.0")
 

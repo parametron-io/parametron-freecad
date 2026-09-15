@@ -53,7 +53,7 @@ class TestFilenameAndSchemaVersion(_ContractTestCase):
     def test_filename_is_exact(self):
         self.assertEqual(
             self.oc.PARAMETRON_OBSERVED_FILENAME,
-            "parametron.observed.json",
+            "prm.observed.json",
         )
 
     def test_schema_version_is_exact(self):

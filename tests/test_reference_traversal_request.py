@@ -22,11 +22,11 @@ class ReferenceTraversalRequestContractTests(unittest.TestCase):
         self.assertEqual(contract.REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION, "1.0")
         self.assertEqual(
             contract.REFERENCE_TRAVERSAL_REQUEST_FILENAME,
-            "parametron.reference-traversal-request.json",
+            "prm.reference-traversal-request.json",
         )
         self.assertEqual(
             contract.REFERENCE_TRAVERSAL_OUTPUT_FILENAME,
-            "parametron.reference-traversal.json",
+            "prm.reference-traversal.json",
         )
         self.assertEqual(
             contract.REFERENCE_TRAVERSAL_REQUEST_CLI_FLAG,

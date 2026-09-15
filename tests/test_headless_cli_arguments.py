@@ -1946,7 +1946,7 @@ class HeadlessCliArgumentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             working, _source = self._make_working_copy_with_source(tmp_dir)
             result_path = working / "result.json"
-            observed_path = working / "parametron.observed.json"
+            observed_path = working / "prm.observed.json"
             artifact_path = working / "exports" / "part.step"
             initial_files = {path.relative_to(working) for path in working.rglob("*")}
 
@@ -2036,7 +2036,7 @@ class HeadlessCliArgumentTests(unittest.TestCase):
             working, _source = self._make_working_copy_with_source(tmp_dir)
             manifest_path = working / "export_manifest_v1.json"
             result_path = working / "result.json"
-            observed_path = working / "parametron.observed.json"
+            observed_path = working / "prm.observed.json"
             artifact_path = working / "exports" / "part.step"
             initial_files = {path.relative_to(working) for path in working.rglob("*")}
 
