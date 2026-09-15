@@ -1,4 +1,4 @@
-"""Tests for the Phase 2 parametron.verification.json contract surface."""
+"""Tests for the Phase 2 prm.verification.json contract surface."""
 
 import importlib
 import sys

@@ -483,7 +483,7 @@ class TestOutputBoundaryControlledFailure(_OutputControlledFailureBase):
 
 
 class TestOutputBoundaryNoWrite(_OutputControlledFailureBase):
-    """No parametron.observed.json is written on malformed decoded data."""
+    """No prm.observed.json is written on malformed decoded data."""
 
     def test_no_observed_file_created_on_failure(self):
         for data in self._malformed_cases():
