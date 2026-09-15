@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-EXPORT_MANIFEST_V1_FILENAME = "export_manifest_v1.json"
+EXPORT_MANIFEST_V1_FILENAME = "prm.export-manifest.json"
 EXPORT_MANIFEST_SCHEMA_VERSION = "1.0"
 EXPORT_MANIFEST_SCHEMA_VERSION_V1 = EXPORT_MANIFEST_SCHEMA_VERSION
 EXPORT_MANIFEST_SCHEMA_VERSION_V2 = "2.0"

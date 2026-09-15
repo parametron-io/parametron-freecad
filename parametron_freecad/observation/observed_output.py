@@ -41,7 +41,7 @@ def generate_observed_output(
     working_copy_sha256: str,
     output_directory: str | os.PathLike[str],
 ) -> None:
-    """Generate canonical parametron.observed.json from injected runtime state."""
+    """Generate canonical prm.observed.json from injected runtime state."""
 
     try:
         observation_data = observe_engine_compatible_requested_scope(

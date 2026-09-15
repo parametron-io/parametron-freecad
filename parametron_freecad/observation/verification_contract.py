@@ -1,4 +1,4 @@
-"""Phase 2 verification contract metadata for parametron.verification.json."""
+"""Phase 2 verification contract metadata for prm.verification.json."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass
 # Filename and schema version
 # ---------------------------------------------------------------------------
 
-PARAMETRON_VERIFICATION_FILENAME = "parametron.verification.json"
+PARAMETRON_VERIFICATION_FILENAME = "prm.verification.json"
 PARAMETRON_VERIFICATION_SCHEMA_VERSION = "1.0"
 
 # ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ class ChecksContract:
 
 @dataclass(frozen=True, slots=True)
 class VerificationContract:
-    """Supported v1 parametron.verification.json contract surfaces."""
+    """Supported v1 prm.verification.json contract surfaces."""
 
     filename: str
     schema_version: str

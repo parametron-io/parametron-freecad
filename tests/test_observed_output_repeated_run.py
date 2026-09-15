@@ -7,7 +7,7 @@ FreeCAD, never evaluate verification decisions, never observe components, never
 perform Label lookup, and never traverse ``document.Objects``.
 
 The focus is byte-level determinism: repeated calls with equivalent inputs must
-produce byte-identical ``parametron.observed.json`` output.
+produce byte-identical ``prm.observed.json`` output.
 """
 
 from __future__ import annotations
@@ -172,7 +172,7 @@ class TestSameDirectoryRepeatedRun(_ObservedOutputTestCase):
 
             self.assertEqual(first, second)
             self.assertTrue(path.exists())
-            self.assertEqual(path, Path(tmp_dir) / "parametron.observed.json")
+            self.assertEqual(path, Path(tmp_dir) / "prm.observed.json")
 
     def test_output_is_utf8_with_single_trailing_newline(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -284,8 +284,8 @@ class TestEquivalentFreshDirectories(_ObservedOutputTestCase):
                 path_a = self.observed_path(dir_a)
                 path_b = self.observed_path(dir_b)
 
-                self.assertEqual(path_a.name, "parametron.observed.json")
-                self.assertEqual(path_b.name, "parametron.observed.json")
+                self.assertEqual(path_a.name, "prm.observed.json")
+                self.assertEqual(path_b.name, "prm.observed.json")
 
                 self.assertEqual(path_a.read_bytes(), path_b.read_bytes())
                 self.assertEqual(

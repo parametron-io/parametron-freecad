@@ -60,7 +60,7 @@ class ReferenceTraversalOutputV2ConflictTests(unittest.TestCase):
             root = Path(tmp)
             with self.assertRaises(ReferenceTraversalOutputWriteError) as caught:
                 write_reference_traversal_output_v2_atomically(
-                    root, root / "parametron.reference-traversal.json",
+                    root, root / "prm.reference-traversal.json",
                     boundary="reference_traversal_entrypoint",
                     operation="reference_traversal",
                     status="partial",

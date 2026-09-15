@@ -15,7 +15,7 @@ FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "reference_traversal"
 RUNNER = Path(__file__).parent / "freecad_reference_fixture_runner.py"
 GENERATOR = REPOSITORY_ROOT / "scripts" / "generate_reference_traversal_fixtures.py"
 SOURCE_DOCUMENT = "reference-root.FCStd"
-OUTPUT_FILENAME = "parametron.reference-traversal.json"
+OUTPUT_FILENAME = "prm.reference-traversal.json"
 
 MAPPINGS = [
     {

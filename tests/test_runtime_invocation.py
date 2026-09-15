@@ -618,7 +618,7 @@ class RuntimeInvocationObservationPreservationTests(unittest.TestCase):
             ) as run_execution:
                 invocation.run_engine_invocation(request)
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             decoded = json.loads(observed_path.read_text(encoding="utf-8"))
 
         run_execution.assert_not_called()
@@ -686,7 +686,7 @@ class RuntimeInvocationObservationPreservationTests(unittest.TestCase):
             ) as excinfo:
                 invocation.run_engine_invocation(request)
 
-            observed_path = output_directory / "parametron.observed.json"
+            observed_path = output_directory / "prm.observed.json"
             observed_path_exists = observed_path.exists()
 
         run_execution.assert_not_called()

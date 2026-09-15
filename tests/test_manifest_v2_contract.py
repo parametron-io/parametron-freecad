@@ -66,7 +66,7 @@ class TestV1ClosurePermanent(unittest.TestCase):
         self.mc = mc
 
     def test_v1_filename_constant(self):
-        self.assertEqual(self.mc.EXPORT_MANIFEST_V1_FILENAME, "export_manifest_v1.json")
+        self.assertEqual(self.mc.EXPORT_MANIFEST_V1_FILENAME, "prm.export-manifest.json")
 
     def test_v1_schema_version_constant(self):
         self.assertEqual(self.mc.EXPORT_MANIFEST_SCHEMA_VERSION, "1.0")
@@ -112,7 +112,7 @@ class TestV1ClosurePermanent(unittest.TestCase):
 
     def test_v1_contract_filename_unchanged(self):
         self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V1_CONTRACT.filename, "export_manifest_v1.json"
+            self.mc.EXPORT_MANIFEST_V1_CONTRACT.filename, "prm.export-manifest.json"
         )
 
     def test_v1_public_names_still_present(self):
@@ -267,7 +267,7 @@ class TestTransportFilenameCompatibility(unittest.TestCase):
 
     def test_filename_is_exact_transport_name(self):
         self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.filename, "export_manifest_v1.json"
+            self.mc.EXPORT_MANIFEST_V2_CONTRACT.filename, "prm.export-manifest.json"
         )
 
     def test_no_v2_filename_constant_exists(self):

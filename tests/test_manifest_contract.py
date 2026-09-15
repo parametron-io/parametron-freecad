@@ -25,7 +25,7 @@ class TestStableConstants(unittest.TestCase):
         self.mc = mc
 
     def test_filename_constant(self):
-        self.assertEqual(self.mc.EXPORT_MANIFEST_V1_FILENAME, "export_manifest_v1.json")
+        self.assertEqual(self.mc.EXPORT_MANIFEST_V1_FILENAME, "prm.export-manifest.json")
 
     def test_schema_version_constant(self):
         self.assertEqual(self.mc.EXPORT_MANIFEST_SCHEMA_VERSION, "1.0")

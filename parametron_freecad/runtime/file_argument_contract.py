@@ -32,8 +32,8 @@ FILE_ARGUMENT_BOUNDARY_ENGINE_OBSERVE = "engine_observe"
 FILE_ARGUMENT_STATUS_IMPLEMENTED = "implemented"
 FILE_ARGUMENT_STATUS_PLANNED = "planned"
 
-# result.json has no central filename constant elsewhere; define it here
-RESULT_JSON_FILENAME = "result.json"
+# The canonical result filename is defined here for runtime file arguments.
+RESULT_JSON_FILENAME = "prm.result.json"
 
 
 @dataclass(frozen=True, slots=True)

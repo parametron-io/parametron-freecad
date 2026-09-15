@@ -1,7 +1,7 @@
 """Tests for Engine-generated verification contract compatibility.
 
 Verifies that the FreeCAD observation runtime accepts minimal Engine-generated
-parametron.verification.json shapes and emits deterministic observed output for
+prm.verification.json shapes and emits deterministic observed output for
 the requested runtime-context categories without broadening observation behavior.
 
 Coverage:
