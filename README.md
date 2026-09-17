@@ -107,8 +107,10 @@ development environment used by maintainers and CI:
 nix develop
 ```
 
-Nix is optional for contributors. Equivalent environments may be used as long
+Nix is optional for contributors. The current Nix environment targets
+`x86_64-linux`; equivalent environments may be used on other platforms as long
 as the documented runtime and verification requirements are satisfied.
+Multi-platform Nix support is outside the current scope.
 
 ## Documentation
 
