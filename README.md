@@ -28,8 +28,10 @@ orchestration and durable product storage/indexing are outside this repository.
   containment against the exact supplied working-copy root.
 
 Manifest schema 2.0 metadata and strict validation are implemented separately;
-execution rejects schema 2.0 manifests. Native suppression, visibility, and
-deletion execution are not currently implemented. See the
+the execute entrypoint rejects schema 2.0 manifests. A focused FreeCAD-native
+suppression/unsuppression consumer is implemented and tested independently, but
+is not yet wired into the execute path. Native visibility and deletion execution
+remain unimplemented. See the
 [target-mutation contract](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/target-mutations.md).
 
 ## Headless usage
