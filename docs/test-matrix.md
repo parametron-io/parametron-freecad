@@ -70,6 +70,14 @@ python -m pytest tests/test_visibility.py
 python -m pytest tests/test_visibility_real_fixtures.py
 ```
 
+Focused post-mutation validity and native dependency evidence checks:
+
+```bash
+python -m pytest \
+  tests/test_post_mutation_validity.py \
+  tests/test_post_mutation_validity_real_fixtures.py
+```
+
 Focused aligned execute-plus-observation checks:
 
 ```bash
@@ -187,6 +195,7 @@ configured FreeCAD smoke behavior into a test failure.
 | PartDesign mutation fixture foundation | Covered | `tests/test_partdesign_mutation_fixtures.py`, `tests/freecad_partdesign_mutation_fixture_runner.py`, `scripts/generate_partdesign_mutation_fixtures.py`, `tests/fixtures/partdesign_mutations/partdesign-mutations.FCStd` | Permanent fixture integrity (SHA-256 `7187abe9...`), native role/TypeId inventory, Body Tip and dependency chain, `Suppressed` and App-level `Visibility` preconditions, safe vs unsafe delete candidate roles, Body shape health, generator success, two-run semantic reproducibility, CLI argument/path/nix validations, `.FCBak` cleanup, and unmutated inspection. This is fixture-prerequisite coverage; actual suppression transitions are covered separately through the production consumer. |
 | FreeCAD-native suppression / unsuppression consumer | Covered | `tests/test_suppression.py`, `tests/test_suppression_real_fixtures.py`, `tests/freecad_suppression_runner.py` (test-only support) | Exact `document.getObject(object)` resolution with no fallback; native `Suppressed` capability and `App::PropertyBool` requirement; both requested boolean states; controlled missing, unsupported, inspection, and write failures with native causes preserved where applicable; caller ordering, fail-fast behavior, and unchanged input ordering/content. Real FreeCAD coverage applies the production consumer to temporary copies of the committed PartDesign fixture, proves `TerminalChamfer` true -> false and intermediate features false -> true, preserves visibility, and leaves committed fixture bytes unchanged. This consumer is not wired to the schema-2 execute boundary and the helper is not a production entrypoint. |
 | FreeCAD-native visibility consumer | Covered | `tests/test_visibility.py`, `tests/test_visibility_real_fixtures.py`, `tests/freecad_visibility_runner.py` (test-only support) | Exact `document.getObject(object)` resolution with no fallback; native App-level `Visibility` capability and exact `App::PropertyBool` requirement; hide and unhide; controlled missing, unsupported, inspection, and write failures with native causes preserved where applicable; no `FreeCADGui` or `ViewObject` dependency; suppression independence; caller ordering, fail-fast/no-rollback behavior, unchanged input ordering/content, and empty collections. Real FreeCAD coverage applies the production consumer to temporary fixture copies, proves hide and unhide plus a controlled missing-target failure, preserves suppression, and leaves committed fixture bytes unchanged. This consumer is not wired to the schema-2 execute boundary and the helper is not a production entrypoint. |
+| FreeCAD-native post-mutation validity and dependency evidence | Covered | `tests/test_post_mutation_validity.py`, `tests/test_post_mutation_validity_real_fixtures.py`, `tests/freecad_post_mutation_validity_runner.py` (test-only support) | Read-only exact native lookup; bounded PartDesign Body shape-health evidence; distinct unavailable-evidence, native-inspection-failure, and proven-invalid-state classifications; null-state precedence; solid count as evidence rather than policy; deterministic `InList` dependents and `OutList` dependencies without deletion policy; real healthy and genuinely null Body evidence; repeated-process determinism; temporary fixture copies and committed-fixture immutability. Mutation and recompute are caller-owned. Schema-2 execute wiring and issue #6 runtime-stage/failure mapping remain unimplemented. |
 | Supported internal object reference discovery | Covered | `tests/test_reference_traversal.py` | Root-only documents, unrelated-object and empty-link exclusion, participating source/target inclusion, multiple sources/targets/properties, LinkSub extraction, exact schema-2 IDs/type/property/mechanism provenance, complete endpoints, duplicate collapse, and object/property/value enumeration-order independence are covered. |
 | Internal traversal raw-evidence preservation | Covered | `tests/test_reference_traversal.py` | Exact typed-result coverage preserves source path, document/object labels, stable names/types, complete endpoints, edge kind/state, source property, reference mechanism, and nullable diagnostics; empty unavailable optional values remain null. Mapped external missing evidence is covered separately; unresolved remains contract vocabulary. |
 | Active traversal cycle prevention | Covered | `tests/test_reference_traversal.py` | Self-link and mutual internal-link coverage proves the one-pass non-recursive discovery boundary terminates with finite participating nodes and distinct edges. Recursive external-document traversal is not implemented. |
@@ -1293,7 +1302,7 @@ tests/freecad_partdesign_mutation_fixture_runner.py
 
 - **Fixture prerequisite coverage documented:** Yes.
 - **Fixture inspection claimed as mutation execution:** No.
-- Schema 2.0 metadata and strict manifest validation are implemented and covered separately below. Fixture inspection establishes starting native state only; focused real-FreeCAD suppression and visibility coverage separately invokes the production consumers against temporary fixture copies and proves actual state transitions. Native deletion, post-mutation validity, target observation, and schema-2 execute integration remain unimplemented.
+- Schema 2.0 metadata and strict manifest validation are implemented and covered separately below. Fixture inspection establishes starting native state only; focused real-FreeCAD suppression and visibility coverage separately invokes the production consumers against temporary fixture copies and proves actual state transitions. Deterministic post-mutation validity and native dependency inspection are implemented and covered separately below. Native deletion, target observation, schema-2 execute integration, and issue #6 runtime-stage/failure mapping remain unimplemented.
 
 ### Validation results
 
@@ -1312,6 +1321,56 @@ nix develop --command python -m pytest
 ```
 
 Required real-FreeCAD skips: 0.
+
+## Focused FreeCAD-Native Post-Mutation Validity Coverage
+
+Production and test assets:
+
+```text
+parametron_freecad/execution/post_mutation_validity.py
+tests/test_post_mutation_validity.py
+tests/test_post_mutation_validity_real_fixtures.py
+tests/freecad_post_mutation_validity_runner.py
+```
+
+`tests/freecad_post_mutation_validity_runner.py` is test-only FreeCAD
+command-host support; it is not a production entrypoint.
+
+### Focused fake/unit contract
+
+| Tested Surface | Expected Behavior |
+| --- | --- |
+| Exact native lookup and supported type | Passes the requested name unchanged to `document.getObject()` and requires positive native `PartDesign::Body` type evidence; no Label or alias fallback |
+| Healthy shape evidence | Reads `Shape.isNull()`, then `Shape.isValid()`, then observes `len(Shape.Solids)` and returns an immutable record with the exact requested object name |
+| Failure classifications | `NativeValidityEvidenceUnavailableError` identifies absent, unsupported, or unusable required evidence; `NativeValidityInspectionError` identifies failures while invoking supported native inspection; `InvalidNativeCadStateError` identifies a native shape positively proven null or invalid |
+| Cause preservation and diagnostics | Native lookup, predicate, solid inspection, and relationship-iteration failures preserve their underlying causes where applicable; messages and results are stable across repeated calls |
+| Invalid-state precedence | Proven null state is classified before `isValid()` or solid evidence is required; proven `isValid() == False` is classified before solid evidence is required |
+| Solid-count semantics | Zero, one, and multiple solids are retained as evidence; solid count is not a universal acceptance threshold |
+| Native dependency mapping | `InList` maps to dependents and `OutList` maps to dependencies; related objects require stable native `Name` values |
+| Dependency determinism | Duplicate names are removed, names are ordered lexically, input enumeration order does not affect immutable tuple results, and repeated calls agree |
+| Policy boundary | Dependency inspection reports native relationships only and makes no deletion-safety decision |
+| Read-only and import-safe behavior | Neither API mutates, recomputes, saves, closes, or removes objects; importing the module does not require FreeCAD |
+
+### Permanent real-FreeCAD evidence
+
+| Tested Surface | Established Fixture/Test Fact |
+| --- | --- |
+| Healthy native Body | Production inspection of `MutationBody` on temporary copies of the committed fixture reports non-null, valid native shape evidence with one solid |
+| Solid-count scope | One solid is a locked fact about `MutationBody` in this fixture, not a general validity rule |
+| Representative native dependencies | `SafeDeleteMarker` has no `InList` or `OutList` relationships under the locked fixture contract; `BaseSketch` reports `IntermediatePad` as a dependent; `IntermediatePad` reports `IntermediatePocket` as a dependent and `BaseSketch` as a dependency |
+| Genuine invalid native state | A fresh test-owned empty `PartDesign::Body` has a genuinely null native shape. Real FreeCAD raises if `isValid()` is queried on that null shape, so production checks proven nullity first and deterministically raises `InvalidNativeCadStateError` |
+| Independent-run determinism | Separate `freecadcmd` processes produce equal normalized healthy evidence, dependency evidence/order, and invalid-state diagnostics |
+| Read-only fixture handling | Fixture-backed tests inspect temporary copies, before/after native state snapshots agree, and committed fixture hash/content remains unchanged; the empty-Body probe is in-memory and does not touch the fixture |
+
+This coverage establishes the read-only native validity/dependency
+infrastructure and permanent valid/invalid evidence needed by issue #3 and by
+later conservative deletion work in issue #4. Mutation and recompute remain
+caller-owned. Native deletion and normal schema 2.0 execute integration remain
+unimplemented. Final runtime-stage ordering and translation through the
+structured runtime failure boundary remain issue #6 scope; the deterministic
+exception hierarchy is available for that later mapping. Engine continues to
+own expected-versus-observed comparison, tolerance evaluation, engineering
+verification decisions, and normalized durable records.
 
 ## Focused FreeCAD-Native Suppression / Unsuppression Coverage
 
