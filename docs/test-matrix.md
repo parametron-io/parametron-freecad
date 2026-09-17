@@ -61,6 +61,13 @@ python -m pytest tests/test_requested_scope_observation.py tests/test_observed_w
 python -m pytest tests/test_observation_request.py
 ```
 
+Focused native suppression checks:
+
+```bash
+python -m pytest tests/test_suppression.py
+python -m pytest tests/test_suppression_real_fixtures.py
+```
+
 Focused aligned execute-plus-observation checks:
 
 ```bash
@@ -112,7 +119,7 @@ configured FreeCAD smoke behavior into a test failure.
 | Result path containment | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_missing_working_copies.py` | Invalid result paths reject before file creation; safe path required for failed `prm.result.json`. |
 | `sourceDocument` containment | Covered | `tests/test_document_lifecycle.py`, `tests/test_headless_missing_working_copies.py`, `tests/test_headless_cli_arguments.py` | Traversal and symlink escapes rejected against the supplied root. |
 | FreeCAD-native manifest contract | Covered | `tests/test_manifest_contract.py` | Filename is `prm.export-manifest.json`. |
-| Manifest schema 2.0 contract metadata & strict validation | Covered | `tests/test_manifest_v2_contract.py`, `tests/test_manifest_v2_validation.py` | Schema 2.0 metadata defined; required core fields and optional `assemblyMutations`/`partMutations`; `{object, suppressed}`, `{object, visible}`, `{object}` shapes; shared section contract; parameter/output reuse; transport filename remains `prm.export-manifest.json`; immutability, import safety, and frozen tuples; strict Schema 2.0 validation implemented (`validate_export_manifest_v2`, `validate_export_manifest`); exact version dispatch (`"1.0"` vs `"2.0"`); strict JSON booleans; duplicate object rejection; suppression/visibility vs deletion conflict rejection; suppression + visibility allowed; cross-scope object conflict rejection; deterministic diagnostics; runtime remains V1-only and rejects schema 2.0 before document operations; native mutation execution is not implemented. |
+| Manifest schema 2.0 contract metadata & strict validation | Covered | `tests/test_manifest_v2_contract.py`, `tests/test_manifest_v2_validation.py` | Schema 2.0 metadata defined; required core fields and optional `assemblyMutations`/`partMutations`; `{object, suppressed}`, `{object, visible}`, `{object}` shapes; shared section contract; parameter/output reuse; transport filename remains `prm.export-manifest.json`; immutability, import safety, and frozen tuples; strict Schema 2.0 validation implemented (`validate_export_manifest_v2`, `validate_export_manifest`); exact version dispatch (`"1.0"` vs `"2.0"`); strict JSON booleans; duplicate object rejection; suppression/visibility vs deletion conflict rejection; suppression + visibility allowed; cross-scope object conflict rejection; deterministic diagnostics. The execute entrypoint remains V1-only and rejects schema 2.0 before document operations. The standalone native suppression/unsuppression consumer is implemented and tested but is not wired to execute; native visibility and deletion execution remain unimplemented. |
 | Strict manifest loading | Covered | `tests/test_manifest_loader.py`, `tests/test_headless_malformed_manifests.py` | Duplicate keys and non-standard JSON constants rejected. |
 | Manifest structural validation | Covered | `tests/test_manifest_validation.py` | Exact field surfaces and supported formats. |
 | Engine dot-form manifest compatibility | Covered | `tests/test_engine_manifest_compat.py`, `tests/test_runtime_entrypoints.py`, `tests/fixtures/engine_generated/export_manifest.v1.json` | Transitional compatibility only. |
@@ -175,7 +182,8 @@ configured FreeCAD smoke behavior into a test failure.
 | Traversal diagnostic classification/deduplication/ordering | Covered | `tests/test_reference_traversal_output_contract.py`, `tests/test_reference_traversal.py` | Unsupported allowlisted non-None value shapes return one schema-neutral warning at `reference_discovery`, status `partial`, and no inferred mapped-missing evidence. Schema-2 exact diagnostic duplicates collapse by complete record before the existing total order and sequence assignment; schema-1 multiplicity is unchanged. Typed results reject canonical Python traceback blocks through the existing chained execution error. |
 | Traversal-present execute/export compatibility | Covered | `tests/test_runtime_entrypoints.py` | Declared output objects reach STEP, CSV, PDF, and success-result artifact handling unchanged and in the established pipeline order around traversal emission. |
 | Real FreeCAD reference API inspection | Covered | `tests/test_reference_traversal.py`, bounded-unit command-host probe | FreeCAD 1.1.1 accepted the exact 21 private Link/XLink type-ID allowlist and exposed object/subelement/list value shapes. No heuristic string/path mechanism is included; supported internal discovery now applies this surface. |
-| PartDesign mutation fixture foundation | Covered | `tests/test_partdesign_mutation_fixtures.py`, `tests/freecad_partdesign_mutation_fixture_runner.py`, `scripts/generate_partdesign_mutation_fixtures.py`, `tests/fixtures/partdesign_mutations/partdesign-mutations.FCStd` | Permanent fixture integrity (SHA-256 `7187abe9...`), native role/TypeId inventory, Body Tip and dependency chain, `Suppressed` and App-level `Visibility` preconditions, safe vs unsafe delete candidate roles, Body shape health, generator success, two-run semantic reproducibility, CLI argument/path/nix validations, `.FCBak` cleanup, and unmutated inspection. Fixture prerequisite coverage only; runtime target mutations are not implemented. |
+| PartDesign mutation fixture foundation | Covered | `tests/test_partdesign_mutation_fixtures.py`, `tests/freecad_partdesign_mutation_fixture_runner.py`, `scripts/generate_partdesign_mutation_fixtures.py`, `tests/fixtures/partdesign_mutations/partdesign-mutations.FCStd` | Permanent fixture integrity (SHA-256 `7187abe9...`), native role/TypeId inventory, Body Tip and dependency chain, `Suppressed` and App-level `Visibility` preconditions, safe vs unsafe delete candidate roles, Body shape health, generator success, two-run semantic reproducibility, CLI argument/path/nix validations, `.FCBak` cleanup, and unmutated inspection. This is fixture-prerequisite coverage; actual suppression transitions are covered separately through the production consumer. |
+| FreeCAD-native suppression / unsuppression consumer | Covered | `tests/test_suppression.py`, `tests/test_suppression_real_fixtures.py`, `tests/freecad_suppression_runner.py` (test-only support) | Exact `document.getObject(object)` resolution with no fallback; native `Suppressed` capability and `App::PropertyBool` requirement; both requested boolean states; controlled missing, unsupported, inspection, and write failures with native causes preserved where applicable; caller ordering, fail-fast behavior, and unchanged input ordering/content. Real FreeCAD coverage applies the production consumer to temporary copies of the committed PartDesign fixture, proves `TerminalChamfer` true -> false and intermediate features false -> true, preserves visibility, and leaves committed fixture bytes unchanged. This consumer is not wired to the schema-2 execute boundary and the helper is not a production entrypoint. |
 | Supported internal object reference discovery | Covered | `tests/test_reference_traversal.py` | Root-only documents, unrelated-object and empty-link exclusion, participating source/target inclusion, multiple sources/targets/properties, LinkSub extraction, exact schema-2 IDs/type/property/mechanism provenance, complete endpoints, duplicate collapse, and object/property/value enumeration-order independence are covered. |
 | Internal traversal raw-evidence preservation | Covered | `tests/test_reference_traversal.py` | Exact typed-result coverage preserves source path, document/object labels, stable names/types, complete endpoints, edge kind/state, source property, reference mechanism, and nullable diagnostics; empty unavailable optional values remain null. Mapped external missing evidence is covered separately; unresolved remains contract vocabulary. |
 | Active traversal cycle prevention | Covered | `tests/test_reference_traversal.py` | Self-link and mutual internal-link coverage proves the one-pass non-recursive discovery boundary terminates with finite participating nodes and distinct edges. Recursive external-document traversal is not implemented. |
@@ -1281,8 +1289,8 @@ tests/freecad_partdesign_mutation_fixture_runner.py
 ### Explicit distinctions and boundaries
 
 - **Fixture prerequisite coverage documented:** Yes.
-- **Mutation runtime coverage claimed:** No.
-- Schema 2.0 metadata and strict manifest validation are implemented and covered separately below. Native suppression/unsuppression, visibility, deletion, post-mutation validity, and target observation are not implemented; fixture inspection does not exercise mutation execution.
+- **Fixture inspection claimed as mutation execution:** No.
+- Schema 2.0 metadata and strict manifest validation are implemented and covered separately below. Fixture inspection establishes starting native state only; focused real-FreeCAD suppression coverage separately invokes the production suppression consumer against temporary fixture copies and proves actual state transitions. Native visibility, deletion, post-mutation validity, and target observation remain unimplemented.
 
 ### Validation results
 
@@ -1301,6 +1309,38 @@ nix develop --command python -m pytest
 ```
 
 Required real-FreeCAD skips: 0.
+
+## Focused FreeCAD-Native Suppression / Unsuppression Coverage
+
+Production and test assets:
+
+```text
+parametron_freecad/execution/suppression.py
+tests/test_suppression.py
+tests/test_suppression_real_fixtures.py
+tests/freecad_suppression_runner.py
+```
+
+`tests/freecad_suppression_runner.py` is test-only FreeCAD command-host support;
+it is not a production entrypoint.
+
+| Tested Surface | Expected Behavior |
+| --- | --- |
+| Exact native target resolution | Passes the request's `object` string unchanged to `document.getObject`; missing, case-variant, alias, and Label values do not trigger fallback lookup |
+| Native capability requirement | Requires an existing native `Suppressed` property whose type is exactly `App::PropertyBool`; does not synthesize unsupported properties |
+| Requested states | `suppressed: true` writes native `True`; `suppressed: false` writes native `False` |
+| Controlled failures | Missing and unsupported targets and native lookup, inspection, and write failures use the consumer's controlled error types; underlying native causes are preserved where applicable |
+| Ordering and fail-fast | Applies entries in caller-provided order, stops at the first failure, retains earlier successful writes, and does not apply later entries |
+| Request preservation | Does not rewrite mutation mappings or reorder the supplied sequence |
+| Real `TerminalChamfer` transition | Production consumer changes native `Suppressed` from `True` to `False` on a temporary copy |
+| Real intermediate-feature transitions | Production consumer changes native `Suppressed` from `False` to `True` for `IntermediatePad` and `IntermediatePocket`, each on an independent temporary copy |
+| Visibility independence | Suppression and unsuppression leave native visibility unchanged |
+| Fixture integrity | Committed PartDesign fixture bytes remain unchanged after real-FreeCAD mutation tests |
+
+This coverage proves the standalone native consumer. The execute entrypoint
+still rejects schema-2 manifests before document operations, so it does not
+prove schema-2 execute integration, recompute, save, or persistence through the
+normal execute flow. Visibility and deletion consumers remain unimplemented.
 
 ## Focused Aligned Manifest Schema 2.0 Metadata and Strict Validation Coverage
 
@@ -1329,7 +1369,7 @@ tests/test_manifest_v2_validation.py
 | Suppression + visibility allowed | Within the same scope, suppression and visibility targeting the same object is explicitly valid (independent semantic axes) |
 | Cross-scope conflict rejection | The same object name occurring in both `assemblyMutations` and `partMutations` across any family is rejected with `cross_scope_mutation_object_conflict`; Engine must resolve scope before handoff |
 | Diagnostic determinism | Diagnostics sort deterministically: assembly mutations before part mutations; family order suppression -> visibility -> deletion; entries in caller-supplied array order; input mappings are immutable |
-| Runtime V1-only safety boundary | Runtime entrypoint uses `validate_export_manifest_v1`; Schema 2.0 mutation-bearing manifests are rejected before CAD document open, parameter assignment, recompute, save, export, or success-result writing; runtime V2 acceptance and native mutation execution remain not implemented |
+| Runtime V1-only safety boundary | Runtime entrypoint uses `validate_export_manifest_v1`; Schema 2.0 mutation-bearing manifests are rejected before CAD document open, parameter assignment, recompute, save, export, or success-result writing; runtime V2 acceptance and mutation-consumer wiring remain unimplemented. The standalone native suppression/unsuppression consumer is covered separately; native visibility and deletion consumers remain unimplemented |
 
 ### Focused test methods
 
@@ -1469,8 +1509,8 @@ tests/test_manifest_v2_validation.py
 - **Strict bool coverage documented:** Yes.
 - **Diagnostic determinism documented:** Yes.
 - **Runtime V1-only safety proof documented:** Yes.
-- **Native mutation runtime coverage claimed implemented:** No.
-- Schema 2.0 runtime manifest acceptance, runtime suppression/unsuppression, runtime visibility mutations, runtime safe deletion, post-mutation validity infrastructure, target observation, and Engine emission are not implemented.
+- **Schema 2.0 execute integration claimed implemented:** No.
+- The standalone native suppression/unsuppression consumer is implemented and tested, but Schema 2.0 runtime manifest acceptance and consumer wiring are not implemented. Native visibility, native safe deletion, post-mutation validity infrastructure, target observation, and Engine emission are not implemented.
 
 ### Validation results
 
