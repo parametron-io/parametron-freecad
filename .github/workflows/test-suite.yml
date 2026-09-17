@@ -75,6 +75,10 @@ jobs:
         if: steps.scope.outputs.run_tests == 'true'
         uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
 
+      - name: Verify strict FreeCAD smoke
+        if: steps.scope.outputs.run_tests == 'true'
+        run: nix develop --command env PARAMETRON_FREECAD_STRICT_SMOKE=1 python -m pytest tests/test_headless_invocation.py -k nix_wrapper_smoke -q
+
       - name: Compile Python sources
         if: steps.scope.outputs.run_tests == 'true'
         run: nix develop --command python -m compileall -q parametron_freecad tests
