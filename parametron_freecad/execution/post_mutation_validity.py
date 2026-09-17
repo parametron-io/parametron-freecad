@@ -57,12 +57,12 @@ def inspect_post_mutation_validity(
     shape = _read_required_attribute(target, "Shape", object_name)
 
     is_null = _call_shape_predicate(shape, "isNull", object_name)
-    is_valid = _call_shape_predicate(shape, "isValid", object_name)
-
     if is_null:
         raise InvalidNativeCadStateError(
             _object_message(object_name, "native shape is null")
         )
+
+    is_valid = _call_shape_predicate(shape, "isValid", object_name)
     if not is_valid:
         raise InvalidNativeCadStateError(
             _object_message(object_name, "native shape reports invalid")
