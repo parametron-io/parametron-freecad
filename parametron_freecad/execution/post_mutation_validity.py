@@ -93,6 +93,67 @@ def inspect_native_dependencies(
     )
 
 
+def inspect_document_post_mutation_validity(
+    document: Any,
+) -> tuple[NativeShapeHealthEvidence, ...]:
+    """Inspect every surviving native PartDesign Body in stable name order.
+
+    At least one supported Body is required so callers cannot treat the
+    absence of bounded native shape-health evidence as a successful result.
+    """
+
+    object_names = _inspect_partdesign_body_names(document)
+    if not object_names:
+        raise NativeValidityEvidenceUnavailableError(
+            "document contains no supported PartDesign Body validity evidence"
+        )
+    return tuple(
+        inspect_post_mutation_validity(document, object_name)
+        for object_name in object_names
+    )
+
+
+def _inspect_partdesign_body_names(document: Any) -> tuple[str, ...]:
+    objects = _read_required_attribute(document, "Objects", "<document>")
+    try:
+        iterator = iter(objects)
+    except Exception as exc:
+        raise NativeValidityEvidenceUnavailableError(
+            "document native Objects validity evidence is not iterable"
+        ) from exc
+
+    names: list[str] = []
+    try:
+        for target in iterator:
+            object_name = target.Name
+            if not isinstance(object_name, str) or not object_name:
+                raise NativeValidityEvidenceUnavailableError(
+                    "document native Objects contains an object without a stable Name"
+                )
+            is_derived_from = target.isDerivedFrom
+            if not callable(is_derived_from):
+                raise NativeValidityEvidenceUnavailableError(
+                    _object_message(
+                        object_name,
+                        "native type evidence is unavailable",
+                    )
+                )
+            if is_derived_from("PartDesign::Body") is True:
+                names.append(object_name)
+    except NativeValidityEvidenceUnavailableError:
+        raise
+    except AttributeError as exc:
+        raise NativeValidityEvidenceUnavailableError(
+            "document native Objects contains an object without usable type evidence"
+        ) from exc
+    except Exception as exc:
+        raise NativeValidityInspectionError(
+            "document native PartDesign Body discovery failed"
+        ) from exc
+
+    return tuple(sorted(set(names)))
+
+
 def _resolve_native_object(document: Any, object_name: str) -> Any:
     try:
         get_object = document.getObject
@@ -311,5 +372,6 @@ __all__ = [
     "NativeValidityInspectionError",
     "PostMutationValidityError",
     "inspect_native_dependencies",
+    "inspect_document_post_mutation_validity",
     "inspect_post_mutation_validity",
 ]

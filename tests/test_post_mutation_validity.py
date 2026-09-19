@@ -60,11 +60,57 @@ class _FakeRelated:
         self.Name = name
 
 
+class _FakeNamedBody:
+    """Fake native PartDesign::Body target with a stable Name attribute."""
+
+    def __init__(self, name: str, *, shape: Any = None) -> None:
+        self.Name = name
+        self.Shape = shape if shape is not None else _FakeShape()
+
+    def isDerivedFrom(self, type_id: str) -> bool:
+        return type_id == "PartDesign::Body"
+
+
+class _FakeNonBody:
+    """Fake native non-Body object that must never be shape-inspected."""
+
+    def __init__(self, name: str) -> None:
+        self.Name = name
+
+    def isDerivedFrom(self, type_id: str) -> bool:
+        return False
+
+    @property
+    def Shape(self) -> Any:
+        raise AssertionError("non-Body object must not be shape-inspected")
+
+
+class _FakeObjectsDocument:
+    """Fake document exposing getObject and an ordered Objects collection."""
+
+    def __init__(self, objects: list[Any]) -> None:
+        self._object_list = list(objects)
+        self._by_name: dict[str, Any] = {}
+        for target in objects:
+            self._by_name.setdefault(target.Name, target)
+
+    def getObject(self, name: str) -> Any:
+        return self._by_name.get(name)
+
+    @property
+    def Objects(self) -> list[Any]:
+        return list(self._object_list)
+
+
 class PublicApiTests(unittest.TestCase):
     def test_functions_are_exported(self) -> None:
         from parametron_freecad.execution import post_mutation_validity
 
-        for name in ["inspect_post_mutation_validity", "inspect_native_dependencies"]:
+        for name in [
+            "inspect_post_mutation_validity",
+            "inspect_native_dependencies",
+            "inspect_document_post_mutation_validity",
+        ]:
             with self.subTest(name=name):
                 self.assertIn(name, post_mutation_validity.__all__)
 
@@ -1104,6 +1150,377 @@ class ReadOnlyBehaviorTests(unittest.TestCase):
         doc = self._NoMutationDocument(target)
 
         inspect_native_dependencies(doc, "Body")
+
+
+class DocumentLevelValidityTests(unittest.TestCase):
+    """Focused coverage for inspect_document_post_mutation_validity."""
+
+    def test_discovers_all_supported_surviving_bodies(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [_FakeNamedBody("Alpha"), _FakeNamedBody("Bravo")]
+        )
+
+        evidence = inspect_document_post_mutation_validity(doc)
+        self.assertEqual({item.object_name for item in evidence}, {"Alpha", "Bravo"})
+
+    def test_deterministic_lexical_ordering_by_name(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [_FakeNamedBody("Zulu"), _FakeNamedBody("Alpha"), _FakeNamedBody("Mike")]
+        )
+
+        evidence = inspect_document_post_mutation_validity(doc)
+        self.assertEqual(
+            [item.object_name for item in evidence], ["Alpha", "Mike", "Zulu"]
+        )
+
+    def test_ordering_independent_of_objects_enumeration_order(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            inspect_document_post_mutation_validity,
+        )
+
+        doc_a = _FakeObjectsDocument(
+            [_FakeNamedBody("Zulu"), _FakeNamedBody("Alpha")]
+        )
+        doc_b = _FakeObjectsDocument(
+            [_FakeNamedBody("Alpha"), _FakeNamedBody("Zulu")]
+        )
+
+        evidence_a = inspect_document_post_mutation_validity(doc_a)
+        evidence_b = inspect_document_post_mutation_validity(doc_b)
+        self.assertEqual(
+            [item.object_name for item in evidence_a],
+            [item.object_name for item in evidence_b],
+        )
+
+    def test_duplicate_discovered_names_do_not_break_deterministic_ordering(
+        self,
+    ) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            inspect_document_post_mutation_validity,
+        )
+
+        # Two distinct native objects reporting the same Name is not a
+        # realistic FreeCAD state, but the discovery helper deduplicates by
+        # name before ordering; this proves that dedup keeps the result
+        # deterministic rather than raising or duplicating evidence.
+        doc = _FakeObjectsDocument(
+            [_FakeNamedBody("Same"), _FakeNamedBody("Same"), _FakeNamedBody("Other")]
+        )
+
+        evidence = inspect_document_post_mutation_validity(doc)
+        self.assertEqual([item.object_name for item in evidence], ["Other", "Same"])
+
+    def test_unrelated_non_body_objects_are_not_shape_inspected(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [_FakeNamedBody("Body"), _FakeNonBody("Sketch")]
+        )
+
+        # Does not raise: _FakeNonBody.Shape would raise AssertionError if
+        # ever accessed, proving non-Body objects are excluded before any
+        # shape inspection happens.
+        evidence = inspect_document_post_mutation_validity(doc)
+        self.assertEqual([item.object_name for item in evidence], ["Body"])
+
+    def test_every_discovered_body_receives_bounded_shape_health_evidence(
+        self,
+    ) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeShapeHealthEvidence,
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [
+                _FakeNamedBody(
+                    "Alpha", shape=_FakeShape(is_null=False, is_valid=True, solids=[object()])
+                ),
+                _FakeNamedBody(
+                    "Bravo",
+                    shape=_FakeShape(is_null=False, is_valid=True, solids=[object()] * 3),
+                ),
+            ]
+        )
+
+        evidence = inspect_document_post_mutation_validity(doc)
+        self.assertEqual(
+            evidence,
+            (
+                NativeShapeHealthEvidence(
+                    object_name="Alpha", is_null=False, is_valid=True, solid_count=1
+                ),
+                NativeShapeHealthEvidence(
+                    object_name="Bravo", is_null=False, is_valid=True, solid_count=3
+                ),
+            ),
+        )
+
+    def test_returned_evidence_order_is_deterministic_across_repeated_calls(
+        self,
+    ) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [_FakeNamedBody("Zulu"), _FakeNamedBody("Alpha")]
+        )
+
+        first = inspect_document_post_mutation_validity(doc)
+        second = inspect_document_post_mutation_validity(doc)
+        self.assertEqual(first, second)
+
+    def test_zero_supported_bodies_fails_closed(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityEvidenceUnavailableError,
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument([_FakeNonBody("Sketch")])
+
+        with self.assertRaises(NativeValidityEvidenceUnavailableError):
+            inspect_document_post_mutation_validity(doc)
+
+    def test_zero_supported_bodies_with_no_objects_at_all_fails_closed(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityEvidenceUnavailableError,
+            inspect_document_post_mutation_validity,
+        )
+
+        with self.assertRaises(NativeValidityEvidenceUnavailableError):
+            inspect_document_post_mutation_validity(_FakeObjectsDocument([]))
+
+    def test_missing_objects_attribute_fails_deterministically(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityEvidenceUnavailableError,
+            inspect_document_post_mutation_validity,
+        )
+
+        class DocumentWithoutObjects:
+            pass
+
+        with self.assertRaises(NativeValidityEvidenceUnavailableError):
+            inspect_document_post_mutation_validity(DocumentWithoutObjects())
+
+    def test_non_iterable_objects_fails_deterministically(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityEvidenceUnavailableError,
+            inspect_document_post_mutation_validity,
+        )
+
+        class DocumentWithNonIterableObjects:
+            Objects = 42
+
+        with self.assertRaises(NativeValidityEvidenceUnavailableError):
+            inspect_document_post_mutation_validity(DocumentWithNonIterableObjects())
+
+    def test_object_without_usable_name_fails_closed(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityEvidenceUnavailableError,
+            inspect_document_post_mutation_validity,
+        )
+
+        class ObjectWithoutName:
+            def isDerivedFrom(self, type_id: str) -> bool:
+                return True
+
+        class DocumentWithBadObject:
+            Objects = [ObjectWithoutName()]
+
+        with self.assertRaises(NativeValidityEvidenceUnavailableError):
+            inspect_document_post_mutation_validity(DocumentWithBadObject())
+
+    def test_object_with_empty_name_fails_closed(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityEvidenceUnavailableError,
+            inspect_document_post_mutation_validity,
+        )
+
+        class ObjectWithEmptyName:
+            Name = ""
+
+            def isDerivedFrom(self, type_id: str) -> bool:
+                return True
+
+        class DocumentWithBadObject:
+            Objects = [ObjectWithEmptyName()]
+
+        with self.assertRaises(NativeValidityEvidenceUnavailableError):
+            inspect_document_post_mutation_validity(DocumentWithBadObject())
+
+    def test_object_with_non_string_name_fails_closed(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityEvidenceUnavailableError,
+            inspect_document_post_mutation_validity,
+        )
+
+        class ObjectWithNonStringName:
+            Name = 123
+
+            def isDerivedFrom(self, type_id: str) -> bool:
+                return True
+
+        class DocumentWithBadObject:
+            Objects = [ObjectWithNonStringName()]
+
+        with self.assertRaises(NativeValidityEvidenceUnavailableError):
+            inspect_document_post_mutation_validity(DocumentWithBadObject())
+
+    def test_missing_type_inspection_fails_closed(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityEvidenceUnavailableError,
+            inspect_document_post_mutation_validity,
+        )
+
+        class ObjectWithoutTypeInspection:
+            Name = "Widget"
+
+        class DocumentWithBadObject:
+            Objects = [ObjectWithoutTypeInspection()]
+
+        with self.assertRaises(NativeValidityEvidenceUnavailableError):
+            inspect_document_post_mutation_validity(DocumentWithBadObject())
+
+    def test_non_callable_type_inspection_fails_closed(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityEvidenceUnavailableError,
+            inspect_document_post_mutation_validity,
+        )
+
+        class ObjectWithNonCallableTypeInspection:
+            Name = "Widget"
+            isDerivedFrom = "not-callable"
+
+        class DocumentWithBadObject:
+            Objects = [ObjectWithNonCallableTypeInspection()]
+
+        with self.assertRaises(NativeValidityEvidenceUnavailableError):
+            inspect_document_post_mutation_validity(DocumentWithBadObject())
+
+    def test_type_inspection_exception_raises_inspection_error_with_cause(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            NativeValidityInspectionError,
+            inspect_document_post_mutation_validity,
+        )
+
+        original = RuntimeError("type inspection failed")
+
+        class ObjectTypeInspectionRaises:
+            Name = "Widget"
+
+            def isDerivedFrom(self, type_id: str) -> bool:
+                raise original
+
+        class DocumentWithBadObject:
+            Objects = [ObjectTypeInspectionRaises()]
+
+        try:
+            inspect_document_post_mutation_validity(DocumentWithBadObject())
+            self.fail("expected NativeValidityInspectionError")
+        except NativeValidityInspectionError as exc:
+            self.assertIs(exc.__cause__, original)
+
+    def test_discovered_invalid_body_prevents_successful_document_validity(
+        self,
+    ) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            InvalidNativeCadStateError,
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [
+                _FakeNamedBody("Healthy"),
+                _FakeNamedBody(
+                    "Broken", shape=_FakeShape(is_null=True, is_valid=True)
+                ),
+            ]
+        )
+
+        with self.assertRaises(InvalidNativeCadStateError):
+            inspect_document_post_mutation_validity(doc)
+
+    def test_discovered_invalid_body_message_identifies_the_broken_body(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            InvalidNativeCadStateError,
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [_FakeNamedBody("Broken", shape=_FakeShape(is_null=True, is_valid=True))]
+        )
+
+        try:
+            inspect_document_post_mutation_validity(doc)
+            self.fail("expected InvalidNativeCadStateError")
+        except InvalidNativeCadStateError as exc:
+            self.assertIn("Broken", str(exc))
+
+    def test_zero_solids_remains_allowed_when_shape_otherwise_valid(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [
+                _FakeNamedBody(
+                    "Body", shape=_FakeShape(is_null=False, is_valid=True, solids=[])
+                )
+            ]
+        )
+
+        evidence = inspect_document_post_mutation_validity(doc)
+        self.assertEqual(evidence[0].solid_count, 0)
+
+    def test_multiple_solids_remains_allowed_when_shape_otherwise_valid(self) -> None:
+        from parametron_freecad.execution.post_mutation_validity import (
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [
+                _FakeNamedBody(
+                    "Body",
+                    shape=_FakeShape(is_null=False, is_valid=True, solids=[object()] * 4),
+                )
+            ]
+        )
+
+        evidence = inspect_document_post_mutation_validity(doc)
+        self.assertEqual(evidence[0].solid_count, 4)
+
+    def test_multiple_bodies_are_each_inspected_in_deterministic_order(self) -> None:
+        # Proves multiple surviving Bodies are individually shape-inspected
+        # (not merely discovered) and the resulting evidence tuple follows
+        # the same deterministic name order as discovery.
+        from parametron_freecad.execution.post_mutation_validity import (
+            inspect_document_post_mutation_validity,
+        )
+
+        doc = _FakeObjectsDocument(
+            [
+                _FakeNamedBody("Charlie", shape=_FakeShape(solids=[object()] * 2)),
+                _FakeNamedBody("Alpha", shape=_FakeShape(solids=[object()])),
+                _FakeNamedBody("Bravo", shape=_FakeShape(solids=[])),
+            ]
+        )
+
+        evidence = inspect_document_post_mutation_validity(doc)
+        self.assertEqual(
+            [(item.object_name, item.solid_count) for item in evidence],
+            [("Alpha", 1), ("Bravo", 0), ("Charlie", 2)],
+        )
 
 
 if __name__ == "__main__":
