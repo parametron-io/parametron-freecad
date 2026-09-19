@@ -31,11 +31,13 @@ Manifest schema 2.0 metadata and strict validation are implemented separately;
 the execute entrypoint rejects schema 2.0 manifests. Focused FreeCAD-native
 target-mutation support now includes independently tested
 suppression/unsuppression, App-level visibility, deterministic post-mutation
-PartDesign Body validity inspection, and deterministic native dependency
-evidence for later conservative deletion work. These standalone capabilities
-are not yet wired into the execute path. Native deletion execution remains
-unimplemented. Final runtime-stage ordering and structured failure mapping are
-deferred to issue #6. See the
+supported Body validity inspection, deterministic native dependency evidence,
+and conservative FreeCAD-native deletion (exact native target lookup,
+surviving-dependent rejection, native removal, post-removal recompute,
+supported post-delete Body validity checks, and fail-closed behavior). These
+standalone capabilities are not yet wired into the execute path. Final
+runtime-stage ordering and structured failure mapping are deferred to issue #6.
+See the
 [target-mutation contract](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/target-mutations.md).
 
 ## Headless usage
