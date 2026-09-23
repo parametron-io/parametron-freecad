@@ -13,6 +13,7 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "reference_traversal"
 RUNNER = Path(__file__).parent / "freecad_reference_fixture_runner.py"
+RELOCATION_RUNNER = Path(__file__).parent / "freecad_reference_fixture_relocation_runner.py"
 GENERATOR = REPOSITORY_ROOT / "scripts" / "generate_reference_traversal_fixtures.py"
 SOURCE_DOCUMENT = "reference-root.FCStd"
 OUTPUT_FILENAME = "prm.reference-traversal.json"
@@ -306,6 +307,46 @@ finally:
         for identity, frozen in FROZEN_NODE_IDS.items():
             with self.subTest(identity=identity):
                 self.assertEqual(_independent_node_id(*identity), frozen)
+
+    def test_complete_committed_bundle_relocates_without_traversal_mapping(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            bundle = Path(temporary) / "arbitrary" / "reference-traversal"
+            bundle.parent.mkdir()
+            self._copy_bundle(bundle)
+            self.assertNotEqual(bundle.resolve(), FIXTURE_ROOT.resolve())
+            output = Path(temporary) / "relocation-proof.json"
+            command = [
+                self.freecad_host,
+                str(RELOCATION_RUNNER),
+                f"--pass={bundle / SOURCE_DOCUMENT}",
+                f"--pass={output}",
+            ]
+            completed = subprocess.run(
+                command, capture_output=True, text=True, timeout=30, check=False
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr + completed.stdout)
+            observed = json.loads(output.read_bytes())
+
+            expected_documents = {
+                "InternalSource.InternalLink": bundle / SOURCE_DOCUMENT,
+                "ExternalSourceOne.ExternalLink": bundle / "references/reference-a.FCStd",
+                "ExternalSourceTwo.ExternalLink": bundle / "references/reference-a.FCStd",
+                "SecondExternalSource.ExternalLink": bundle / "references/reference-b.FCStd",
+            }
+            expected_targets = {
+                "InternalSource.InternalLink": "InternalTarget",
+                "ExternalSourceOne.ExternalLink": "SharedTarget",
+                "ExternalSourceTwo.ExternalLink": "SharedTarget",
+                "SecondExternalSource.ExternalLink": "SecondTarget",
+            }
+            self.assertEqual(set(observed), set(expected_targets))
+            for property_path, target_name in expected_targets.items():
+                with self.subTest(property_path=property_path):
+                    self.assertEqual(observed[property_path]["target"], target_name)
+                    self.assertEqual(
+                        Path(observed[property_path]["document"]),
+                        expected_documents[property_path].resolve(),
+                    )
 
     def test_real_fixture_direct_traversal_matches_exact_schema_2_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

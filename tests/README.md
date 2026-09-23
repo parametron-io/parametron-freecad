@@ -23,9 +23,14 @@ environment satisfying the same requirements works.
 
 Most tests run under ordinary Python and do not require a FreeCAD installation. Fake-FreeCAD module injection is used to test the document lifecycle, headless runtime, parameter assignment, document recompute, and artifact export boundaries without a real FreeCAD process.
 
-The committed real reference-traversal fixtures run in the normal Nix suite
-when the repository FreeCAD wrapper and `freecadcmd` are available. Maintain a
-semantic replacement bundle in a new directory with:
+The complete `tests/fixtures/reference_traversal/` directory is the portable
+real reference-traversal fixture unit; `reference-root.FCStd` depends on its
+`references/` sibling directory. The real fixture tests copy that complete
+bundle to an arbitrary temporary location and use FreeCAD directly to verify
+the persisted internal and external links without a traversal request or
+`externalTargets` mappings. They run in the normal Nix suite when the repository
+FreeCAD wrapper and `freecadcmd` are available. Maintain a semantic replacement
+bundle in a new directory with:
 
 ```
 nix develop --command freecadcmd scripts/generate_reference_traversal_fixtures.py --pass=/absolute/new/output-directory
