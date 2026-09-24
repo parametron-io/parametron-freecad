@@ -152,26 +152,20 @@ class TestVersionDispatchMatrix(unittest.TestCase):
 
 
 class TestV1ClosureRegression(unittest.TestCase):
-    """Task 3 must not alter V1 field closure or diagnostics."""
+    """Canonical V1 permits optional target mutations and rejects schema 2.0."""
 
-    def test_v1_accepts_only_the_four_known_top_level_fields(self):
+    def test_v1_accepts_required_core_without_mutations(self):
         self.assertTrue(mv.validate_export_manifest_v1(MINIMAL_V1).is_valid)
 
-    def test_v1_rejects_assembly_mutations_as_unknown_field(self):
+    def test_v1_accepts_optional_assembly_mutations(self):
         data = {**MINIMAL_V1, "assemblyMutations": {}}
         result = mv.validate_export_manifest_v1(data)
-        self.assertIn(
-            (mv.DIAGNOSTIC_UNKNOWN_FIELD, "assemblyMutations"),
-            [(d.code, d.path) for d in result.diagnostics],
-        )
+        self.assertTrue(result.is_valid, result.diagnostics)
 
-    def test_v1_rejects_part_mutations_as_unknown_field(self):
+    def test_v1_accepts_optional_part_mutations(self):
         data = {**MINIMAL_V1, "partMutations": {}}
         result = mv.validate_export_manifest_v1(data)
-        self.assertIn(
-            (mv.DIAGNOSTIC_UNKNOWN_FIELD, "partMutations"),
-            [(d.code, d.path) for d in result.diagnostics],
-        )
+        self.assertTrue(result.is_valid, result.diagnostics)
 
     def test_v1_rejects_schema_2_0(self):
         data = {**MINIMAL_V1, "schemaVersion": "2.0"}

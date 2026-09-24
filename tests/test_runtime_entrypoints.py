@@ -3042,12 +3042,9 @@ class EngineCompatibilityEntrypointTests(unittest.TestCase):
                 _dependencies=self._fake_dependencies([]),
             )
 
-    def test_engine_name_only_param_cause_is_unsupported_parameter_target_error(
+    def test_legacy_engine_shape_fails_canonical_validation_without_translation(
         self,
     ) -> None:
-        from parametron_freecad.execution.engine_manifest_compat import (
-            EngineManifestUnsupportedParameterTargetError,
-        )
         from parametron_freecad.runtime import entrypoints
 
         working_copy = Path("/tmp/wc")
@@ -3067,10 +3064,8 @@ class EngineCompatibilityEntrypointTests(unittest.TestCase):
                 _dependencies=self._fake_dependencies([]),
             )
 
-        self.assertIsInstance(
-            excinfo.exception.__cause__,
-            EngineManifestUnsupportedParameterTargetError,
-        )
+        self.assertIsNone(excinfo.exception.__cause__)
+        self.assertIn("manifest validation failed", str(excinfo.exception).lower())
 
     def test_engine_name_only_param_rejected_before_freecad_document_open(
         self,

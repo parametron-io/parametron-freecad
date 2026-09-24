@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.0",
+  "sourceDocument": "source/cube.FCStd",
+  "parameterAssignments": [
+    {
+      "target": "VarSet.boxChamfer",
+      "value": 5,
+      "valueKind": "float"
+    },
+    {
+      "target": "VarSet.boxHeight",
+      "value": 60,
+      "valueKind": "float"
+    },
+    {
+      "target": "VarSet.boxLength",
+      "value": 80,
+      "valueKind": "float"
+    },
+    {
+      "target": "VarSet.boxWidth",
+      "value": 50,
+      "valueKind": "float"
+    },
+    {
+      "target": "VarSet.holeDia",
+      "value": 18,
+      "valueKind": "float"
+    }
+  ],
+  "partMutations": {
+    "suppression": [
+      {
+        "object": "Fillet",
+        "suppressed": true
+      },
+      {
+        "object": "Pocket001",
+        "suppressed": false
+      }
+    ],
+    "visibility": [
+      {
+        "object": "Body",
+        "visible": true
+      },
+      {
+        "object": "Body001",
+        "visible": true
+      },
+      {
+        "object": "Body003",
+        "visible": false
+      },
+      {
+        "object": "Chamfer",
+        "visible": true
+      },
+      {
+        "object": "Pad002",
+        "visible": true
+      }
+    ],
+    "deletion": [
+      {
+        "object": "Body002"
+      }
+    ]
+  },
+  "outputs": []
+}

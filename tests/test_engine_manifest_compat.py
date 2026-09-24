@@ -17,9 +17,53 @@ import parametron_freecad.execution.engine_manifest_compat as emc
 from parametron_freecad.execution.manifest_loader import LoadedManifest
 from parametron_freecad.execution.manifest_validation import validate_export_manifest_v1
 
-FIXTURE_PATH = (
-    Path(__file__).parent / "fixtures" / "engine_generated" / "export_manifest.v1.json"
-)
+# Historical input retained only for the still-used rehearsal compatibility API.
+# This is not part of the current Engine-generated input corpus.
+LEGACY_EXAMPLE = '''
+{
+  "schemaVersion": "1.0",
+  "planHash": "349e2081f19cd8676b56d12a1507e98b466bb0de342c8138766610a0964632f5",
+  "adapter": "freecad",
+  "product": {
+    "id": "Box"
+  },
+  "inputs": {
+    "sourceModel": "input/box.FCStd"
+  },
+  "values": {
+    "height": 42,
+    "length": 35,
+    "width": 53
+  },
+  "parameterAssignments": [
+    {
+      "name": "length",
+      "value": 35,
+      "type": "number",
+      "unit": "mm"
+    },
+    {
+      "name": "width",
+      "value": 53,
+      "type": "number",
+      "unit": "mm"
+    },
+    {
+      "name": "height",
+      "value": 42,
+      "type": "number",
+      "unit": "mm"
+    }
+  ],
+  "outputs": [
+    {
+      "type": "step",
+      "filename": "Box.step",
+      "object": "Body"
+    }
+  ]
+}
+'''
 
 
 # ---------------------------------------------------------------------------
@@ -711,12 +755,12 @@ class EngineOutputNormalizationTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class SanitizedFixtureTests(unittest.TestCase):
+class HistoricalCompatibilityExampleTests(unittest.TestCase):
     def _load_fixture(self) -> dict:
-        return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+        return json.loads(LEGACY_EXAMPLE)
 
-    def test_fixture_file_exists(self) -> None:
-        self.assertTrue(FIXTURE_PATH.exists(), f"Fixture not found: {FIXTURE_PATH}")
+    def test_historical_example_is_available(self) -> None:
+        self.assertTrue(LEGACY_EXAMPLE)
 
     def test_fixture_is_valid_json_object(self) -> None:
         data = self._load_fixture()
