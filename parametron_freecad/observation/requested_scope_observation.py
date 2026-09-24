@@ -11,6 +11,7 @@ from parametron_freecad.observation.observed_contract import (
     OBSERVATION_FIELD_METADATA,
     OBSERVATION_FIELD_PARAMETERS,
     OBSERVATION_FIELD_REFERENCES,
+    OBSERVATION_FIELD_TARGET_STATE,
 )
 from parametron_freecad.observation.observation_ordering import (
     order_observation_payload,
@@ -20,6 +21,10 @@ from parametron_freecad.observation.parameter_observation import (
 )
 from parametron_freecad.observation.reference_observation import (
     observe_requested_references,
+)
+from parametron_freecad.observation.target_state_observation import (
+    observe_target_state,
+    requested_target_state,
 )
 from parametron_freecad.observation.verification_contract import (
     FIELD_OBSERVE,
@@ -69,7 +74,8 @@ def observe_requested_contract_scope(
     if observe is None:
         return {}
 
-    observation: dict[str, tuple[dict[str, Any], ...]] = {}
+    target_state_request = requested_target_state(verification_data)
+    observation: dict[str, Any] = {}
 
     if observe.get(OBSERVE_FIELD_PARAMETERS):
         observation[OBSERVATION_FIELD_PARAMETERS] = observe_requested_parameters(
@@ -85,6 +91,11 @@ def observe_requested_contract_scope(
         observation[OBSERVATION_FIELD_REFERENCES] = observe_requested_references(
             document,
             verification_data,
+        )
+
+    if target_state_request is not None:
+        observation[OBSERVATION_FIELD_TARGET_STATE] = observe_target_state(
+            document, target_state_request
         )
 
     return order_observation_payload(observation)

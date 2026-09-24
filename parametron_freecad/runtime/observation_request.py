@@ -13,6 +13,10 @@ from parametron_freecad.observation.verification_loader import (
     VerificationLoadError,
     load_parametron_verification_v1,
 )
+from parametron_freecad.observation.target_state_observation import (
+    TargetStateObservationError,
+    requested_target_state,
+)
 
 
 class ObservationRequestError(ValueError):
@@ -25,9 +29,11 @@ def load_observation_request(path: Path) -> Mapping[str, Any]:
     try:
         loaded = load_parametron_verification_v1(path)
         require_engine_verification_expectations_compatible(loaded.data)
+        requested_target_state(loaded.data)
     except (
         EngineVerificationExpectationCompatibilityError,
         VerificationLoadError,
+        TargetStateObservationError,
     ) as exc:
         raise ObservationRequestError(str(exc)) from exc
 

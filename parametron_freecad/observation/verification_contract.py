@@ -50,12 +50,14 @@ OBSERVE_FIELD_COMPONENTS = "components"
 OBSERVE_FIELD_PARAMETERS = "parameters"
 OBSERVE_FIELD_METADATA = "metadata"
 OBSERVE_FIELD_REFERENCES = "references"
+OBSERVE_FIELD_TARGET_STATE = "targetState"
 
 OBSERVE_FIELDS = (
     OBSERVE_FIELD_COMPONENTS,
     OBSERVE_FIELD_PARAMETERS,
     OBSERVE_FIELD_METADATA,
     OBSERVE_FIELD_REFERENCES,
+    OBSERVE_FIELD_TARGET_STATE,
 )
 
 # ---------------------------------------------------------------------------
@@ -63,9 +65,13 @@ OBSERVE_FIELDS = (
 # ---------------------------------------------------------------------------
 
 OBSERVATION_CONTEXT_FIELD_PARAMETERS = "parameters"
+OBSERVATION_CONTEXT_FIELD_TARGET_STATE = "targetState"
+TARGET_STATE_FAMILIES = ("suppression", "visibility", "existence")
+TARGET_IDENTITY_FIELDS = ("destination", "object")
 
 OBSERVATION_CONTEXT_FIELDS = (
     OBSERVATION_CONTEXT_FIELD_PARAMETERS,
+    OBSERVATION_CONTEXT_FIELD_TARGET_STATE,
 )
 
 # ---------------------------------------------------------------------------
@@ -238,6 +244,7 @@ class ObservationContextContract:
 
     fields: tuple[str, ...]
     parameters_field: str
+    target_state_field: str
     parameter_binding: ObservationParameterBindingContract
 
 
@@ -250,6 +257,7 @@ class ObserveContract:
     parameters_field: str
     metadata_field: str
     references_field: str
+    target_state_field: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -369,6 +377,7 @@ OBSERVATION_PARAMETER_BINDING_CONTRACT = ObservationParameterBindingContract(
 OBSERVATION_CONTEXT_CONTRACT = ObservationContextContract(
     fields=OBSERVATION_CONTEXT_FIELDS,
     parameters_field=OBSERVATION_CONTEXT_FIELD_PARAMETERS,
+    target_state_field=OBSERVATION_CONTEXT_FIELD_TARGET_STATE,
     parameter_binding=OBSERVATION_PARAMETER_BINDING_CONTRACT,
 )
 
@@ -378,6 +387,7 @@ OBSERVE_CONTRACT = ObserveContract(
     parameters_field=OBSERVE_FIELD_PARAMETERS,
     metadata_field=OBSERVE_FIELD_METADATA,
     references_field=OBSERVE_FIELD_REFERENCES,
+    target_state_field=OBSERVE_FIELD_TARGET_STATE,
 )
 
 EXPECTED_COMPONENT_CONTRACT = ExpectedComponentContract(
@@ -562,9 +572,13 @@ __all__ = [
     "OBSERVE_FIELD_METADATA",
     "OBSERVE_FIELD_PARAMETERS",
     "OBSERVE_FIELD_REFERENCES",
+    "OBSERVE_FIELD_TARGET_STATE",
     "OBSERVE_FIELDS",
     "OBSERVATION_CONTEXT_CONTRACT",
     "OBSERVATION_CONTEXT_FIELD_PARAMETERS",
+    "OBSERVATION_CONTEXT_FIELD_TARGET_STATE",
+    "TARGET_STATE_FAMILIES",
+    "TARGET_IDENTITY_FIELDS",
     "OBSERVATION_CONTEXT_FIELDS",
     "OBSERVATION_PARAMETER_BINDING_CONTRACT",
     "OBSERVATION_PARAMETER_FIELD_GROUP_NAME",

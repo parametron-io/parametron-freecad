@@ -51,12 +51,17 @@ OBSERVATION_FIELD_PARAMETERS = "parameters"
 OBSERVATION_FIELD_METADATA = "metadata"
 OBSERVATION_FIELD_REFERENCES = "references"
 OBSERVATION_FIELD_COMPONENTS = "components"
+OBSERVATION_FIELD_TARGET_STATE = "targetState"
+TARGET_STATE_FAMILIES = ("suppression", "visibility", "existence")
+TARGET_STATE_BOOLEAN_FIELDS = ("destination", "object", "status", "value")
+TARGET_STATE_EXISTENCE_FIELDS = ("destination", "object", "status")
 
 OBSERVATION_FIELDS = (
     OBSERVATION_FIELD_PARAMETERS,
     OBSERVATION_FIELD_METADATA,
     OBSERVATION_FIELD_REFERENCES,
     OBSERVATION_FIELD_COMPONENTS,
+    OBSERVATION_FIELD_TARGET_STATE,
 )
 
 # ---------------------------------------------------------------------------
@@ -225,6 +230,7 @@ class ObservationContract:
     metadata_field: str
     references_field: str
     components_field: str
+    target_state_field: str
     parameter: ObservedParameterContract
     metadata: ObservedMetadataContract
     reference: ObservedReferenceContract
@@ -297,6 +303,7 @@ OBSERVATION_CONTRACT = ObservationContract(
     metadata_field=OBSERVATION_FIELD_METADATA,
     references_field=OBSERVATION_FIELD_REFERENCES,
     components_field=OBSERVATION_FIELD_COMPONENTS,
+    target_state_field=OBSERVATION_FIELD_TARGET_STATE,
     parameter=OBSERVED_PARAMETER_CONTRACT,
     metadata=OBSERVED_METADATA_CONTRACT,
     reference=OBSERVED_REFERENCE_CONTRACT,
@@ -357,6 +364,10 @@ __all__ = [
     "OBSERVATION_FIELD_METADATA",
     "OBSERVATION_FIELD_PARAMETERS",
     "OBSERVATION_FIELD_REFERENCES",
+    "OBSERVATION_FIELD_TARGET_STATE",
+    "TARGET_STATE_FAMILIES",
+    "TARGET_STATE_BOOLEAN_FIELDS",
+    "TARGET_STATE_EXISTENCE_FIELDS",
     "OBSERVATION_FIELDS",
     "OBSERVED_COMPONENT_CONTRACT",
     "OBSERVED_COMPONENT_FIELD_ID",
