@@ -22,13 +22,13 @@ EXPECTED_OBJECTS = [
     "Sketch001",
     "Pocket",
     "Chamfer",
-    "TargetObject",
-    "TargetBody",
-    "Unsuppress_Feature",
-    "Suppress_Feature",
-    "UnhideFeature",
-    "SafeDeleteObject",
-    "HideObject",
+    "Body001",
+    "Body002",
+    "Body003",
+    "Pocket001",
+    "Fillet",
+    "Pad002",
+    "VarSet",
 ]
 
 EXPECTED_PARAMETERS = [
@@ -89,6 +89,7 @@ def object_snapshot(obj):
     if hasattr(obj, "Shape"):
         try:
             result["shapeNull"] = obj.Shape.isNull()
+            result["shapeValid"] = False if result["shapeNull"] else obj.Shape.isValid()
         except Exception as exc:
             result["shapeNullError"] = str(exc)
 

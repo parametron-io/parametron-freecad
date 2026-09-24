@@ -12,7 +12,7 @@
   "sourceDocument": {
     "logicalId": "cube_canonical_lifecycle_model",
     "path": "input/cube.FCStd",
-    "fingerprint": "sha256:1dba513110bbf11173b70f808e54c4c316f571fd8f6f4b8d0d5c1aa757550e87"
+    "fingerprint": "sha256:9376277c131ac3f361f05412b3a6b455f8574eabf99f1e02d1fa75d3fca82250"
   },
   "rootProduct": {
     "id": "cmp.root"
