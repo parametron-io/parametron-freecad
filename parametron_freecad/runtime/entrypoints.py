@@ -12,6 +12,23 @@ from parametron_freecad.execution.csv_export import (
     CsvArtifactExportError,
     export_csv_artifacts,
 )
+from parametron_freecad.execution.deletion import (
+    DeletionMutationError,
+    DeletionValidityError,
+    apply_deletion_mutations,
+)
+from parametron_freecad.execution.suppression import (
+    SuppressionMutationError,
+    apply_suppression_mutations,
+)
+from parametron_freecad.execution.visibility import (
+    VisibilityMutationError,
+    apply_visibility_mutations,
+)
+from parametron_freecad.execution.post_mutation_validity import (
+    PostMutationValidityError,
+    inspect_document_post_mutation_validity,
+)
 from parametron_freecad.execution.document_recompute import (
     DocumentRecomputeError,
     recompute_document,
@@ -22,10 +39,6 @@ from parametron_freecad.execution.document_save import (
 )
 from parametron_freecad.execution.manifest_contract import (
     EXPORT_MANIFEST_V1_CONTRACT,
-)
-from parametron_freecad.execution.engine_manifest_compat import (
-    EngineManifestCompatibilityError,
-    normalize_loaded_export_manifest_v1,
 )
 from parametron_freecad.execution.manifest_loader import (
     LoadedManifest,
@@ -57,6 +70,7 @@ from parametron_freecad.observation.observed_output import (
     generate_observed_output,
 )
 from parametron_freecad.runtime.document_lifecycle import (
+    DocumentCloseError,
     DocumentLifecycleError,
     OpenedDocument,
     SourceDocumentPathError,
@@ -73,7 +87,11 @@ from parametron_freecad.runtime.failure_output_contract import (
     FAILURE_STAGE_DOCUMENT_OPEN,
     FAILURE_STAGE_DOCUMENT_SAVE,
     FAILURE_STAGE_FREECAD_RESOLUTION,
-    FAILURE_STAGE_MANIFEST_COMPATIBILITY,
+    FAILURE_STAGE_DOCUMENT_CLOSE,
+    FAILURE_STAGE_SUPPRESSION,
+    FAILURE_STAGE_VISIBILITY,
+    FAILURE_STAGE_DELETION,
+    FAILURE_STAGE_POST_MUTATION_VALIDITY,
     FAILURE_STAGE_MANIFEST_LOADING,
     FAILURE_STAGE_MANIFEST_VALIDATION,
     FAILURE_STAGE_OBSERVATION,
@@ -148,6 +166,12 @@ class ValidatedExecutionManifest:
 @dataclass(frozen=True, slots=True)
 class _ExecutionEntrypointDependencies:
     apply_parameter_assignments: Callable[[Any, Any], None] = apply_parameter_assignments
+    apply_suppression_mutations: Callable[[Any, Any], None] = apply_suppression_mutations
+    apply_visibility_mutations: Callable[[Any, Any], None] = apply_visibility_mutations
+    apply_deletion_mutations: Callable[[Any, Any], None] = apply_deletion_mutations
+    inspect_document_post_mutation_validity: Callable[[Any], Any] = (
+        inspect_document_post_mutation_validity
+    )
     recompute_document: Callable[[Any], None] = recompute_document
     save_document: Callable[[Any], None] = save_document
     export_step_artifacts: Callable[..., None] = export_step_artifacts
@@ -234,14 +258,26 @@ def _failure_stage_for_exception(exc: BaseException) -> str:
 
     if isinstance(source, ManifestLoadError):
         return FAILURE_STAGE_MANIFEST_LOADING
-    if isinstance(source, EngineManifestCompatibilityError):
-        return FAILURE_STAGE_MANIFEST_COMPATIBILITY
     if isinstance(source, SourceDocumentPathError):
         return FAILURE_STAGE_SOURCE_DOCUMENT_RESOLUTION
+    if isinstance(source, DocumentCloseError):
+        return FAILURE_STAGE_DOCUMENT_CLOSE
     if isinstance(source, DocumentLifecycleError):
         return FAILURE_STAGE_DOCUMENT_OPEN
     if isinstance(source, ParameterAssignmentError):
         return FAILURE_STAGE_PARAMETER_ASSIGNMENT
+    if isinstance(source, SuppressionMutationError):
+        return FAILURE_STAGE_SUPPRESSION
+    if isinstance(source, VisibilityMutationError):
+        return FAILURE_STAGE_VISIBILITY
+    if isinstance(source, DeletionValidityError):
+        if isinstance(source.__cause__, DocumentRecomputeError):
+            return FAILURE_STAGE_RECOMPUTE
+        return FAILURE_STAGE_POST_MUTATION_VALIDITY
+    if isinstance(source, DeletionMutationError):
+        return FAILURE_STAGE_DELETION
+    if isinstance(source, PostMutationValidityError):
+        return FAILURE_STAGE_POST_MUTATION_VALIDITY
     if isinstance(source, DocumentRecomputeError):
         return FAILURE_STAGE_RECOMPUTE
     if isinstance(source, DocumentSaveError):
@@ -342,11 +378,6 @@ def _validate_execution_manifest(
     except ManifestLoadError as exc:
         raise ExecutionEntrypointError(str(exc)) from exc
 
-    try:
-        loaded_manifest = normalize_loaded_export_manifest_v1(loaded_manifest)
-    except EngineManifestCompatibilityError as exc:
-        raise ExecutionEntrypointError(str(exc)) from exc
-
     validation_result = validate_export_manifest_v1(loaded_manifest.data)
     if not validation_result.is_valid:
         raise ExecutionEntrypointError(
@@ -368,6 +399,40 @@ def _validate_execution_manifest(
         loaded_manifest=loaded_manifest,
         source_document_path=source_document_path,
     )
+
+
+def _apply_target_mutations_and_recompute(
+    document: Any,
+    manifest: Mapping[str, Any],
+    dependencies: _ExecutionEntrypointDependencies,
+) -> None:
+    """Compose native consumers in contract order, reusing deletion's checks."""
+
+    contract = EXPORT_MANIFEST_V1_CONTRACT
+    consumers = {
+        contract.assembly_mutations.suppression_field: dependencies.apply_suppression_mutations,
+        contract.assembly_mutations.visibility_field: dependencies.apply_visibility_mutations,
+        contract.assembly_mutations.deletion_field: dependencies.apply_deletion_mutations,
+    }
+    # Preserve ordinary execution's recompute even with no assignments/mutations.
+    needs_recompute = True
+    has_target_mutations = False
+    for section_field in contract.optional_top_level_fields:
+        section = manifest.get(section_field, {})
+        for family in contract.assembly_mutations.fields:
+            mutations = section.get(family, ())
+            if not mutations:
+                continue
+            consumers[family](document, mutations)
+            has_target_mutations = True
+            # Each successful deletion already recomputes and checks all Bodies.
+            # Later suppression/visibility writes require a new final check.
+            needs_recompute = family != contract.assembly_mutations.deletion_field
+
+    if needs_recompute:
+        dependencies.recompute_document(document)
+        if has_target_mutations:
+            dependencies.inspect_document_post_mutation_validity(document)
 
 
 def run_execution_entrypoint(
@@ -462,7 +527,9 @@ def run_execution_entrypoint(
             validated_manifest.source_document_path,
         ) as opened:
             _dependencies.apply_parameter_assignments(opened.document, assignments)
-            _dependencies.recompute_document(opened.document)
+            _apply_target_mutations_and_recompute(
+                opened.document, validated_manifest.loaded_manifest.data, _dependencies
+            )
             _dependencies.save_document(opened.document)
             _dependencies.export_step_artifacts(
                 opened.document,
@@ -526,6 +593,10 @@ def run_execution_entrypoint(
                 )
         _dependencies.write_success_result(result_path, outputs)
     except (
+        SuppressionMutationError,
+        VisibilityMutationError,
+        DeletionMutationError,
+        PostMutationValidityError,
         CsvArtifactExportError,
         DocumentLifecycleError,
         DocumentRecomputeError,

@@ -16,19 +16,22 @@ FIELD_PART_MUTATIONS = "partMutations"
 FIELD_SCHEMA_VERSION = "schemaVersion"
 FIELD_SOURCE_DOCUMENT = "sourceDocument"
 
-TOP_LEVEL_FIELDS = (
+REQUIRED_TOP_LEVEL_FIELDS = (
     FIELD_SCHEMA_VERSION,
     FIELD_SOURCE_DOCUMENT,
     FIELD_PARAMETER_ASSIGNMENTS,
     FIELD_OUTPUTS,
 )
 
-V2_REQUIRED_TOP_LEVEL_FIELDS = TOP_LEVEL_FIELDS
-V2_OPTIONAL_TOP_LEVEL_FIELDS = (
+OPTIONAL_TOP_LEVEL_FIELDS = (
     FIELD_ASSEMBLY_MUTATIONS,
     FIELD_PART_MUTATIONS,
 )
-V2_TOP_LEVEL_FIELDS = V2_REQUIRED_TOP_LEVEL_FIELDS + V2_OPTIONAL_TOP_LEVEL_FIELDS
+TOP_LEVEL_FIELDS = REQUIRED_TOP_LEVEL_FIELDS + OPTIONAL_TOP_LEVEL_FIELDS
+
+V2_REQUIRED_TOP_LEVEL_FIELDS = REQUIRED_TOP_LEVEL_FIELDS
+V2_OPTIONAL_TOP_LEVEL_FIELDS = OPTIONAL_TOP_LEVEL_FIELDS
+V2_TOP_LEVEL_FIELDS = TOP_LEVEL_FIELDS
 
 MUTATION_COLLECTION_SUPPRESSION = "suppression"
 MUTATION_COLLECTION_VISIBILITY = "visibility"
@@ -108,7 +111,7 @@ class OutputContract:
 
 @dataclass(frozen=True, slots=True)
 class ManifestContract:
-    """Supported Phase 1 export manifest field names."""
+    """Canonical schema 1.0 export manifest field names."""
 
     filename: str
     schema_version: str
@@ -119,11 +122,17 @@ class ManifestContract:
     outputs_field: str
     parameter_assignment: ParameterAssignmentContract
     output: OutputContract
+    required_top_level_fields: tuple[str, ...]
+    optional_top_level_fields: tuple[str, ...]
+    assembly_mutations_field: str
+    part_mutations_field: str
+    assembly_mutations: TargetMutationSectionContract
+    part_mutations: TargetMutationSectionContract
 
 
 @dataclass(frozen=True, slots=True)
 class SuppressionEntryContract:
-    """Field names for one schema 2.0 suppression mutation entry."""
+    """Field names for one suppression mutation entry."""
 
     fields: tuple[str, ...]
     object_field: str
@@ -132,7 +141,7 @@ class SuppressionEntryContract:
 
 @dataclass(frozen=True, slots=True)
 class VisibilityEntryContract:
-    """Field names for one schema 2.0 visibility mutation entry."""
+    """Field names for one visibility mutation entry."""
 
     fields: tuple[str, ...]
     object_field: str
@@ -141,7 +150,7 @@ class VisibilityEntryContract:
 
 @dataclass(frozen=True, slots=True)
 class DeletionEntryContract:
-    """Field names for one schema 2.0 deletion mutation entry."""
+    """Field names for one deletion mutation entry."""
 
     fields: tuple[str, ...]
     object_field: str
@@ -149,7 +158,7 @@ class DeletionEntryContract:
 
 @dataclass(frozen=True, slots=True)
 class TargetMutationSectionContract:
-    """Shared field and entry contracts for schema 2.0 target mutations."""
+    """Shared field and entry contracts for target mutations."""
 
     fields: tuple[str, ...]
     suppression_field: str
@@ -233,6 +242,12 @@ EXPORT_MANIFEST_V1_CONTRACT = ManifestContract(
     outputs_field=FIELD_OUTPUTS,
     parameter_assignment=PARAMETER_ASSIGNMENT_CONTRACT,
     output=OUTPUT_CONTRACT,
+    required_top_level_fields=REQUIRED_TOP_LEVEL_FIELDS,
+    optional_top_level_fields=OPTIONAL_TOP_LEVEL_FIELDS,
+    assembly_mutations_field=FIELD_ASSEMBLY_MUTATIONS,
+    part_mutations_field=FIELD_PART_MUTATIONS,
+    assembly_mutations=TARGET_MUTATION_SECTION_CONTRACT,
+    part_mutations=TARGET_MUTATION_SECTION_CONTRACT,
 )
 
 EXPORT_MANIFEST_V2_CONTRACT = ManifestV2Contract(
@@ -261,6 +276,8 @@ def supported_output_formats() -> tuple[str, ...]:
 
 
 __all__ = [
+    "REQUIRED_TOP_LEVEL_FIELDS",
+    "OPTIONAL_TOP_LEVEL_FIELDS",
     "DELETION_ENTRY_CONTRACT",
     "DELETION_ENTRY_FIELDS",
     "DeletionEntryContract",
