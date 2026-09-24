@@ -19,7 +19,8 @@ orchestration and durable product storage/indexing are outside this repository.
   not added to the result's artifact list.
 - Declared STEP, CSV, and PDF exports. STEP selects exactly one object through
   `document.getObject(outputs[].id)`, with no Label or whole-document fallback.
-- Optional observation of requested parameters, metadata, and reference
+- Optional observation of requested parameters, metadata, reference existence,
+  and canonical request-scoped target-state suppression, visibility, and
   existence on the same live document, without evaluating verification checks.
 - Optional non-recursive Link/XLink reference discovery for internal objects
   and Engine-mapped external targets, with deterministic raw schema-2 evidence,
@@ -35,8 +36,10 @@ supported Body validity inspection, deterministic native dependency evidence,
 and conservative FreeCAD-native deletion (exact native target lookup,
 surviving-dependent rejection, native removal, post-removal recompute,
 supported post-delete Body validity checks, and fail-closed behavior). These
-standalone capabilities are not yet wired into the execute path. Final
-runtime-stage ordering and structured failure mapping are deferred to issue #6.
+standalone mutation capabilities are not yet wired into the execute path.
+Target-state observation is implemented in the existing observation stage;
+its final placement after target mutations, runtime-stage ordering, and
+structured mutation failure mapping remain issue #6 work.
 See the
 [target-mutation contract](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/target-mutations.md).
 

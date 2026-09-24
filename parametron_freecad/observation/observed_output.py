@@ -27,6 +27,7 @@ from parametron_freecad.observation.reference_observation import (
 from parametron_freecad.observation.requested_scope_observation import (
     RequestedScopeObservationError,
 )
+from parametron_freecad.observation.target_state_observation import TargetStateObservationError
 
 
 class ObservedOutputError(ValueError):
@@ -64,6 +65,7 @@ def generate_observed_output(
         ParameterObservationError,
         ReferenceObservationError,
         RequestedScopeObservationError,
+        TargetStateObservationError,
     ) as exc:
         raise ObservedOutputError(str(exc)) from exc
 

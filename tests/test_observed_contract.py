@@ -120,7 +120,7 @@ class TestObservationCategories(_ContractTestCase):
     def test_observation_fields_are_exact_and_ordered(self):
         self.assertEqual(
             self.oc.OBSERVATION_FIELDS,
-            ("parameters", "metadata", "references", "components"),
+            ("parameters", "metadata", "references", "components", "targetState"),
         )
 
     def test_observation_field_constants(self):
@@ -128,6 +128,7 @@ class TestObservationCategories(_ContractTestCase):
         self.assertEqual(self.oc.OBSERVATION_FIELD_METADATA, "metadata")
         self.assertEqual(self.oc.OBSERVATION_FIELD_REFERENCES, "references")
         self.assertEqual(self.oc.OBSERVATION_FIELD_COMPONENTS, "components")
+        self.assertEqual(self.oc.OBSERVATION_FIELD_TARGET_STATE, "targetState")
 
     def test_observation_fields_is_tuple(self):
         self.assertIsInstance(self.oc.OBSERVATION_FIELDS, tuple)
@@ -139,7 +140,7 @@ class TestObservationCategories(_ContractTestCase):
     def test_supported_observation_categories_helper_returns_exact_tuple(self):
         self.assertEqual(
             self.oc.supported_observation_categories(),
-            ("parameters", "metadata", "references", "components"),
+            ("parameters", "metadata", "references", "components", "targetState"),
         )
 
     def test_supported_observation_categories_returns_tuple(self):
