@@ -87,7 +87,7 @@ class TestObserveFields(_ContractTestCase):
     def test_observe_fields_are_exact_and_ordered(self):
         self.assertEqual(
             self.vc.OBSERVE_FIELDS,
-            ("components", "parameters", "metadata", "references"),
+            ("components", "parameters", "metadata", "references", "targetState"),
         )
 
     def test_observe_field_constants(self):
@@ -95,11 +95,13 @@ class TestObserveFields(_ContractTestCase):
         self.assertEqual(self.vc.OBSERVE_FIELD_PARAMETERS, "parameters")
         self.assertEqual(self.vc.OBSERVE_FIELD_METADATA, "metadata")
         self.assertEqual(self.vc.OBSERVE_FIELD_REFERENCES, "references")
+        self.assertEqual(self.vc.OBSERVE_FIELD_TARGET_STATE, "targetState")
 
 
 class TestObservationContextFields(_ContractTestCase):
     def test_observation_context_fields_are_exact_and_ordered(self):
-        self.assertEqual(self.vc.OBSERVATION_CONTEXT_FIELDS, ("parameters",))
+        self.assertEqual(self.vc.OBSERVATION_CONTEXT_FIELDS, ("parameters", "targetState"))
+        self.assertEqual(self.vc.OBSERVATION_CONTEXT_FIELD_TARGET_STATE, "targetState")
         self.assertEqual(
             self.vc.OBSERVATION_PARAMETER_FIELDS,
             ("id", "name", "groupName"),
@@ -200,7 +202,7 @@ class TestHelperFunctions(_ContractTestCase):
     def test_helper_function_return_values_are_exact(self):
         self.assertEqual(
             self.vc.supported_observation_categories(),
-            ("components", "parameters", "metadata", "references"),
+            ("components", "parameters", "metadata", "references", "targetState"),
         )
         self.assertEqual(
             self.vc.supported_expected_component_kinds(),
