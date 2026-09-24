@@ -1,0 +1,583 @@
+{
+  "schemaVersion": "1.0",
+  "captureId": "cap.freecad.canonical-lifecycle.cube.v1",
+  "adapter": {
+    "name": "freecad",
+    "version": ""
+  },
+  "cadSystem": {
+    "name": "FreeCAD",
+    "version": "1.1.1"
+  },
+  "sourceDocument": {
+    "logicalId": "cube_canonical_lifecycle_model",
+    "path": "input/cube.FCStd",
+    "fingerprint": "sha256:1dba513110bbf11173b70f808e54c4c316f571fd8f6f4b8d0d5c1aa757550e87"
+  },
+  "rootProduct": {
+    "id": "cmp.root"
+  },
+  "annotations": {
+    "description": "Canonical lifecycle capture of the real cube.FCStd fixture used for parameter and target-mutation execution.",
+    "comment": "Validated through read-only headless FreeCAD probing against tests/fixtures/canonical_lifecycle/input/cube.FCStd; native identities, target properties, dependencies, and source integrity are recorded without saving the document.",
+    "purpose": "Provide native-evidence-backed capture truth for canonical parameter and target-mutation lifecycle execution."
+  },
+  "entities": {
+    "components": [
+      {
+        "id": "cmp.root",
+        "kind": "assembly",
+        "name": "cube",
+        "displayName": "cube",
+        "cadType": "App::Document",
+        "quantity": 1,
+        "material": "",
+        "identitySource": {
+          "kind": "parent_scoped_path",
+          "path": "cmp.root",
+          "nativeRef": "cube"
+        },
+        "stabilityClass": "stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "This document has no native App::Part container; the FreeCAD document itself is captured as the required root assembly-kind component.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "cmp.body",
+        "kind": "part",
+        "name": "Body",
+        "displayName": "Body",
+        "cadType": "PartDesign::Body",
+        "quantity": 1,
+        "material": "",
+        "identitySource": {
+          "kind": "parent_scoped_path",
+          "path": "cmp.root/Body",
+          "nativeRef": "Body"
+        },
+        "stabilityClass": "stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": true,
+          "unhide": true,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Verified via headless probe: Body has no native Suppressed property (suppress/unsuppress left false); Body.Visibility is real and settable (hide/unhide true). Body.Tip=Chamfer and Body.Shape.isNull()=false.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "cmp.targetObject",
+        "kind": "part",
+        "name": "Body001",
+        "displayName": "TargetObject",
+        "cadType": "PartDesign::Body",
+        "quantity": 1,
+        "material": "",
+        "identitySource": {
+          "kind": "parent_scoped_path",
+          "path": "cmp.root/Body001",
+          "nativeRef": "Body001"
+        },
+        "stabilityClass": "stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": true,
+          "unhide": true,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Canonical lifecycle target Body with native visibility capability captured for explicit unhide coverage.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "cmp.safeDeleteObject",
+        "kind": "part",
+        "name": "Body002",
+        "displayName": "SafeDeleteObject",
+        "cadType": "PartDesign::Body",
+        "quantity": 1,
+        "material": "",
+        "identitySource": {
+          "kind": "parent_scoped_path",
+          "path": "cmp.root/Body002",
+          "nativeRef": "Body002"
+        },
+        "stabilityClass": "stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": true,
+          "unhide": true,
+          "delete": true
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Dedicated canonical lifecycle deletion target. It is intentionally separate from the parameter-driven Body and TargetObject geometry.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "cmp.hideObject",
+        "kind": "part",
+        "name": "Body003",
+        "displayName": "HideObject",
+        "cadType": "PartDesign::Body",
+        "quantity": 1,
+        "material": "",
+        "identitySource": {
+          "kind": "parent_scoped_path",
+          "path": "cmp.root/Body003",
+          "nativeRef": "Body003"
+        },
+        "stabilityClass": "stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": true,
+          "unhide": true,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Dedicated canonical lifecycle Body-level visibility target used to exercise hide without altering the parameter-driven Body.",
+          "purpose": ""
+        }
+      }
+    ],
+    "features": [
+      {
+        "id": "fea.body.sketch",
+        "componentId": "cmp.body",
+        "name": "Sketch",
+        "displayName": "Sketch",
+        "cadType": "Sketcher::SketchObject",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Sketch",
+          "nativeRef": "Sketch"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Sketcher::SketchObject has no native Suppressed property; ExpressionEngine binds Constraints[9] and Constraints[10] to VarSet.boxLength and VarSet.boxWidth.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "fea.body.pad",
+        "componentId": "cmp.body",
+        "name": "Pad",
+        "displayName": "Pad",
+        "cadType": "PartDesign::Pad",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Pad",
+          "nativeRef": "Pad"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": true,
+          "unsuppress": true,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Verified via headless probe: Pad has a native writable Suppressed property. ExpressionEngine binds Length to VarSet.boxHeight.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "fea.body.sketch001",
+        "componentId": "cmp.body",
+        "name": "Sketch001",
+        "displayName": "Sketch001",
+        "cadType": "Sketcher::SketchObject",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Sketch001",
+          "nativeRef": "Sketch001"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Sketcher::SketchObject has no native Suppressed property; ExpressionEngine binds Constraints[0] (Diameter) to VarSet.holeDia.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "fea.body.pocket",
+        "componentId": "cmp.body",
+        "name": "Pocket",
+        "displayName": "Pocket",
+        "cadType": "PartDesign::Pocket",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Pocket",
+          "nativeRef": "Pocket"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": true,
+          "unsuppress": true,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Verified via headless probe: Pocket has a native writable Suppressed property. Controlled experiment (Pocket.Suppressed=true, doc.recompute()) left Body.Tip=Chamfer, Body.Shape valid, and Chamfer.State=['Up-to-date']; no ExpressionEngine bindings on Pocket itself.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "fea.body.chamfer",
+        "componentId": "cmp.body",
+        "name": "Chamfer",
+        "displayName": "Chamfer",
+        "cadType": "PartDesign::Chamfer",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Chamfer",
+          "nativeRef": "Chamfer"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": true,
+          "unsuppress": true,
+          "hide": true,
+          "unhide": true,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Verified native writable Suppressed target and Body.Tip feature; ExpressionEngine binds Size to VarSet.boxChamfer. Native visibility capability is captured for canonical lifecycle unhide coverage.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "fea.targetObject.targetBody",
+        "componentId": "cmp.targetObject",
+        "name": "Pad001",
+        "displayName": "TargetBody",
+        "cadType": "PartDesign::Pad",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Pad001",
+          "nativeRef": "Pad001"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Base feature of TargetObject. It participates in the fixture shape but is not itself a target action.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "fea.targetObject.unsuppressFeature",
+        "componentId": "cmp.targetObject",
+        "name": "Pocket001",
+        "displayName": "Unsuppress_Feature",
+        "cadType": "PartDesign::Pocket",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Pocket001",
+          "nativeRef": "Pocket001"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": true,
+          "unsuppress": true,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Dedicated canonical lifecycle suppression-state target used for an unsuppress action.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "fea.targetObject.suppressFeature",
+        "componentId": "cmp.targetObject",
+        "name": "Fillet",
+        "displayName": "Suppress_Feature",
+        "cadType": "PartDesign::Fillet",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Fillet",
+          "nativeRef": "Fillet"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": true,
+          "unsuppress": true,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Dedicated canonical lifecycle suppression-state target used for a suppress action.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "fea.targetObject.unhideFeature",
+        "componentId": "cmp.targetObject",
+        "name": "Pad002",
+        "displayName": "UnhideFeature",
+        "cadType": "PartDesign::Pad",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Pad002",
+          "nativeRef": "Pad002"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": true,
+          "unhide": true,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Dedicated feature-level visibility target with native visibility capability captured for canonical lifecycle unhide coverage.",
+          "purpose": ""
+        }
+      }
+    ],
+    "relationships": [],
+    "parameterGroups": [
+      {
+        "id": "grp.root.varset",
+        "ownerComponentId": "cmp.root",
+        "name": "VarSet",
+        "displayName": "box_body",
+        "groupKind": "varset",
+        "cadType": "App::VarSet",
+        "observable": true,
+        "writable": true,
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "VarSet",
+          "nativeRef": "VarSet"
+        },
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "FreeCAD Name='VarSet' and Label='box_body' differ; Name is the stable capture identity anchor used above, Label is descriptive only. VarSet is a top-level document object, not a member of Body.Group.",
+          "purpose": ""
+        }
+      }
+    ],
+    "parameters": [
+      {
+        "id": "par.root.varset.boxLength",
+        "ownerKind": "group",
+        "ownerId": "grp.root.varset",
+        "componentId": "cmp.root",
+        "name": "boxLength",
+        "displayName": "",
+        "cadType": "App::PropertyLength",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 50,
+        "unit": "mm",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "boxLength",
+          "groupScopedKey": "boxLength",
+          "nativeRef": "VarSet.boxLength"
+        },
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "Drives Sketch.Constraints[9] (Distance) via expression <<box_body>>.boxLength.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "par.root.varset.boxWidth",
+        "ownerKind": "group",
+        "ownerId": "grp.root.varset",
+        "componentId": "cmp.root",
+        "name": "boxWidth",
+        "displayName": "",
+        "cadType": "App::PropertyLength",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 30,
+        "unit": "mm",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "boxWidth",
+          "groupScopedKey": "boxWidth",
+          "nativeRef": "VarSet.boxWidth"
+        },
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "Drives Sketch.Constraints[10] (Distance) via expression <<box_body>>.boxWidth.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "par.root.varset.boxHeight",
+        "ownerKind": "group",
+        "ownerId": "grp.root.varset",
+        "componentId": "cmp.root",
+        "name": "boxHeight",
+        "displayName": "",
+        "cadType": "App::PropertyLength",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 40,
+        "unit": "mm",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "boxHeight",
+          "groupScopedKey": "boxHeight",
+          "nativeRef": "VarSet.boxHeight"
+        },
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "Drives Pad.Length via expression <<box_body>>.boxHeight.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "par.root.varset.holeDia",
+        "ownerKind": "group",
+        "ownerId": "grp.root.varset",
+        "componentId": "cmp.root",
+        "name": "holeDia",
+        "displayName": "",
+        "cadType": "App::PropertyLength",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 12,
+        "unit": "mm",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "holeDia",
+          "groupScopedKey": "holeDia",
+          "nativeRef": "VarSet.holeDia"
+        },
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "Drives Sketch001.Constraints[0] (Diameter) via expression <<box_body>>.holeDia.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "par.root.varset.boxChamfer",
+        "ownerKind": "group",
+        "ownerId": "grp.root.varset",
+        "componentId": "cmp.root",
+        "name": "boxChamfer",
+        "displayName": "",
+        "cadType": "App::PropertyLength",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 3,
+        "unit": "mm",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "boxChamfer",
+          "groupScopedKey": "boxChamfer",
+          "nativeRef": "VarSet.boxChamfer"
+        },
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "Drives Chamfer.Size via expression <<box_body>>.boxChamfer.",
+          "purpose": ""
+        }
+      }
+    ],
+    "metadata": []
+  },
+  "structure": {
+    "rootComponentId": "cmp.root",
+    "nodes": [
+      {
+        "componentId": "cmp.root",
+        "parentComponentId": "",
+        "children": [
+          "cmp.body",
+          "cmp.targetObject",
+          "cmp.safeDeleteObject",
+          "cmp.hideObject"
+        ]
+      },
+      {
+        "componentId": "cmp.body",
+        "parentComponentId": "cmp.root",
+        "children": []
+      },
+      {
+        "componentId": "cmp.targetObject",
+        "parentComponentId": "cmp.root",
+        "children": []
+      },
+      {
+        "componentId": "cmp.safeDeleteObject",
+        "parentComponentId": "cmp.root",
+        "children": []
+      },
+      {
+        "componentId": "cmp.hideObject",
+        "parentComponentId": "cmp.root",
+        "children": []
+      }
+    ]
+  }
+}
