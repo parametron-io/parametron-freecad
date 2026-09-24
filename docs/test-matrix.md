@@ -59,6 +59,7 @@ Focused observation/reference-foundation checks:
 python -m pytest tests/test_reference_access.py tests/test_reference_observation.py
 python -m pytest tests/test_requested_scope_observation.py tests/test_observed_writer.py tests/test_observed_output_repeated_run.py
 python -m pytest tests/test_observation_request.py
+python -m pytest -q tests/test_verification_contract.py tests/test_observed_contract.py tests/test_target_state_observation.py tests/test_target_state_real_fixtures.py
 ```
 
 Focused native suppression, visibility, and deletion checks:
@@ -159,6 +160,7 @@ configured FreeCAD smoke behavior into a test failure.
 | Requested parameter observation | Covered | `tests/test_parameter_observation.py`, `tests/test_unavailable_requested_observations.py` | Exact `document.getObject` and property read. |
 | Requested metadata observation | Covered | `tests/test_metadata_observation.py`, `tests/test_unavailable_requested_observations.py` | Exact owner/key reads. |
 | Requested reference observation | Covered | `tests/test_reference_access.py`, `tests/test_reference_observation.py`, `tests/test_unavailable_requested_observations.py` | Existence check only; not traversal. |
+| Canonical schema `1.0` target-state observation | Covered, including gated real FreeCAD | `tests/test_verification_contract.py`, `tests/test_observed_contract.py`, `tests/test_target_state_observation.py`, `tests/test_target_state_real_fixtures.py` | Request contract and runtime request-loader boundary; exact suppression and visibility true/false, boolean `target_missing` versus `unavailable`, native existence/absence, exact request scope, destination/object ordering, independence from mutation intent, compatibility when unrequested, canonical atomic observed output and structured failures. Real-native proof covers exact object lookup, App-level booleans, and existence/absence in headless FreeCAD; it does not complete issue #7's native matrix. |
 | Observation ordering | Covered | `tests/test_observation_ordering.py`, `tests/test_requested_scope_observation.py` | Deterministic ordering for already-built payloads. |
 | Observed JSON writing | Covered | `tests/test_observed_writer.py`, `tests/test_observed_output_repeated_run.py` | Canonical UTF-8 JSON with atomic destination replacement; no standalone CLI `observe`. |
 | Engine invocation surface | Covered | `tests/test_runtime_invocation.py`, `tests/test_invocation_contract.py` | Execute and observe modes; execute failures preserve entrypoint-written failed `prm.result.json`. |
@@ -1306,7 +1308,7 @@ tests/freecad_partdesign_mutation_fixture_runner.py
 
 - **Fixture prerequisite coverage documented:** Yes.
 - **Fixture inspection claimed as mutation execution:** No.
-- Schema 2.0 metadata and strict manifest validation are implemented and covered separately below. Fixture inspection establishes starting native state only; focused real-FreeCAD suppression, visibility, and deletion coverage separately invokes the production consumers against temporary fixture copies and proves actual state transitions and removals. Deterministic post-mutation validity and native dependency inspection are implemented and covered separately below. Standalone conservative native deletion is implemented and covered separately below. Target observation, normal schema 2.0 execute integration, and issue #6 runtime-stage/failure mapping remain unimplemented.
+- Schema 2.0 metadata and strict manifest validation are implemented and covered separately below. Fixture inspection establishes starting native state only; focused real-FreeCAD suppression, visibility, and deletion coverage separately invokes the production consumers against temporary fixture copies and proves actual state transitions and removals. Deterministic post-mutation validity and native dependency inspection are implemented and covered separately below. Standalone conservative native deletion is implemented and covered separately below. At the time of this fixture-prerequisite validation, target observation, normal schema 2.0 execute integration, and issue #6 runtime-stage/failure mapping remained unimplemented; current target-state observation coverage is recorded in the table above.
 
 ### Validation results
 
