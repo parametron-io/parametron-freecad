@@ -6,6 +6,12 @@ including rejection of unsupported requests. It does not create new requirements
 Recorded validation counts below are separate prior runs, not a claim that the
 current suite was rerun or that overlapping counts should be summed.
 
+The final fresh-Nix validation for the canonical target-mutation lifecycle
+recorded 511 canonical contract tests, 162 lifecycle/failure tests, 251 native
+consumer regression tests, 4 canonical lifecycle native integration tests,
+and 3,803 full-suite tests passed. Smoke and `git diff --check` passed. These
+overlapping suites are not summed; this documentation update does not rerun them.
+
 ## Command Rules
 
 Current validation commands are ordinary Python/test commands, run inside a
@@ -51,6 +57,7 @@ python -m pytest tests/test_failure_output_contract.py tests/test_failure_result
 python -m pytest tests/test_reference_traversal_output_contract.py
 python -m pytest tests/test_reference_traversal_request.py tests/test_reference_traversal.py
 python -m pytest tests/test_step_export.py tests/test_csv_export.py tests/test_pdf_export.py
+python -m pytest tests/test_canonical_manifest_validation.py tests/test_canonical_runtime_lifecycle.py tests/test_canonical_lifecycle.py
 ```
 
 Focused observation/reference-foundation checks:
@@ -133,15 +140,19 @@ configured FreeCAD smoke behavior into a test failure.
 | Result path containment | Covered | `tests/test_headless_cli_arguments.py`, `tests/test_headless_missing_working_copies.py` | Invalid result paths reject before file creation; safe path required for failed `prm.result.json`. |
 | `sourceDocument` containment | Covered | `tests/test_document_lifecycle.py`, `tests/test_headless_missing_working_copies.py`, `tests/test_headless_cli_arguments.py` | Traversal and symlink escapes rejected against the supplied root. |
 | FreeCAD-native manifest contract | Covered | `tests/test_manifest_contract.py` | Filename is `prm.export-manifest.json`. |
-| Manifest schema 2.0 contract metadata & strict validation | Covered | `tests/test_manifest_v2_contract.py`, `tests/test_manifest_v2_validation.py` | Schema 2.0 metadata defined; required core fields and optional `assemblyMutations`/`partMutations`; `{object, suppressed}`, `{object, visible}`, `{object}` shapes; shared section contract; parameter/output reuse; transport filename remains `prm.export-manifest.json`; immutability, import safety, and frozen tuples; strict Schema 2.0 validation implemented (`validate_export_manifest_v2`, `validate_export_manifest`); exact version dispatch (`"1.0"` vs `"2.0"`); strict JSON booleans; duplicate object rejection; suppression/visibility vs deletion conflict rejection; suppression + visibility allowed; cross-scope object conflict rejection; deterministic diagnostics. The execute entrypoint remains V1-only and rejects schema 2.0 before document operations; normal schema 2.0 execute wiring is not implemented. The standalone native suppression/unsuppression, visibility, and conservative deletion consumers are implemented and tested but are not wired to execute. |
+| Manifest schema 2.0 contract metadata & strict validation | Covered | `tests/test_manifest_v2_contract.py`, `tests/test_manifest_v2_validation.py` | Standalone schema 2.0 metadata and strict validation cover the shared mutation section shapes, version dispatch, booleans, duplicates, conflicts, and deterministic diagnostics. Normal execute accepts canonical schema 1.0 with mutations and rejects schema 2.0 before document operations. |
+| Canonical schema 1.0 mutation validation | Covered | `tests/test_canonical_manifest_validation.py`, `tests/test_canonical_lifecycle.py` | Four required core fields and optional `assemblyMutations`/`partMutations`; each section is closed to suppression, visibility, deletion. Strict booleans and entry shapes; duplicate, deletion, and cross-scope conflict rejection; suppression plus visibility coexistence; deterministic diagnostics without input mutation. Canonical Engine-generated manifest loads directly, and normal execute rejects schema 2.0. |
+| Canonical runtime lifecycle and failure handling | Covered | `tests/test_canonical_runtime_lifecycle.py` | Parameter assignment → Assembly suppression, visibility, deletion → Part suppression, visibility, deletion → required final recompute/validity when applicable → save → STEP/CSV/PDF exports → traversal → observation → close → success. Each deletion includes internal recompute and supported Body validity inspection; a final pass follows later mutation state without redundant checking after final deletion. Mutation-free execution retains one recompute and no new target-mutation validity requirement. Structured stages cover suppression, visibility, deletion, recompute, post_mutation_validity, document_save, observation, and document_close; failures stop later work, attempt cleanup, preserve native causes and the primary execution failure even when cleanup/result emission fails, and prevent false success. Earlier completed mutations are not generally rolled back. |
+| Canonical native lifecycle | Covered, real FreeCAD | `tests/test_canonical_lifecycle.py`, `tests/freecad_canonical_lifecycle_runner.py`, `tests/fixtures/canonical_lifecycle/` | Real normal execute persists large-variant parameters, suppression/unsuppression, hide/unhide, and conservative `Body002` deletion. No-delete regression proves `Body002` survives when deletion is omitted. Reopening proves persisted state equals live post-mutation observation; result/traversal emission, source-fixture integrity, and repeated-run semantic determinism are covered. |
+| Canonical Engine-generated input corpus | Covered | `tests/test_canonical_lifecycle.py`, `tests/fixtures/engine_generated/prm.export-manifest.json`, `tests/fixtures/engine_generated/prm.verification.json`, `tests/fixtures/engine_generated/prm.reference-traversal-request.json` | Actual Engine production-materialized runtime inputs, copied byte-for-byte; direct manifest and request loading. Engine retains verification and normalization ownership. |
 | Strict manifest loading | Covered | `tests/test_manifest_loader.py`, `tests/test_headless_malformed_manifests.py` | Duplicate keys and non-standard JSON constants rejected. |
 | Manifest structural validation | Covered | `tests/test_manifest_validation.py` | Exact field surfaces and supported formats. |
-| Engine dot-form manifest compatibility | Covered | `tests/test_engine_manifest_compat.py`, `tests/test_runtime_entrypoints.py`, `tests/fixtures/engine_generated/export_manifest.v1.json` | Transitional compatibility only. |
+| Engine dot-form manifest compatibility | Covered | `tests/test_engine_manifest_compat.py`, `parametron_freecad/runtime/integration_rehearsal.py` | Transitional normalization remains used by integration rehearsal; normal execute loads canonical schema 1.0 directly without it. |
 | Engine name-only parameter rejection | Covered | `tests/test_engine_manifest_compat.py`, `tests/test_runtime_entrypoints.py` | Rejected before document open and side effects. |
 | Exact parameter target resolver | Covered | `tests/test_parameter_target_resolver.py`, `tests/test_parameter_assignment.py` | `<ObjectName>.<PropertyName>` only. |
 | Parameter assignment | Covered | `tests/test_parameter_assignment.py`, `tests/test_headless_cli_arguments.py` | Scalar assignment in manifest order. |
-| Document recompute | Covered | `tests/test_document_recompute.py`, `tests/test_headless_cli_arguments.py` | Recompute called once. |
-| Native document persistence | Covered | `tests/test_document_save.py`, `tests/test_runtime_entrypoints.py`, `tests/test_failure_output_contract.py`, `tests/test_reference_traversal_real_fixtures.py` | `document.save()` is called exactly once on the opened working copy after recompute and before exports/traversal/observation; `DocumentSaveError` wraps save failures and maps to stage `document_save`; zero derived outputs (`outputs: []`) persist native document and yield `artifacts: []`; real FreeCAD close/reopen semantic round trip proves `Probe.Value` persists across real reopens. |
+| Document recompute | Covered | `tests/test_document_recompute.py`, `tests/test_headless_cli_arguments.py`, `tests/test_canonical_runtime_lifecycle.py` | Mutation-free execution retains one recompute. Deletion includes post-removal recompute/validity; later mutation state may require a final pass. |
+| Native document persistence | Covered | `tests/test_document_save.py`, `tests/test_runtime_entrypoints.py`, `tests/test_failure_output_contract.py`, `tests/test_reference_traversal_real_fixtures.py`, `tests/test_canonical_lifecycle.py` | `document.save()` is called exactly once on the opened working copy after required recompute/validity and before exports/traversal/observation; `DocumentSaveError` maps to stage `document_save`; zero derived outputs persist native state with `artifacts: []`. Real FreeCAD close/reopen proof covers ordinary parameter and canonical target-mutation execution. |
 | STEP export | Covered | `tests/test_step_export.py`, `tests/test_headless_cli_arguments.py`, `tests/test_headless_repeated_run.py`, `tests/test_headless_unsupported_artifact_requests.py` | Exact `document.getObject(id)` lookup and one-object export; declared output path confined to working copy; no `document.Objects` fallback. |
 | CSV export | Covered | `tests/test_csv_export.py`, `tests/test_headless_unsupported_artifact_requests.py` | Spreadsheet-backed CSV behavior. |
 | PDF export | Covered | `tests/test_pdf_export.py`, `tests/test_headless_unsupported_artifact_requests.py` | TechDraw-backed PDF behavior. |
@@ -198,10 +209,10 @@ configured FreeCAD smoke behavior into a test failure.
 | Traversal-present execute/export compatibility | Covered | `tests/test_runtime_entrypoints.py` | Declared output objects reach STEP, CSV, PDF, and success-result artifact handling unchanged and in the established pipeline order around traversal emission. |
 | Real FreeCAD reference API inspection | Covered | `tests/test_reference_traversal.py`, bounded-unit command-host probe | FreeCAD 1.1.1 accepted the exact 21 private Link/XLink type-ID allowlist and exposed object/subelement/list value shapes. No heuristic string/path mechanism is included; supported internal discovery now applies this surface. |
 | PartDesign mutation fixture foundation | Covered | `tests/test_partdesign_mutation_fixtures.py`, `tests/freecad_partdesign_mutation_fixture_runner.py`, `scripts/generate_partdesign_mutation_fixtures.py`, `tests/fixtures/partdesign_mutations/partdesign-mutations.FCStd` | Permanent fixture integrity (SHA-256 `7187abe9...`), native role/TypeId inventory, Body Tip and dependency chain, `Suppressed` and App-level `Visibility` preconditions, safe vs unsafe delete candidate roles, Body shape health, generator success, two-run semantic reproducibility, CLI argument/path/nix validations, `.FCBak` cleanup, and unmutated inspection. This is fixture-prerequisite coverage; actual suppression transitions are covered separately through the production consumer. |
-| FreeCAD-native suppression / unsuppression consumer | Covered | `tests/test_suppression.py`, `tests/test_suppression_real_fixtures.py`, `tests/freecad_suppression_runner.py` (test-only support) | Exact `document.getObject(object)` resolution with no fallback; native `Suppressed` capability and `App::PropertyBool` requirement; both requested boolean states; controlled missing, unsupported, inspection, and write failures with native causes preserved where applicable; caller ordering, fail-fast behavior, and unchanged input ordering/content. Real FreeCAD coverage applies the production consumer to temporary copies of the committed PartDesign fixture, proves `TerminalChamfer` true -> false and intermediate features false -> true, preserves visibility, and leaves committed fixture bytes unchanged. This consumer is not wired to the schema-2 execute boundary and the helper is not a production entrypoint. |
-| FreeCAD-native visibility consumer | Covered | `tests/test_visibility.py`, `tests/test_visibility_real_fixtures.py`, `tests/freecad_visibility_runner.py` (test-only support) | Exact `document.getObject(object)` resolution with no fallback; native App-level `Visibility` capability and exact `App::PropertyBool` requirement; hide and unhide; controlled missing, unsupported, inspection, and write failures with native causes preserved where applicable; no `FreeCADGui` or `ViewObject` dependency; suppression independence; caller ordering, fail-fast/no-rollback behavior, unchanged input ordering/content, and empty collections. Real FreeCAD coverage applies the production consumer to temporary fixture copies, proves hide and unhide plus a controlled missing-target failure, preserves suppression, and leaves committed fixture bytes unchanged. This consumer is not wired to the schema-2 execute boundary and the helper is not a production entrypoint. |
-| FreeCAD-native deletion consumer | Covered | `tests/test_deletion.py`, `tests/test_deletion_real_fixtures.py`, `tests/freecad_deletion_runner.py` (test-only support) | Exact `document.getObject(object)` lookup with no fallback; deterministic dependency inspection; native `InList` dependent rejection without cascade, force, or repair policy; `document.removeObject`; exact post-removal absence verification; post-removal recompute; deterministic document-level supported `PartDesign::Body` validity inspection; fail-closed behavior on unavailable or invalid evidence; controlled missing-target, native-operation, and validity failures with preserved cause chains where applicable; caller ordering, fail-fast/no-rollback semantics, and unchanged caller input; import safety without FreeCAD. Real FreeCAD coverage applies the production consumer to temporary fixture copies and an in-memory test document, proves safe deletion of `SafeDeleteMarker`, rejection of `BaseSketch` with `IntermediatePad` dependency evidence, genuine invalid post-delete Body-state failure, repeated-process determinism, and committed-fixture immutability. This consumer is not wired into the schema 2.0 execute boundary and the runner is not a production entrypoint. |
-| FreeCAD-native post-mutation validity and dependency evidence | Covered | `tests/test_post_mutation_validity.py`, `tests/test_post_mutation_validity_real_fixtures.py`, `tests/freecad_post_mutation_validity_runner.py` (test-only support) | Read-only exact native lookup; bounded PartDesign Body shape-health evidence; distinct unavailable-evidence, native-inspection-failure, and proven-invalid-state classifications; null-state precedence; solid count as evidence rather than policy; deterministic `InList` dependents and `OutList` dependencies without deletion policy; deterministic document-level Body composition helper (`inspect_document_post_mutation_validity`) discovering surviving native `PartDesign::Body` objects in stable native-name order independent of `document.Objects` enumeration order, reusing bounded shape-health inspection, and failing closed when no supported Body evidence exists; real healthy and genuinely null Body evidence; repeated-process determinism; temporary fixture copies and committed-fixture immutability. The inspection helpers remain read-only; mutation, removal, and recompute are caller-owned. Schema-2 execute wiring and issue #6 runtime-stage/failure mapping remain unimplemented. |
+| FreeCAD-native suppression / unsuppression consumer | Covered | `tests/test_suppression.py`, `tests/test_suppression_real_fixtures.py`, `tests/freecad_suppression_runner.py` (test-only support) | Exact `document.getObject(object)` resolution with no fallback; native `Suppressed` capability and `App::PropertyBool` requirement; both requested boolean states; controlled missing, unsupported, inspection, and write failures with native causes preserved where applicable; caller ordering, fail-fast behavior, and unchanged input ordering/content. Real FreeCAD coverage applies the production consumer to temporary copies of the committed PartDesign fixture, proves `TerminalChamfer` true -> false and intermediate features false -> true, preserves visibility, and leaves committed fixture bytes unchanged. Normal schema-1 execute composes this consumer; the test helper is not a production entrypoint. |
+| FreeCAD-native visibility consumer | Covered | `tests/test_visibility.py`, `tests/test_visibility_real_fixtures.py`, `tests/freecad_visibility_runner.py` (test-only support) | Exact `document.getObject(object)` resolution with no fallback; native App-level `Visibility` capability and exact `App::PropertyBool` requirement; hide and unhide; controlled missing, unsupported, inspection, and write failures with native causes preserved where applicable; no `FreeCADGui` or `ViewObject` dependency; suppression independence; caller ordering, fail-fast/no-rollback behavior, unchanged input ordering/content, and empty collections. Real FreeCAD coverage applies the production consumer to temporary fixture copies, proves hide and unhide plus a controlled missing-target failure, preserves suppression, and leaves committed fixture bytes unchanged. Normal schema-1 execute composes this consumer; the test helper is not a production entrypoint. |
+| FreeCAD-native deletion consumer | Covered | `tests/test_deletion.py`, `tests/test_deletion_real_fixtures.py`, `tests/freecad_deletion_runner.py` (test-only support) | Exact `document.getObject(object)` lookup with no fallback; deterministic dependency inspection; native `InList` dependent rejection without cascade, force, or repair policy; `document.removeObject`; exact post-removal absence verification; post-removal recompute; deterministic document-level supported `PartDesign::Body` validity inspection; fail-closed behavior on unavailable or invalid evidence; controlled missing-target, native-operation, and validity failures with preserved cause chains where applicable; caller ordering, fail-fast/no-rollback semantics, and unchanged caller input; import safety without FreeCAD. Real FreeCAD coverage applies the production consumer to temporary fixture copies and an in-memory test document, proves safe deletion of `SafeDeleteMarker`, rejection of `BaseSketch` with `IntermediatePad` dependency evidence, genuine invalid post-delete Body-state failure, repeated-process determinism, and committed-fixture immutability. Normal schema-1 execute composes this consumer; the test runner is not a production entrypoint. |
+| FreeCAD-native post-mutation validity and dependency evidence | Covered | `tests/test_post_mutation_validity.py`, `tests/test_post_mutation_validity_real_fixtures.py`, `tests/freecad_post_mutation_validity_runner.py` (test-only support) | Read-only exact native lookup; bounded PartDesign Body shape-health evidence; distinct unavailable-evidence, native-inspection-failure, and proven-invalid-state classifications; null-state precedence; solid count as evidence rather than policy; deterministic `InList` dependents and `OutList` dependencies without deletion policy; deterministic document-level Body composition helper (`inspect_document_post_mutation_validity`) discovering surviving native `PartDesign::Body` objects in stable native-name order independent of `document.Objects` enumeration order, reusing bounded shape-health inspection, and failing closed when no supported Body evidence exists; real healthy and genuinely null Body evidence; repeated-process determinism; temporary fixture copies and committed-fixture immutability. The inspection helpers remain read-only; mutation, removal, and recompute are caller-owned. Normal schema-1 execute composes these inspections with structured failure mapping; schema-2 execute remains unsupported. |
 | Supported internal object reference discovery | Covered | `tests/test_reference_traversal.py` | Root-only documents, unrelated-object and empty-link exclusion, participating source/target inclusion, multiple sources/targets/properties, LinkSub extraction, exact schema-2 IDs/type/property/mechanism provenance, complete endpoints, duplicate collapse, and object/property/value enumeration-order independence are covered. |
 | Internal traversal raw-evidence preservation | Covered | `tests/test_reference_traversal.py` | Exact typed-result coverage preserves source path, document/object labels, stable names/types, complete endpoints, edge kind/state, source property, reference mechanism, and nullable diagnostics; empty unavailable optional values remain null. Mapped external missing evidence is covered separately; unresolved remains contract vocabulary. |
 | Active traversal cycle prevention | Covered | `tests/test_reference_traversal.py` | Self-link and mutual internal-link coverage proves the one-pass non-recursive discovery boundary terminates with finite participating nodes and distinct edges. Recursive external-document traversal is not implemented. |
@@ -1308,7 +1319,7 @@ tests/freecad_partdesign_mutation_fixture_runner.py
 
 - **Fixture prerequisite coverage documented:** Yes.
 - **Fixture inspection claimed as mutation execution:** No.
-- Schema 2.0 metadata and strict manifest validation are implemented and covered separately below. Fixture inspection establishes starting native state only; focused real-FreeCAD suppression, visibility, and deletion coverage separately invokes the production consumers against temporary fixture copies and proves actual state transitions and removals. Deterministic post-mutation validity and native dependency inspection are implemented and covered separately below. Standalone conservative native deletion is implemented and covered separately below. At the time of this fixture-prerequisite validation, target observation, normal schema 2.0 execute integration, and issue #6 runtime-stage/failure mapping remained unimplemented; current target-state observation coverage is recorded in the table above.
+- Schema 2.0 metadata and strict manifest validation are implemented and covered separately below. Fixture inspection establishes starting native state only; focused real-FreeCAD suppression, visibility, and deletion coverage separately invokes the production consumers against temporary fixture copies and proves actual state transitions and removals. Deterministic post-mutation validity and native dependency inspection are implemented and covered separately below. Standalone conservative native deletion is implemented and covered separately below. This fixture-prerequisite run is historical. Current schema-1 execute integration and observation coverage are recorded in the table above; schema-2 execute remains unsupported.
 
 ### Validation results
 
@@ -1374,9 +1385,9 @@ infrastructure and permanent valid/invalid evidence originally introduced in
 issue #3 and consumed by the standalone conservative native deletion
 consumer in issue #4. Inspection helpers remain read-only; mutation, removal,
 and recompute remain caller-owned. Normal schema 2.0 execute integration remains
-unimplemented. Final runtime-stage ordering and translation through the
-structured runtime failure boundary remain issue #6 scope; the deterministic
-exception hierarchy is available for that later mapping. Engine continues to
+unsupported. Canonical schema-1
+execute composes these capabilities with ordered stages and structured failure
+mapping, as recorded in the current coverage table. Engine continues to
 own expected-versus-observed comparison, tolerance evaluation, engineering
 verification decisions, and normalized durable records.
 
@@ -1485,8 +1496,9 @@ it is not a production entrypoint.
 This coverage proves the standalone native deletion consumer. The execute
 entrypoint still rejects schema-2 manifests before document operations, so it
 does not prove schema-2 execute integration, save, or persistence through the
-normal execute flow. Normal schema 2.0 execute integration, final runtime
-lifecycle sequencing, and structured failure mapping are deferred to issue #6.
+normal execute flow. Normal schema-1 execute lifecycle sequencing and structured
+failure mapping
+are covered in the current coverage table; schema-2 execute remains unsupported.
 Engine owns planning, semantic target resolution, verification decisions, and
 normalized records.
 
@@ -1543,7 +1555,7 @@ tests/test_manifest_v2_validation.py
 | Tested Surface | Expected Behavior |
 | --- | --- |
 | Schema version dispatch | Exact dispatch: `"1.0"` -> `validate_export_manifest_v1`, `"2.0"` -> `validate_export_manifest_v2`; missing version, non-string, whitespace-padded (`" 2.0 "`), numeric (`2.0`), unvetted (`"3.0"`, `"v2"`), and empty strings fail deterministically with `invalid_schema_version`; no trimming, case folding, numeric coercion, or fallback |
-| Schema 1.0 closure | Filename remains `prm.export-manifest.json`; schema version remains `"1.0"`; exact four top-level fields (`schemaVersion`, `sourceDocument`, `parameterAssignments`, `outputs`); `assemblyMutations` and `partMutations` rejected as unknown fields; existing V1 public surface and runtime execution preserved |
+| Schema 1.0 closure | Filename remains `prm.export-manifest.json`; schema version remains `"1.0"`; four required core fields (`schemaVersion`, `sourceDocument`, `parameterAssignments`, `outputs`) with optional `assemblyMutations` and `partMutations`; canonical schema-1 runtime execution preserved |
 | Schema 2.0 metadata exactness | Schema version is exactly `"2.0"`; required top-level fields match V1 core; optional top-level fields (`assemblyMutations`, `partMutations`) are exact; all-fields tuple preserves deterministic ordering |
 | Schema 2.0 positive cases | Minimal valid manifest (core fields with no mutation sections); empty mutation sections (`{}`); sparse mutation sections (e.g. suppression only, deletion only); full multi-scope and multi-family manifests; coexisting suppression and visibility on the same object |
 | Mutation section structure | Mutation sections must be JSON objects; allowed collections are strictly `suppression`, `visibility`, `deletion`; unknown collections (e.g. `parameters`, `properties`, `keep`, `actions`, `targets`) rejected with `unknown_mutation_collection`; non-array collections rejected with `invalid_mutation_collection_type` |
@@ -1554,137 +1566,21 @@ tests/test_manifest_v2_validation.py
 | Suppression + visibility allowed | Within the same scope, suppression and visibility targeting the same object is explicitly valid (independent semantic axes) |
 | Cross-scope conflict rejection | The same object name occurring in both `assemblyMutations` and `partMutations` across any family is rejected with `cross_scope_mutation_object_conflict`; Engine must resolve scope before handoff |
 | Diagnostic determinism | Diagnostics sort deterministically: assembly mutations before part mutations; family order suppression -> visibility -> deletion; entries in caller-supplied array order; input mappings are immutable |
-| Runtime V1-only safety boundary | Runtime entrypoint uses `validate_export_manifest_v1`; Schema 2.0 mutation-bearing manifests are rejected before CAD document open, parameter assignment, recompute, save, export, or success-result writing; runtime V2 acceptance and mutation-consumer wiring remain unimplemented. The standalone native suppression/unsuppression, visibility, and conservative deletion consumers are covered separately |
+| Runtime V1-only safety boundary | Runtime entrypoint uses `validate_export_manifest_v1`; Schema 2.0 mutation-bearing manifests are rejected before CAD document open, parameter assignment, recompute, save, export, or success-result writing; runtime V2 acceptance remains unsupported. Normal schema-1 execute composes the mutation consumers; standalone coverage remains recorded separately |
 
-### Focused test methods
+### Focused test coverage
 
-`tests/test_manifest_v2_contract.py`:
+`tests/test_manifest_v2_contract.py` covers the retained schema-2 metadata,
+shared mutation section contract, immutable field collections, transport
+filename, and the schema-1 validator's rejection of version 2.0. Its schema-1
+metadata assertions now include optional mutation sections.
 
-- `TestSchema10ClosureAndCompatibility`:
-  - `test_export_manifest_v1_filename_unchanged`
-  - `test_export_manifest_schema_version_v1_constant`
-  - `test_v1_top_level_fields_unchanged`
-  - `test_export_manifest_v1_contract_object_fields_unchanged`
-  - `test_v1_contract_has_no_mutation_fields`
-  - `test_existing_all_exports_present`
-- `TestSchema20Metadata`:
-  - `test_export_manifest_schema_version_v2_constant`
-  - `test_v2_required_top_level_fields_matches_v1_core`
-  - `test_v2_optional_top_level_fields`
-  - `test_v2_top_level_fields_order_and_contents`
-  - `test_v2_contract_dataclass_fields`
-  - `test_v2_contract_singleton_instance_attributes`
-- `TestTargetMutationSectionContract`:
-  - `test_mutation_collection_constants`
-  - `test_target_mutation_section_fields_tuple`
-  - `test_mutation_entry_field_constants`
-  - `test_suppression_entry_fields_and_contract`
-  - `test_visibility_entry_fields_and_contract`
-  - `test_deletion_entry_fields_and_contract`
-  - `test_target_mutation_section_contract_singleton`
-  - `test_part_and_assembly_share_exact_same_mutation_section_contract`
-- `TestSharedContractsAndTransportFilename`:
-  - `test_v1_and_v2_share_exact_same_parameter_assignment_contract`
-  - `test_v1_and_v2_share_exact_same_output_contract`
-  - `test_v1_and_v2_share_exact_same_manifest_filename`
-  - `test_no_v2_filename_constant_introduced`
-- `TestForbiddenMutationSurfacesAbsent`:
-  - `test_no_parameters_or_properties_in_mutation_metadata`
-  - `test_no_action_or_keep_in_mutation_metadata`
-  - `test_no_target_kind_or_semantic_id_in_mutation_metadata`
-  - `test_no_force_cascade_or_dependency_policy_in_mutation_metadata`
-- `TestImmutabilityAndImportSafety`:
-  - `test_manifest_contract_import_safe_without_freecad`
-  - `test_manifest_contract_import_safe_without_freecad_gui`
-  - `test_manifest_v2_contract_rejects_attribute_assignment`
-  - `test_target_mutation_section_contract_rejects_attribute_assignment`
-  - `test_all_new_field_collections_are_tuples`
-- `TestTask2Task3Boundary`:
-  - `test_v1_validator_does_not_accept_schema_2_0`
-  - `test_v1_validator_flags_schema_2_0_as_invalid_schema_version`
-  - `test_v1_validator_flags_assembly_mutations_as_unknown_field`
-  - `test_v2_validator_is_exposed_in_manifest_validation_module`
-  - `test_generic_manifest_validator_is_exposed_in_manifest_validation_module`
-  - `test_loader_does_not_expose_mutation_parsing`
-  - `test_engine_manifest_compat_module_has_no_mutation_normalization`
-  - `test_runtime_entrypoints_module_source_has_no_v2_symbols`
-  - `test_manifest_contract_module_itself_exposes_no_validation_function`
-- `TestNoRuntimeBehaviorExposedOnV2Surface`:
-  - `test_no_apply_suppression`, `test_no_apply_visibility`, `test_no_apply_deletion`
-  - `test_no_execute_mutations`, `test_no_parse_mutations`
-
-`tests/test_manifest_v2_validation.py`:
-
-- `TestSchemaVersionDispatch`:
-  - `test_validate_export_manifest_dispatches_v1`
-  - `test_validate_export_manifest_dispatches_v2`
-  - `test_missing_schema_version_rejected`
-  - `test_non_string_schema_version_rejected`
-  - `test_unsupported_string_schema_version_rejected`
-  - `test_schema_version_whitespace_not_trimmed`
-  - `test_schema_version_no_case_folding`
-  - `test_schema_version_no_numeric_coercion`
-- `TestSchema10Closure`:
-  - `test_v1_validator_rejects_assembly_mutations`
-  - `test_v1_validator_rejects_part_mutations`
-  - `test_v1_validator_rejects_schema_20_even_without_mutations`
-  - `test_v1_validator_accepts_clean_v1_manifest`
-- `TestSchema20PositiveCases`:
-  - `test_minimal_v2_manifest_valid`
-  - `test_empty_assembly_and_part_mutations_valid`
-  - `test_sparse_mutation_sections_valid`
-  - `test_full_v2_manifest_with_all_mutation_families_valid`
-  - `test_suppression_and_visibility_on_same_object_is_valid`
-  - `test_multiple_distinct_objects_in_same_family_valid`
-- `TestSchema20StructuralValidation`:
-  - `test_non_mapping_mutation_section_rejected`
-  - `test_unknown_mutation_collection_rejected`
-  - `test_forbidden_collection_names_rejected`
-  - `test_non_list_mutation_collection_rejected`
-  - `test_non_mapping_mutation_entry_rejected`
-  - `test_missing_required_entry_fields`
-  - `test_unknown_entry_fields_rejected`
-  - `test_invalid_object_field_type`
-  - `test_empty_object_field_rejected`
-- `TestSchema20StrictBooleans`:
-  - `test_suppressed_field_requires_strict_bool`
-  - `test_visible_field_requires_strict_bool`
-  - `test_boolean_fields_reject_integers_0_and_1`
-  - `test_boolean_fields_reject_strings_true_and_false`
-- `TestSchema20DuplicateRejection`:
-  - `test_duplicate_suppression_object_rejected`
-  - `test_duplicate_visibility_object_rejected`
-  - `test_duplicate_deletion_object_rejected`
-  - `test_duplicate_object_matching_is_exact_string`
-- `TestSchema20ConflictRejection`:
-  - `test_suppression_and_deletion_conflict_rejected`
-  - `test_visibility_and_deletion_conflict_rejected`
-- `TestSchema20CrossScopeConflicts`:
-  - `test_same_object_in_assembly_and_part_mutations_rejected`
-  - `test_cross_scope_conflict_across_different_families_rejected`
-- `TestSchema20DiagnosticDeterminism`:
-  - `test_mutation_arrays_not_reordered`
-  - `test_object_strings_not_normalized`
-  - `test_diagnostic_order_assembly_before_part`
-  - `test_diagnostic_order_suppression_visibility_deletion`
-  - `test_input_mapping_not_mutated`
-- `TestSharedCoreValidationBehavior`:
-  - `test_missing_required_core_fields_rejected_same_as_v1`
-  - `test_unknown_top_level_fields_rejected_same_as_v1`
-  - `test_empty_source_document_rejected_same_as_v1`
-  - `test_non_list_parameter_assignments_rejected_same_as_v1`
-  - `test_unsupported_output_format_rejected_same_as_v1`
-  - `test_supported_output_formats_unchanged`
-- `TestRuntimeRemainsV1Only`:
-  - `test_entrypoints_module_imports_only_v1_validator`
-  - `test_entrypoints_source_has_no_v2_symbols`
-  - `test_real_v1_validator_rejects_v2_mutation_bearing_manifest_before_freecad_open`
-- `TestImportIsolation`:
-  - `test_module_imports_without_freecad`
-  - `test_validate_export_manifest_v2_is_callable_without_freecad_module_present`
-- `TestLoaderBoundaryIntegration`:
-  - `test_loader_rejects_duplicate_json_object_keys_before_mutation_validation`
-  - `test_duplicate_mutation_object_value_is_a_separate_validator_level_contract`
+`tests/test_manifest_v2_validation.py` covers exact version dispatch, valid
+schema-1 mutation sections, standalone schema-2 validation, closed entry and
+section shapes, strict booleans, duplicates, deletion and cross-scope conflicts,
+and deterministic diagnostics. `tests/test_canonical_manifest_validation.py`
+adds focused canonical schema-1 cases, including direct runtime use recorded in
+the current coverage table.
 
 ### Explicit distinctions and boundaries
 
@@ -1695,7 +1591,7 @@ tests/test_manifest_v2_validation.py
 - **Diagnostic determinism documented:** Yes.
 - **Runtime V1-only safety proof documented:** Yes.
 - **Schema 2.0 execute integration claimed implemented:** No.
-- The standalone native suppression/unsuppression, visibility, and conservative deletion consumers and post-mutation validity infrastructure are implemented and tested, but Schema 2.0 runtime manifest acceptance and consumer wiring remain unimplemented. Target observation remains outside this completed deletion capability, and Engine-owned planning, verification, and normalization remain outside this repository.
+- The standalone native consumers and validity infrastructure retain focused coverage. Normal schema-1 execute composes them and emits raw post-mutation observation; schema-2 execute remains unsupported. Engine owns planning, expected-versus-observed verification, and normalization.
 
 ### Validation results
 
