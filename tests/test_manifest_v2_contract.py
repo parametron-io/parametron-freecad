@@ -1,11 +1,4 @@
-"""Permanent Task 2 contract tests for schema 2.0 manifest metadata.
-
-These tests lock the schema 2.0 *metadata/type* surface added to
-``parametron_freecad.execution.manifest_contract``. They do not exercise
-Task 3 behavior (schema dispatch, mutation parsing, conflict validation,
-runtime mutation execution) — those remain deliberately unimplemented and
-this module asserts that they stay unimplemented.
-"""
+"""Contract metadata for canonical schema 1.0 and the retained V2 validation API."""
 
 from __future__ import annotations
 
@@ -58,7 +51,7 @@ class TestImportSafety(unittest.TestCase):
 
 
 class TestV1ClosurePermanent(unittest.TestCase):
-    """schema 1.0 remains permanently closed and unchanged by Task 2."""
+    """Schema 1.0 includes optional, closed target-mutation sections."""
 
     def setUp(self):
         import parametron_freecad.execution.manifest_contract as mc
@@ -82,30 +75,30 @@ class TestV1ClosurePermanent(unittest.TestCase):
     def test_v1_top_level_fields_exact_and_ordered(self):
         self.assertEqual(
             self.mc.TOP_LEVEL_FIELDS,
-            ("schemaVersion", "sourceDocument", "parameterAssignments", "outputs"),
+            ("schemaVersion", "sourceDocument", "parameterAssignments", "outputs", "assemblyMutations", "partMutations"),
         )
 
-    def test_v1_top_level_fields_is_tuple_of_four(self):
+    def test_v1_top_level_fields_is_tuple_of_six(self):
         self.assertIsInstance(self.mc.TOP_LEVEL_FIELDS, tuple)
-        self.assertEqual(len(self.mc.TOP_LEVEL_FIELDS), 4)
+        self.assertEqual(len(self.mc.TOP_LEVEL_FIELDS), 6)
 
-    def test_v1_contract_object_is_exactly_four_field(self):
+    def test_v1_contract_object_includes_optional_mutations(self):
         contract = self.mc.EXPORT_MANIFEST_V1_CONTRACT
         self.assertEqual(contract.top_level_fields, self.mc.TOP_LEVEL_FIELDS)
-        self.assertEqual(len(contract.top_level_fields), 4)
+        self.assertEqual(len(contract.top_level_fields), 6)
 
-    def test_v1_contract_does_not_expose_assembly_mutations_field(self):
-        self.assertNotIn("assemblyMutations", self.mc.TOP_LEVEL_FIELDS)
+    def test_v1_contract_exposes_assembly_mutations_field(self):
+        self.assertIn("assemblyMutations", self.mc.OPTIONAL_TOP_LEVEL_FIELDS)
 
-    def test_v1_contract_does_not_expose_part_mutations_field(self):
-        self.assertNotIn("partMutations", self.mc.TOP_LEVEL_FIELDS)
+    def test_v1_contract_exposes_part_mutations_field(self):
+        self.assertIn("partMutations", self.mc.OPTIONAL_TOP_LEVEL_FIELDS)
 
-    def test_v1_contract_dataclass_has_no_mutation_attributes(self):
+    def test_v1_contract_dataclass_has_mutation_attributes(self):
         contract = self.mc.EXPORT_MANIFEST_V1_CONTRACT
-        self.assertFalse(hasattr(contract, "assembly_mutations"))
-        self.assertFalse(hasattr(contract, "part_mutations"))
-        self.assertFalse(hasattr(contract, "assembly_mutations_field"))
-        self.assertFalse(hasattr(contract, "part_mutations_field"))
+        self.assertTrue(hasattr(contract, "assembly_mutations"))
+        self.assertTrue(hasattr(contract, "part_mutations"))
+        self.assertTrue(hasattr(contract, "assembly_mutations_field"))
+        self.assertTrue(hasattr(contract, "part_mutations_field"))
 
     def test_v1_contract_schema_version_still_1_0(self):
         self.assertEqual(self.mc.EXPORT_MANIFEST_V1_CONTRACT.schema_version, "1.0")
@@ -213,8 +206,8 @@ class TestV2TopLevelFields(unittest.TestCase):
         self.assertIsInstance(self.mc.V2_TOP_LEVEL_FIELDS, tuple)
 
     def test_required_top_level_fields_reuse_v1_top_level_fields_object(self):
-        # The contract intentionally reuses TOP_LEVEL_FIELDS as the V2 required set.
-        self.assertIs(self.mc.V2_REQUIRED_TOP_LEVEL_FIELDS, self.mc.TOP_LEVEL_FIELDS)
+        # Both schemas share the four required core fields.
+        self.assertIs(self.mc.V2_REQUIRED_TOP_LEVEL_FIELDS, self.mc.REQUIRED_TOP_LEVEL_FIELDS)
 
     def test_v2_contract_required_fields_match_module_constant(self):
         self.assertEqual(
@@ -715,14 +708,14 @@ class TestTask2Task3Boundary(unittest.TestCase):
         codes = [d.code for d in result.diagnostics]
         self.assertIn(mv.DIAGNOSTIC_INVALID_SCHEMA_VERSION, codes)
 
-    def test_v1_validator_flags_assembly_mutations_as_unknown_field(self):
+    def test_v1_validator_recognizes_assembly_mutations_even_when_version_is_invalid(self):
         import parametron_freecad.execution.manifest_validation as mv
 
         result = mv.validate_export_manifest_v1(self._v2_mutation_bearing_payload())
         unknown_paths = [
             d.path for d in result.diagnostics if d.code == mv.DIAGNOSTIC_UNKNOWN_FIELD
         ]
-        self.assertIn("assemblyMutations", unknown_paths)
+        self.assertNotIn("assemblyMutations", unknown_paths)
 
     def test_v2_validation_api_exists_but_runtime_remains_v1_only(self):
         # Task 3 supersedes the Task 2 absence invariant: V2 validation and

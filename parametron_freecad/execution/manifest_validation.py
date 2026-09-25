@@ -133,7 +133,7 @@ def validate_export_manifest_v1(data: Mapping[str, Any]) -> ManifestValidationRe
         )
         return ManifestValidationResult(diagnostics=tuple(diagnostics))
 
-    for field_name in contract.top_level_fields:
+    for field_name in contract.required_top_level_fields:
         if field_name not in data:
             diagnostics.append(
                 ManifestDiagnostic(
@@ -158,6 +158,7 @@ def validate_export_manifest_v1(data: Mapping[str, Any]) -> ManifestValidationRe
     _validate_source_document(data, diagnostics)
     _validate_parameter_assignments(data, diagnostics)
     _validate_outputs(data, diagnostics)
+    _validate_target_mutations(data, diagnostics)
 
     return ManifestValidationResult(diagnostics=tuple(diagnostics))
 
@@ -201,6 +202,15 @@ def validate_export_manifest_v2(data: Mapping[str, Any]) -> ManifestValidationRe
     _validate_source_document(data, diagnostics)
     _validate_parameter_assignments(data, diagnostics)
     _validate_outputs(data, diagnostics)
+    _validate_target_mutations(data, diagnostics)
+
+    return ManifestValidationResult(diagnostics=tuple(diagnostics))
+
+
+def _validate_target_mutations(
+    data: Mapping[str, Any], diagnostics: list[ManifestDiagnostic]
+) -> None:
+    contract = EXPORT_MANIFEST_V1_CONTRACT
 
     assembly_occurrences = _validate_mutation_section(
         data,
@@ -219,8 +229,6 @@ def validate_export_manifest_v2(data: Mapping[str, Any]) -> ManifestValidationRe
     _validate_cross_scope_mutation_conflicts(
         assembly_occurrences, part_occurrences, diagnostics
     )
-
-    return ManifestValidationResult(diagnostics=tuple(diagnostics))
 
 
 def _validate_schema_version_v2(
@@ -409,7 +417,7 @@ def _validate_within_scope_mutation_conflicts(
     occurrences: dict[str, list[tuple[str, str]]],
     diagnostics: list[ManifestDiagnostic],
 ) -> None:
-    contract = EXPORT_MANIFEST_V2_CONTRACT.assembly_mutations
+    contract = EXPORT_MANIFEST_V1_CONTRACT.assembly_mutations
     suppression = {name for name, _ in occurrences[contract.suppression_field]}
     visibility = {name for name, _ in occurrences[contract.visibility_field]}
     for object_name, object_path in occurrences[contract.deletion_field]:
@@ -436,7 +444,7 @@ def _validate_cross_scope_mutation_conflicts(
     part_occurrences: dict[str, list[tuple[str, str]]],
     diagnostics: list[ManifestDiagnostic],
 ) -> None:
-    contract = EXPORT_MANIFEST_V2_CONTRACT.assembly_mutations
+    contract = EXPORT_MANIFEST_V1_CONTRACT.assembly_mutations
     assembly_names = {
         name
         for family in contract.fields
@@ -454,8 +462,8 @@ def _validate_cross_scope_mutation_conflicts(
                     path=object_path,
                     message=(
                         f"mutation object '{object_name}' occurs in both "
-                        f"'{EXPORT_MANIFEST_V2_CONTRACT.assembly_mutations_field}' "
-                        f"and '{EXPORT_MANIFEST_V2_CONTRACT.part_mutations_field}'"
+                        f"'{EXPORT_MANIFEST_V1_CONTRACT.assembly_mutations_field}' "
+                        f"and '{EXPORT_MANIFEST_V1_CONTRACT.part_mutations_field}'"
                     ),
                 )
             )

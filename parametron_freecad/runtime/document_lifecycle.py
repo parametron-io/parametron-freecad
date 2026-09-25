@@ -117,7 +117,13 @@ def opened_freecad_document(
     opened = open_freecad_document(freecad_module, path)
     try:
         yield opened
-    finally:
+    except BaseException as exc:
+        try:
+            close_freecad_document(freecad_module, opened)
+        except Exception as close_exc:
+            exc.add_note(f"document cleanup also failed: {close_exc}")
+        raise
+    else:
         close_freecad_document(freecad_module, opened)
 
 

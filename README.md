@@ -3,8 +3,8 @@
 FreeCAD runtime integration for Parametron behind Engine-owned contracts.
 
 The runtime opens a prepared working-copy document, applies exact property
-assignments, recomputes and saves the native document, exports declared
-artifacts, and returns raw CAD evidence. Engine owns planning, request
+assignments and requested target mutations, recomputes and saves the native
+document, exports declared artifacts, and returns raw CAD evidence. Engine owns planning, request
 construction, normalization, and verification decisions. Higher-level
 orchestration and durable product storage/indexing are outside this repository.
 
@@ -28,18 +28,17 @@ orchestration and durable product storage/indexing are outside this repository.
 - Canonical success and handled-failure `prm.result.json` output, with path
   containment against the exact supplied working-copy root.
 
-Manifest schema 2.0 metadata and strict validation are implemented separately;
-the execute entrypoint rejects schema 2.0 manifests. Focused FreeCAD-native
-target-mutation support now includes independently tested
-suppression/unsuppression, App-level visibility, deterministic post-mutation
-supported Body validity inspection, deterministic native dependency evidence,
-and conservative FreeCAD-native deletion (exact native target lookup,
-surviving-dependent rejection, native removal, post-removal recompute,
-supported post-delete Body validity checks, and fail-closed behavior). These
-standalone mutation capabilities are not yet wired into the execute path.
-Target-state observation is implemented in the existing observation stage;
-its final placement after target mutations, runtime-stage ordering, and
-structured mutation failure mapping remain issue #6 work.
+Normal `execute` consumes canonical Engine-produced schema 1.0 manifests
+directly. Optional `assemblyMutations` and `partMutations` support suppression,
+visibility, and conservative deletion. Assembly precedes Part; within each
+section, suppression precedes visibility and deletion. Focused native tests
+also cover each capability independently. Schema 2.0 metadata and strict
+validation remain a separate surface; normal `execute` rejects schema 2.0.
+Requested target-state observation reads live native state after successful
+mutation and persistence and emits raw evidence. Engine owns expected-versus-
+observed verification and normalized records. Mutation and lifecycle failures
+use the existing structured failure boundary; cleanup is attempted and a
+required-stage failure prevents a success result.
 See the
 [target-mutation contract](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/target-mutations.md).
 
@@ -74,9 +73,15 @@ The launcher selects `PARAMETRON_FREECAD_BIN` when configured, otherwise
 directory. Optional observation and traversal requests require `--output-dir`.
 The caller prepares the working copy and output directories.
 
-Execution proceeds through assignment, recompute, native save, exports,
-optional traversal, optional observation, document close, and success-result
-writing. A standalone external `observe` command is unsupported; a separate
+Execution validates the canonical manifest and supplied requests before native
+execution, opens the prepared source document, applies parameter assignments
+and target mutations, performs required recompute and supported post-mutation
+validity checks, saves the native document, then runs exports, optional
+traversal, and optional observation. It closes the document before writing the
+success result. Deletion performs its own post-removal recompute and validity
+check; a final pass runs when later mutation state requires it. Mutation-free
+execution retains its established recompute behavior. A standalone external
+`observe` command is unsupported; a separate
 in-process observation callable accepts injected document state.
 
 See [runtime.md](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/runtime.md)

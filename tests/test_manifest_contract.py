@@ -48,11 +48,11 @@ class TestTopLevelFieldContract(unittest.TestCase):
     def test_top_level_fields_exact(self):
         self.assertEqual(
             self.mc.TOP_LEVEL_FIELDS,
-            ("schemaVersion", "sourceDocument", "parameterAssignments", "outputs"),
+            ("schemaVersion", "sourceDocument", "parameterAssignments", "outputs", "assemblyMutations", "partMutations"),
         )
 
     def test_top_level_fields_count(self):
-        self.assertEqual(len(self.mc.TOP_LEVEL_FIELDS), 4)
+        self.assertEqual(len(self.mc.TOP_LEVEL_FIELDS), 6)
 
     def test_top_level_fields_is_tuple(self):
         self.assertIsInstance(self.mc.TOP_LEVEL_FIELDS, tuple)
@@ -62,7 +62,7 @@ class TestTopLevelFieldContract(unittest.TestCase):
             self.mc.TOP_LEVEL_FIELDS[0] = "other"
 
     def test_top_level_fields_no_extra(self):
-        allowed = {"schemaVersion", "sourceDocument", "parameterAssignments", "outputs"}
+        allowed = {"schemaVersion", "sourceDocument", "parameterAssignments", "outputs", "assemblyMutations", "partMutations"}
         self.assertEqual(set(self.mc.TOP_LEVEL_FIELDS), allowed)
 
     def test_individual_field_constants(self):
