@@ -6,11 +6,12 @@ including rejection of unsupported requests. It does not create new requirements
 Recorded validation counts below are separate prior runs, not a claim that the
 current suite was rerun or that overlapping counts should be summed.
 
-The final fresh-Nix validation for the canonical target-mutation lifecycle
-recorded 511 canonical contract tests, 162 lifecycle/failure tests, 251 native
-consumer regression tests, 4 canonical lifecycle native integration tests,
-and 3,803 full-suite tests passed. Smoke and `git diff --check` passed. These
-overlapping suites are not summed; this documentation update does not rerun them.
+The completed permanent production-execute native proof recorded 3 focused
+real-FreeCAD tests, 45 adjacent native regressions, 4 canonical lifecycle
+native tests, 68 runtime entrypoint tests with 8 subtests, and 3,806 full-suite
+tests passed, with no failures or skips. Strict smoke passed on FreeCAD 1.1.1;
+compileall and `git diff --check` passed. These overlapping suites are not
+summed; this documentation update does not rerun them.
 
 ## Command Rules
 
@@ -88,6 +89,14 @@ python -m pytest \
   tests/test_post_mutation_validity_real_fixtures.py
 ```
 
+Production-execute real-FreeCAD target-mutation proof (requires an available
+FreeCAD host; strict mode makes host unavailability a failure):
+
+```bash
+env PARAMETRON_FREECAD_STRICT_SMOKE=1 \
+  python -m pytest tests/test_mutation_execute_real_fixtures.py
+```
+
 Focused aligned execute-plus-observation checks:
 
 ```bash
@@ -123,6 +132,13 @@ configured FreeCAD smoke behavior into a test failure.
 | Covered | Directly tested. |
 | Indirectly covered | Verified through integration or side-effect assertions. |
 
+Real-FreeCAD coverage is proven only by an executed native PASS. A gated SKIP
+means the host was unavailable and supplies no native proof; FAIL means the
+native check did not pass. Fast/default tests cover contract validation,
+serialization, orchestration, failure routing, and fake-FreeCAD behavior.
+Native tests cover actual object mutation, recompute, validity, save/reopen,
+observation, and native failure behavior.
+
 ## Current Coverage
 
 | Area | Status | Evidence | Notes |
@@ -144,15 +160,16 @@ configured FreeCAD smoke behavior into a test failure.
 | Canonical schema 1.0 mutation validation | Covered | `tests/test_canonical_manifest_validation.py`, `tests/test_canonical_lifecycle.py` | Four required core fields and optional `assemblyMutations`/`partMutations`; each section is closed to suppression, visibility, deletion. Strict booleans and entry shapes; duplicate, deletion, and cross-scope conflict rejection; suppression plus visibility coexistence; deterministic diagnostics without input mutation. Canonical Engine-generated manifest loads directly, and normal execute rejects schema 2.0. |
 | Canonical runtime lifecycle and failure handling | Covered | `tests/test_canonical_runtime_lifecycle.py` | Parameter assignment → Assembly suppression, visibility, deletion → Part suppression, visibility, deletion → required final recompute/validity when applicable → save → STEP/CSV/PDF exports → traversal → observation → close → success. Each deletion includes internal recompute and supported Body validity inspection; a final pass follows later mutation state without redundant checking after final deletion. Mutation-free execution retains one recompute and no new target-mutation validity requirement. Structured stages cover suppression, visibility, deletion, recompute, post_mutation_validity, document_save, observation, and document_close; failures stop later work, attempt cleanup, preserve native causes and the primary execution failure even when cleanup/result emission fails, and prevent false success. Earlier completed mutations are not generally rolled back. |
 | Canonical native lifecycle | Covered, real FreeCAD | `tests/test_canonical_lifecycle.py`, `tests/freecad_canonical_lifecycle_runner.py`, `tests/fixtures/canonical_lifecycle/` | Real normal execute persists large-variant parameters, suppression/unsuppression, hide/unhide, and conservative `Body002` deletion. No-delete regression proves `Body002` survives when deletion is omitted. Reopening proves persisted state equals live post-mutation observation; result/traversal emission, source-fixture integrity, and repeated-run semantic determinism are covered. |
-| Canonical Engine-generated input corpus | Covered | `tests/test_canonical_lifecycle.py`, `tests/fixtures/engine_generated/prm.export-manifest.json`, `tests/fixtures/engine_generated/prm.verification.json`, `tests/fixtures/engine_generated/prm.reference-traversal-request.json` | Actual Engine production-materialized runtime inputs, copied byte-for-byte; direct manifest and request loading. Engine retains verification and normalization ownership. |
+| Production-execute target-mutation native proof | Covered, real FreeCAD | `tests/test_mutation_execute_real_fixtures.py`, `tests/freecad_mutation_execute_runner.py` (test-only host, not a production entrypoint), `tests/fixtures/partdesign_mutations/` | Canonical schema 1.0 `prm.export-manifest.json` and `prm.verification.json` enter production execute. Real FreeCAD proves suppress/unsuppress, hide/unhide, conservative safe deletion, post-mutation recompute and validity, working-copy save and independent reopen, and requested raw suppression/visibility/existence observation in `prm.observed.json`. Unsafe deletion and native validity failures yield failed `prm.result.json`, no observation or false success, and predictable document closure. Equivalent runs agree on native state, validity, result, target-state observation, and output names; the committed fixture hash stays unchanged. This does not prove arbitrary-object deletion, `.FCStd` archive byte identity, or the separate real Engine-to-FreeCAD rehearsal. |
+| Canonical Engine-generated input corpus | Covered | `tests/test_canonical_lifecycle.py`, `tests/fixtures/engine_generated/prm.export-manifest.json`, `tests/fixtures/engine_generated/prm.verification.json`, `tests/fixtures/engine_generated/prm.reference-traversal-request.json` | Actual Engine production-materialized inputs for FreeCAD consumption, copied byte-for-byte; direct manifest and request loading. `prm.result.json` and `prm.observed.json` are FreeCAD outputs, not Engine-generated input fixtures. Engine retains verification and normalization ownership. |
 | Strict manifest loading | Covered | `tests/test_manifest_loader.py`, `tests/test_headless_malformed_manifests.py` | Duplicate keys and non-standard JSON constants rejected. |
 | Manifest structural validation | Covered | `tests/test_manifest_validation.py` | Exact field surfaces and supported formats. |
-| Engine dot-form manifest compatibility | Covered | `tests/test_engine_manifest_compat.py`, `parametron_freecad/runtime/integration_rehearsal.py` | Transitional normalization remains used by integration rehearsal; normal execute loads canonical schema 1.0 directly without it. |
+| Retired Engine dot-form compatibility regression | Covered | `tests/test_engine_manifest_compat.py` | Historical compatibility and rejection coverage; the current production execute path consumes canonical Engine-produced schema 1.0 inputs directly. |
 | Engine name-only parameter rejection | Covered | `tests/test_engine_manifest_compat.py`, `tests/test_runtime_entrypoints.py` | Rejected before document open and side effects. |
 | Exact parameter target resolver | Covered | `tests/test_parameter_target_resolver.py`, `tests/test_parameter_assignment.py` | `<ObjectName>.<PropertyName>` only. |
 | Parameter assignment | Covered | `tests/test_parameter_assignment.py`, `tests/test_headless_cli_arguments.py` | Scalar assignment in manifest order. |
 | Document recompute | Covered | `tests/test_document_recompute.py`, `tests/test_headless_cli_arguments.py`, `tests/test_canonical_runtime_lifecycle.py` | Mutation-free execution retains one recompute. Deletion includes post-removal recompute/validity; later mutation state may require a final pass. |
-| Native document persistence | Covered | `tests/test_document_save.py`, `tests/test_runtime_entrypoints.py`, `tests/test_failure_output_contract.py`, `tests/test_reference_traversal_real_fixtures.py`, `tests/test_canonical_lifecycle.py` | `document.save()` is called exactly once on the opened working copy after required recompute/validity and before exports/traversal/observation; `DocumentSaveError` maps to stage `document_save`; zero derived outputs persist native state with `artifacts: []`. Real FreeCAD close/reopen proof covers ordinary parameter and canonical target-mutation execution. |
+| Native document persistence | Covered | `tests/test_document_save.py`, `tests/test_runtime_entrypoints.py`, `tests/test_failure_output_contract.py`, `tests/test_reference_traversal_real_fixtures.py`, `tests/test_canonical_lifecycle.py`, `tests/test_mutation_execute_real_fixtures.py` | `document.save()` is called exactly once on the opened working copy after required recompute/validity and before exports/traversal/observation; `DocumentSaveError` maps to stage `document_save`; zero derived outputs persist native state with `artifacts: []`. Real FreeCAD close/reopen proof covers ordinary parameter and canonical target-mutation execution. Archive byte identity is not claimed. |
 | STEP export | Covered | `tests/test_step_export.py`, `tests/test_headless_cli_arguments.py`, `tests/test_headless_repeated_run.py`, `tests/test_headless_unsupported_artifact_requests.py` | Exact `document.getObject(id)` lookup and one-object export; declared output path confined to working copy; no `document.Objects` fallback. |
 | CSV export | Covered | `tests/test_csv_export.py`, `tests/test_headless_unsupported_artifact_requests.py` | Spreadsheet-backed CSV behavior. |
 | PDF export | Covered | `tests/test_pdf_export.py`, `tests/test_headless_unsupported_artifact_requests.py` | TechDraw-backed PDF behavior. |
@@ -171,7 +188,7 @@ configured FreeCAD smoke behavior into a test failure.
 | Requested parameter observation | Covered | `tests/test_parameter_observation.py`, `tests/test_unavailable_requested_observations.py` | Exact `document.getObject` and property read. |
 | Requested metadata observation | Covered | `tests/test_metadata_observation.py`, `tests/test_unavailable_requested_observations.py` | Exact owner/key reads. |
 | Requested reference observation | Covered | `tests/test_reference_access.py`, `tests/test_reference_observation.py`, `tests/test_unavailable_requested_observations.py` | Existence check only; not traversal. |
-| Canonical schema `1.0` target-state observation | Covered, including gated real FreeCAD | `tests/test_verification_contract.py`, `tests/test_observed_contract.py`, `tests/test_target_state_observation.py`, `tests/test_target_state_real_fixtures.py` | Request contract and runtime request-loader boundary; exact suppression and visibility true/false, boolean `target_missing` versus `unavailable`, native existence/absence, exact request scope, destination/object ordering, independence from mutation intent, compatibility when unrequested, canonical atomic observed output and structured failures. Real-native proof covers exact object lookup, App-level booleans, and existence/absence in headless FreeCAD; it does not complete issue #7's native matrix. |
+| Canonical schema `1.0` target-state observation | Covered, including gated real FreeCAD | `tests/test_verification_contract.py`, `tests/test_observed_contract.py`, `tests/test_target_state_observation.py`, `tests/test_target_state_real_fixtures.py`, `tests/test_mutation_execute_real_fixtures.py` | Engine-defined request scope; exact native lookup and post-execution suppression, visibility, and existence evidence with `target_missing`/`unavailable` semantics. Production-execute proof compares raw `prm.observed.json` with independently reopened native state. FreeCAD does not decide verification success or produce normalized Engine records. |
 | Observation ordering | Covered | `tests/test_observation_ordering.py`, `tests/test_requested_scope_observation.py` | Deterministic ordering for already-built payloads. |
 | Observed JSON writing | Covered | `tests/test_observed_writer.py`, `tests/test_observed_output_repeated_run.py` | Canonical UTF-8 JSON with atomic destination replacement; no standalone CLI `observe`. |
 | Engine invocation surface | Covered | `tests/test_runtime_invocation.py`, `tests/test_invocation_contract.py` | Execute and observe modes; execute failures preserve entrypoint-written failed `prm.result.json`. |
