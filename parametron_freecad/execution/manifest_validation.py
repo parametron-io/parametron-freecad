@@ -8,7 +8,6 @@ from typing import Any
 
 from parametron_freecad.execution.manifest_contract import (
     EXPORT_MANIFEST_V1_CONTRACT,
-    EXPORT_MANIFEST_V2_CONTRACT,
 )
 
 ROOT_PATH = "$"
@@ -103,8 +102,6 @@ def validate_export_manifest(data: Mapping[str, Any]) -> ManifestValidationResul
 
     if value == EXPORT_MANIFEST_V1_CONTRACT.schema_version:
         return validate_export_manifest_v1(data)
-    if value == EXPORT_MANIFEST_V2_CONTRACT.schema_version:
-        return validate_export_manifest_v2(data)
 
     return ManifestValidationResult(
         diagnostics=(
@@ -163,50 +160,6 @@ def validate_export_manifest_v1(data: Mapping[str, Any]) -> ManifestValidationRe
     return ManifestValidationResult(diagnostics=tuple(diagnostics))
 
 
-def validate_export_manifest_v2(data: Mapping[str, Any]) -> ManifestValidationResult:
-    """Validate a decoded schema 2.0 manifest without executing mutations."""
-
-    diagnostics: list[ManifestDiagnostic] = []
-    contract = EXPORT_MANIFEST_V2_CONTRACT
-
-    if not isinstance(data, Mapping):
-        diagnostics.append(
-            ManifestDiagnostic(
-                code=DIAGNOSTIC_INVALID_FIELD_TYPE,
-                path=ROOT_PATH,
-                message="manifest root must be an object",
-            )
-        )
-        return ManifestValidationResult(diagnostics=tuple(diagnostics))
-
-    for field_name in contract.required_top_level_fields:
-        if field_name not in data:
-            diagnostics.append(
-                ManifestDiagnostic(
-                    code=DIAGNOSTIC_MISSING_REQUIRED_FIELD,
-                    path=field_name,
-                    message=f"missing required field '{field_name}'",
-                )
-            )
-
-    for field_name in sorted(key for key in data if key not in contract.top_level_fields):
-        diagnostics.append(
-            ManifestDiagnostic(
-                code=DIAGNOSTIC_UNKNOWN_FIELD,
-                path=field_name,
-                message=f"unknown field '{field_name}'",
-            )
-        )
-
-    _validate_schema_version_v2(data, diagnostics)
-    _validate_source_document(data, diagnostics)
-    _validate_parameter_assignments(data, diagnostics)
-    _validate_outputs(data, diagnostics)
-    _validate_target_mutations(data, diagnostics)
-
-    return ManifestValidationResult(diagnostics=tuple(diagnostics))
-
-
 def _validate_target_mutations(
     data: Mapping[str, Any], diagnostics: list[ManifestDiagnostic]
 ) -> None:
@@ -229,35 +182,6 @@ def _validate_target_mutations(
     _validate_cross_scope_mutation_conflicts(
         assembly_occurrences, part_occurrences, diagnostics
     )
-
-
-def _validate_schema_version_v2(
-    data: Mapping[str, Any], diagnostics: list[ManifestDiagnostic]
-) -> None:
-    field_name = EXPORT_MANIFEST_V2_CONTRACT.schema_version_field
-    if field_name not in data:
-        return
-    value = data[field_name]
-    if not isinstance(value, str):
-        diagnostics.append(
-            ManifestDiagnostic(
-                code=DIAGNOSTIC_INVALID_FIELD_TYPE,
-                path=field_name,
-                message=f"field '{field_name}' must be a string",
-            )
-        )
-        return
-    if value != EXPORT_MANIFEST_V2_CONTRACT.schema_version:
-        diagnostics.append(
-            ManifestDiagnostic(
-                code=DIAGNOSTIC_INVALID_SCHEMA_VERSION,
-                path=field_name,
-                message=(
-                    "schemaVersion must be "
-                    f"'{EXPORT_MANIFEST_V2_CONTRACT.schema_version}'"
-                ),
-            )
-        )
 
 
 def _validate_mutation_section(
@@ -781,5 +705,4 @@ __all__ = [
     "ROOT_PATH",
     "validate_export_manifest",
     "validate_export_manifest_v1",
-    "validate_export_manifest_v2",
 ]

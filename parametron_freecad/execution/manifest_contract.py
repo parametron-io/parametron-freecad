@@ -7,7 +7,6 @@ from dataclasses import dataclass
 EXPORT_MANIFEST_V1_FILENAME = "prm.export-manifest.json"
 EXPORT_MANIFEST_SCHEMA_VERSION = "1.0"
 EXPORT_MANIFEST_SCHEMA_VERSION_V1 = EXPORT_MANIFEST_SCHEMA_VERSION
-EXPORT_MANIFEST_SCHEMA_VERSION_V2 = "2.0"
 
 FIELD_ASSEMBLY_MUTATIONS = "assemblyMutations"
 FIELD_OUTPUTS = "outputs"
@@ -28,10 +27,6 @@ OPTIONAL_TOP_LEVEL_FIELDS = (
     FIELD_PART_MUTATIONS,
 )
 TOP_LEVEL_FIELDS = REQUIRED_TOP_LEVEL_FIELDS + OPTIONAL_TOP_LEVEL_FIELDS
-
-V2_REQUIRED_TOP_LEVEL_FIELDS = REQUIRED_TOP_LEVEL_FIELDS
-V2_OPTIONAL_TOP_LEVEL_FIELDS = OPTIONAL_TOP_LEVEL_FIELDS
-V2_TOP_LEVEL_FIELDS = TOP_LEVEL_FIELDS
 
 MUTATION_COLLECTION_SUPPRESSION = "suppression"
 MUTATION_COLLECTION_VISIBILITY = "visibility"
@@ -169,27 +164,6 @@ class TargetMutationSectionContract:
     deletion_entry: DeletionEntryContract
 
 
-@dataclass(frozen=True, slots=True)
-class ManifestV2Contract:
-    """Schema 2.0 manifest fields layered on the existing transport contract."""
-
-    filename: str
-    schema_version: str
-    required_top_level_fields: tuple[str, ...]
-    optional_top_level_fields: tuple[str, ...]
-    top_level_fields: tuple[str, ...]
-    schema_version_field: str
-    source_document_field: str
-    parameter_assignments_field: str
-    outputs_field: str
-    assembly_mutations_field: str
-    part_mutations_field: str
-    parameter_assignment: ParameterAssignmentContract
-    output: OutputContract
-    assembly_mutations: TargetMutationSectionContract
-    part_mutations: TargetMutationSectionContract
-
-
 PARAMETER_ASSIGNMENT_CONTRACT = ParameterAssignmentContract(
     fields=PARAMETER_ASSIGNMENT_FIELDS,
     target_field=PARAMETER_ASSIGNMENT_FIELD_TARGET,
@@ -250,25 +224,6 @@ EXPORT_MANIFEST_V1_CONTRACT = ManifestContract(
     part_mutations=TARGET_MUTATION_SECTION_CONTRACT,
 )
 
-EXPORT_MANIFEST_V2_CONTRACT = ManifestV2Contract(
-    filename=EXPORT_MANIFEST_V1_FILENAME,
-    schema_version=EXPORT_MANIFEST_SCHEMA_VERSION_V2,
-    required_top_level_fields=V2_REQUIRED_TOP_LEVEL_FIELDS,
-    optional_top_level_fields=V2_OPTIONAL_TOP_LEVEL_FIELDS,
-    top_level_fields=V2_TOP_LEVEL_FIELDS,
-    schema_version_field=FIELD_SCHEMA_VERSION,
-    source_document_field=FIELD_SOURCE_DOCUMENT,
-    parameter_assignments_field=FIELD_PARAMETER_ASSIGNMENTS,
-    outputs_field=FIELD_OUTPUTS,
-    assembly_mutations_field=FIELD_ASSEMBLY_MUTATIONS,
-    part_mutations_field=FIELD_PART_MUTATIONS,
-    parameter_assignment=PARAMETER_ASSIGNMENT_CONTRACT,
-    output=OUTPUT_CONTRACT,
-    assembly_mutations=TARGET_MUTATION_SECTION_CONTRACT,
-    part_mutations=TARGET_MUTATION_SECTION_CONTRACT,
-)
-
-
 def supported_output_formats() -> tuple[str, ...]:
     """Return the supported Phase 1 output formats in deterministic order."""
 
@@ -283,10 +238,8 @@ __all__ = [
     "DeletionEntryContract",
     "EXPORT_MANIFEST_SCHEMA_VERSION",
     "EXPORT_MANIFEST_SCHEMA_VERSION_V1",
-    "EXPORT_MANIFEST_SCHEMA_VERSION_V2",
     "EXPORT_MANIFEST_V1_CONTRACT",
     "EXPORT_MANIFEST_V1_FILENAME",
-    "EXPORT_MANIFEST_V2_CONTRACT",
     "FIELD_ASSEMBLY_MUTATIONS",
     "FIELD_OUTPUTS",
     "FIELD_PARAMETER_ASSIGNMENTS",
@@ -294,7 +247,6 @@ __all__ = [
     "FIELD_SCHEMA_VERSION",
     "FIELD_SOURCE_DOCUMENT",
     "ManifestContract",
-    "ManifestV2Contract",
     "MUTATION_COLLECTION_DELETION",
     "MUTATION_COLLECTION_SUPPRESSION",
     "MUTATION_COLLECTION_VISIBILITY",
@@ -323,9 +275,6 @@ __all__ = [
     "TARGET_MUTATION_SECTION_FIELDS",
     "TOP_LEVEL_FIELDS",
     "TargetMutationSectionContract",
-    "V2_OPTIONAL_TOP_LEVEL_FIELDS",
-    "V2_REQUIRED_TOP_LEVEL_FIELDS",
-    "V2_TOP_LEVEL_FIELDS",
     "VISIBILITY_ENTRY_CONTRACT",
     "VISIBILITY_ENTRY_FIELDS",
     "VISIBILITY_ENTRY_FIELD_VISIBLE",

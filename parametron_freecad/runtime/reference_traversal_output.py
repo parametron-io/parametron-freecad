@@ -1,4 +1,4 @@
-"""Raw reference traversal output schema 2.0."""
+"""Raw reference traversal output schema 1.0."""
 
 from __future__ import annotations
 
@@ -17,17 +17,17 @@ from parametron_freecad.runtime.reference_traversal_output_contract import (
     order_reference_traversal_diagnostics,
 )
 
-REFERENCE_TRAVERSAL_OUTPUT_SCHEMA_VERSION_V2 = "2.0"
-REFERENCE_TRAVERSAL_NODE_ORDER_FIELDS_V2 = (
+REFERENCE_TRAVERSAL_OUTPUT_SCHEMA_VERSION = "1.0"
+REFERENCE_TRAVERSAL_NODE_ORDER_FIELDS = (
     "documentPath", "kind", "id", "objectName", "objectType", "label", "state", "diagnostic"
 )
-REFERENCE_TRAVERSAL_EDGE_ORDER_FIELDS_V2 = (
+REFERENCE_TRAVERSAL_EDGE_ORDER_FIELDS = (
     "source", "target", "kind", "sourceProperty", "referenceMechanism", "state", "diagnostic"
 )
 
 
 @dataclass(frozen=True, slots=True)
-class RawReferenceTraversalNodeV2:
+class RawReferenceTraversalNode:
     kind: str
     state: str
     document_path: str
@@ -38,9 +38,9 @@ class RawReferenceTraversalNodeV2:
 
 
 @dataclass(frozen=True, slots=True)
-class RawReferenceTraversalEdgeV2:
-    source: RawReferenceTraversalNodeV2
-    target: RawReferenceTraversalNodeV2
+class RawReferenceTraversalEdge:
+    source: RawReferenceTraversalNode
+    target: RawReferenceTraversalNode
     kind: str
     state: str
     source_property: str | None = None
@@ -74,12 +74,12 @@ def _state(value: object) -> str:
     return result
 
 
-def build_reference_traversal_node_identity_key_v2(
-    node: RawReferenceTraversalNodeV2,
+def build_reference_traversal_node_identity_key(
+    node: RawReferenceTraversalNode,
 ) -> tuple[str, ...]:
-    if not isinstance(node, RawReferenceTraversalNodeV2):
+    if not isinstance(node, RawReferenceTraversalNode):
         raise ReferenceTraversalOutputContractError(
-            "node must be a RawReferenceTraversalNodeV2"
+            "node must be a RawReferenceTraversalNode"
         )
     return build_reference_traversal_semantic_node_identity_key(
         kind=node.kind,
@@ -88,27 +88,27 @@ def build_reference_traversal_node_identity_key_v2(
     )
 
 
-def build_reference_traversal_node_id_v2(
-    node: RawReferenceTraversalNodeV2,
+def build_reference_traversal_node_id(
+    node: RawReferenceTraversalNode,
 ) -> str:
-    identity_key = build_reference_traversal_node_identity_key_v2(node)
+    identity_key = build_reference_traversal_node_identity_key(node)
     preimage = dumps_canonical(identity_key).encode("utf-8")
     return f"{node.kind}:{hashlib.sha256(preimage).hexdigest()}"
 
 
-def build_reference_traversal_edge_identity_key_v2(
-    edge: RawReferenceTraversalEdgeV2,
+def build_reference_traversal_edge_identity_key(
+    edge: RawReferenceTraversalEdge,
 ) -> tuple[tuple[str, ...], tuple[str, ...], str, str | None, str | None]:
-    if not isinstance(edge, RawReferenceTraversalEdgeV2):
+    if not isinstance(edge, RawReferenceTraversalEdge):
         raise ReferenceTraversalOutputContractError(
-            "edge must be a RawReferenceTraversalEdgeV2"
+            "edge must be a RawReferenceTraversalEdge"
         )
     kind = _required(edge.kind, "kind")
     if kind not in REFERENCE_TRAVERSAL_SEMANTIC_EDGE_IDENTITY_SUPPORTED_KINDS:
         raise ReferenceTraversalOutputContractError("edge kind is not defined")
     return (
-        build_reference_traversal_node_identity_key_v2(edge.source),
-        build_reference_traversal_node_identity_key_v2(edge.target),
+        build_reference_traversal_node_identity_key(edge.source),
+        build_reference_traversal_node_identity_key(edge.target),
         kind,
         _optional(edge.source_property, "sourceProperty"),
         _optional(edge.reference_mechanism, "referenceMechanism"),
@@ -119,12 +119,12 @@ def _optional_order(value: str | None) -> tuple[int, str]:
     return (0, "") if value is None else (1, value)
 
 
-def _node_order(node: RawReferenceTraversalNodeV2) -> tuple[Any, ...]:
+def _node_order(node: RawReferenceTraversalNode) -> tuple[Any, ...]:
     _state(node.state)
     return (
         node.document_path,
         node.kind,
-        build_reference_traversal_node_id_v2(node),
+        build_reference_traversal_node_id(node),
         _optional_order(node.object_name),
         _optional_order(_optional(node.object_type, "objectType")),
         _optional_order(_optional(node.label, "label")),
@@ -133,11 +133,11 @@ def _node_order(node: RawReferenceTraversalNodeV2) -> tuple[Any, ...]:
     )
 
 
-def _edge_order(edge: RawReferenceTraversalEdgeV2) -> tuple[Any, ...]:
+def _edge_order(edge: RawReferenceTraversalEdge) -> tuple[Any, ...]:
     _state(edge.state)
     return (
-        build_reference_traversal_node_id_v2(edge.source),
-        build_reference_traversal_node_id_v2(edge.target),
+        build_reference_traversal_node_id(edge.source),
+        build_reference_traversal_node_id(edge.target),
         edge.kind,
         _optional_order(_optional(edge.source_property, "sourceProperty")),
         _optional_order(_optional(edge.reference_mechanism, "referenceMechanism")),
@@ -147,30 +147,30 @@ def _edge_order(edge: RawReferenceTraversalEdgeV2) -> tuple[Any, ...]:
 
 
 def _deduplicate_edges(
-    edges: Sequence[RawReferenceTraversalEdgeV2],
-) -> tuple[RawReferenceTraversalEdgeV2, ...]:
-    unique: dict[tuple[Any, ...], RawReferenceTraversalEdgeV2] = {}
+    edges: Sequence[RawReferenceTraversalEdge],
+) -> tuple[RawReferenceTraversalEdge, ...]:
+    unique: dict[tuple[Any, ...], RawReferenceTraversalEdge] = {}
     for edge in edges:
-        key = build_reference_traversal_edge_identity_key_v2(edge)
+        key = build_reference_traversal_edge_identity_key(edge)
         previous = unique.get(key)
         if previous is not None and previous != edge:
             raise ReferenceTraversalOutputContractError(
-                "duplicate schema-2 edge identity has conflicting raw evidence"
+                "duplicate canonical edge identity has conflicting raw evidence"
             )
         unique[key] = edge
     return tuple(sorted(unique.values(), key=_edge_order))
 
 
 def _deduplicate_nodes(
-    nodes: Sequence[RawReferenceTraversalNodeV2],
-) -> tuple[RawReferenceTraversalNodeV2, ...]:
-    unique: dict[tuple[str, ...], RawReferenceTraversalNodeV2] = {}
+    nodes: Sequence[RawReferenceTraversalNode],
+) -> tuple[RawReferenceTraversalNode, ...]:
+    unique: dict[tuple[str, ...], RawReferenceTraversalNode] = {}
     for node in nodes:
-        key = build_reference_traversal_node_identity_key_v2(node)
+        key = build_reference_traversal_node_identity_key(node)
         previous = unique.get(key)
         if previous is not None and previous != node:
             raise ReferenceTraversalOutputContractError(
-                "duplicate schema-2 node identity has conflicting raw evidence"
+                "duplicate canonical node identity has conflicting raw evidence"
             )
         unique[key] = node
     return tuple(sorted(unique.values(), key=_node_order))
@@ -182,14 +182,14 @@ def _deduplicate_diagnostics(
     return order_reference_traversal_diagnostics(tuple(dict.fromkeys(diagnostics)))
 
 
-def build_reference_traversal_output_payload_v2(
+def build_reference_traversal_output_payload(
     *,
     boundary: str,
     operation: str,
     status: str,
     source_document: str,
-    nodes: Sequence[RawReferenceTraversalNodeV2],
-    edges: Sequence[RawReferenceTraversalEdgeV2],
+    nodes: Sequence[RawReferenceTraversalNode],
+    edges: Sequence[RawReferenceTraversalEdge],
     diagnostics: Sequence[RawReferenceTraversalDiagnostic] = (),
 ) -> dict[str, Any]:
     for name, value in (
@@ -206,7 +206,7 @@ def build_reference_traversal_output_payload_v2(
     ordered_edges = _deduplicate_edges(edges)
     ordered_diagnostics = _deduplicate_diagnostics(diagnostics)
     return {
-        "schemaVersion": REFERENCE_TRAVERSAL_OUTPUT_SCHEMA_VERSION_V2,
+        "schemaVersion": REFERENCE_TRAVERSAL_OUTPUT_SCHEMA_VERSION,
         "kind": REFERENCE_TRAVERSAL_OUTPUT_KIND_RAW_REFERENCE_TRAVERSAL,
         "boundary": boundary,
         "operation": operation,
@@ -215,7 +215,7 @@ def build_reference_traversal_output_payload_v2(
         "nodes": [
             {
                 "sequence": sequence,
-                "id": build_reference_traversal_node_id_v2(node),
+                "id": build_reference_traversal_node_id(node),
                 "kind": node.kind,
                 "state": node.state,
                 "documentPath": node.document_path,
@@ -229,8 +229,8 @@ def build_reference_traversal_output_payload_v2(
         "edges": [
             {
                 "sequence": sequence,
-                "source": build_reference_traversal_node_id_v2(edge.source),
-                "target": build_reference_traversal_node_id_v2(edge.target),
+                "source": build_reference_traversal_node_id(edge.source),
+                "target": build_reference_traversal_node_id(edge.target),
                 "kind": edge.kind,
                 "sourceProperty": _optional(edge.source_property, "sourceProperty"),
                 "referenceMechanism": _optional(
@@ -254,21 +254,21 @@ def build_reference_traversal_output_payload_v2(
     }
 
 
-def serialize_reference_traversal_output_v2(**kwargs: Any) -> bytes:
+def serialize_reference_traversal_output(**kwargs: Any) -> bytes:
     return dumps_canonical(
-        build_reference_traversal_output_payload_v2(**kwargs)
+        build_reference_traversal_output_payload(**kwargs)
     ).encode("utf-8")
 
 
 __all__ = [
-    "REFERENCE_TRAVERSAL_OUTPUT_SCHEMA_VERSION_V2",
-    "REFERENCE_TRAVERSAL_NODE_ORDER_FIELDS_V2",
-    "REFERENCE_TRAVERSAL_EDGE_ORDER_FIELDS_V2",
-    "RawReferenceTraversalEdgeV2",
-    "RawReferenceTraversalNodeV2",
-    "build_reference_traversal_edge_identity_key_v2",
-    "build_reference_traversal_node_id_v2",
-    "build_reference_traversal_node_identity_key_v2",
-    "build_reference_traversal_output_payload_v2",
-    "serialize_reference_traversal_output_v2",
+    "REFERENCE_TRAVERSAL_OUTPUT_SCHEMA_VERSION",
+    "REFERENCE_TRAVERSAL_NODE_ORDER_FIELDS",
+    "REFERENCE_TRAVERSAL_EDGE_ORDER_FIELDS",
+    "RawReferenceTraversalEdge",
+    "RawReferenceTraversalNode",
+    "build_reference_traversal_edge_identity_key",
+    "build_reference_traversal_node_id",
+    "build_reference_traversal_node_identity_key",
+    "build_reference_traversal_output_payload",
+    "serialize_reference_traversal_output",
 ]

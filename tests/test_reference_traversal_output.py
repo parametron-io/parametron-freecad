@@ -9,17 +9,17 @@ from parametron_freecad.runtime.reference_traversal_output_contract import (
     RawReferenceTraversalNode,
     serialize_reference_traversal_output,
 )
-from parametron_freecad.runtime.reference_traversal_output_v2 import (
-    RawReferenceTraversalEdgeV2,
-    RawReferenceTraversalNodeV2,
-    build_reference_traversal_node_id_v2,
-    build_reference_traversal_node_identity_key_v2,
-    build_reference_traversal_output_payload_v2,
-    serialize_reference_traversal_output_v2,
+from parametron_freecad.runtime.reference_traversal_output import (
+    RawReferenceTraversalEdge as CanonicalReferenceTraversalEdge,
+    RawReferenceTraversalNode as CanonicalReferenceTraversalNode,
+    build_reference_traversal_node_id,
+    build_reference_traversal_node_identity_key,
+    build_reference_traversal_output_payload,
+    serialize_reference_traversal_output,
 )
 
 
-class ReferenceTraversalOutputV2Tests(unittest.TestCase):
+class ReferenceTraversalOutputTests(unittest.TestCase):
     def _node(self, **overrides):
         values = {
             "kind": "object",
@@ -30,10 +30,10 @@ class ReferenceTraversalOutputV2Tests(unittest.TestCase):
             "label": "Bolt label",
         }
         values.update(overrides)
-        return RawReferenceTraversalNodeV2(**values)
+        return CanonicalReferenceTraversalNode(**values)
 
     def _payload(self, *, nodes=(), edges=(), diagnostics=()):
-        return build_reference_traversal_output_payload_v2(
+        return build_reference_traversal_output_payload(
             boundary="reference_traversal_entrypoint",
             operation="reference_traversal",
             status="succeeded",
@@ -49,23 +49,23 @@ class ReferenceTraversalOutputV2Tests(unittest.TestCase):
             document_path="模型.FCStd", object_name="部品", label=None
         )
         self.assertEqual(
-            dumps_canonical(build_reference_traversal_node_identity_key_v2(ascii_node))
+            dumps_canonical(build_reference_traversal_node_identity_key(ascii_node))
             .encode("utf-8"),
             b'["object","assembly.FCStd","Bolt"]\n',
         )
         self.assertEqual(
-            build_reference_traversal_node_id_v2(ascii_node),
+            build_reference_traversal_node_id(ascii_node),
             "object:ff0fe3e51839e76aa5b17db3b5bd2ebd6fe62c33b048138d7f4d2a095e0d350c",
         )
         self.assertEqual(
-            build_reference_traversal_node_id_v2(unicode_node),
+            build_reference_traversal_node_id(unicode_node),
             "object:806027d94b239f7198e1b1ba4b79088b749b53f77ab3ae14a37664210354e119",
         )
 
-    def test_payload_has_exact_v2_fields_and_null_provenance(self) -> None:
+    def test_payload_has_exact_canonical_fields_and_null_provenance(self) -> None:
         node = self._node(object_type=None, label=None)
         payload = self._payload(nodes=(node,))
-        self.assertEqual(payload["schemaVersion"], "2.0")
+        self.assertEqual(payload["schemaVersion"], "1.0")
         self.assertEqual(
             tuple(payload["nodes"][0]),
             (
@@ -79,15 +79,15 @@ class ReferenceTraversalOutputV2Tests(unittest.TestCase):
         source = self._node()
         target = self._node(object_name="Nut")
         edges = (
-            RawReferenceTraversalEdgeV2(
+            CanonicalReferenceTraversalEdge(
                 source, target, "document_internal_reference", "resolved",
                 "Second", "App::PropertyLink",
             ),
-            RawReferenceTraversalEdgeV2(
+            CanonicalReferenceTraversalEdge(
                 source, target, "document_internal_reference", "resolved",
                 None, None,
             ),
-            RawReferenceTraversalEdgeV2(
+            CanonicalReferenceTraversalEdge(
                 source, target, "document_internal_reference", "resolved",
                 "First", "App::PropertyLink",
             ),
@@ -101,7 +101,7 @@ class ReferenceTraversalOutputV2Tests(unittest.TestCase):
     def test_equal_complete_edge_identity_collapses(self) -> None:
         source = self._node()
         target = self._node(object_name="Nut")
-        edge = RawReferenceTraversalEdgeV2(
+        edge = CanonicalReferenceTraversalEdge(
             source, target, "document_internal_reference", "resolved",
             "Link", "App::PropertyLink",
         )
@@ -122,33 +122,26 @@ class ReferenceTraversalOutputV2Tests(unittest.TestCase):
             "status": "partial",
             "source_document": "assembly.FCStd",
         }
-        forward = serialize_reference_traversal_output_v2(
+        forward = serialize_reference_traversal_output(
             **kwargs, nodes=(first, second), edges=(), diagnostics=(diagnostic_a, diagnostic_b)
         )
-        reverse = serialize_reference_traversal_output_v2(
+        reverse = serialize_reference_traversal_output(
             **kwargs, nodes=(second, first), edges=(), diagnostics=(diagnostic_b, diagnostic_a)
         )
         self.assertEqual(forward, reverse)
         self.assertEqual(forward[-1:], b"\n")
 
-    def test_schema_1_serializer_remains_unchanged(self) -> None:
-        node = RawReferenceTraversalNode(
-            id="legacy", kind="object", state="resolved",
-            document_path="assembly.FCStd", object_name="Bolt",
-        )
-        before = serialize_reference_traversal_output(
+    def test_canonical_serializer_retains_rich_provenance(self) -> None:
+        node = self._node()
+        serialized = serialize_reference_traversal_output(
             boundary="reference_traversal_entrypoint",
             operation="reference_traversal",
             status="succeeded",
             source_document="assembly.FCStd",
             nodes=(node,), edges=(), diagnostics=(),
         )
-        self.assertIn(b'"schemaVersion":"1.0"', before)
-        self.assertNotIn(b"objectType", before)
-        self.assertEqual(
-            tuple(RawReferenceTraversalEdge.__dataclass_fields__),
-            ("source", "target", "kind", "state", "diagnostic"),
-        )
+        self.assertIn(b'"schemaVersion":"1.0"', serialized)
+        self.assertIn(b'"objectType":"PartDesign::Feature"', serialized)
 
 
 if __name__ == "__main__":

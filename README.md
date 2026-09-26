@@ -23,7 +23,7 @@ orchestration and durable product storage/indexing are outside this repository.
   and canonical request-scoped target-state suppression, visibility, and
   existence on the same live document, without evaluating verification checks.
 - Optional non-recursive Link/XLink reference discovery for internal objects
-  and Engine-mapped external targets, with deterministic raw schema-2 evidence,
+  and Engine-mapped external targets, with deterministic rich schema-1 evidence,
   provenance, identity, deduplication, and controlled failures.
 - Canonical success and handled-failure `prm.result.json` output, with path
   containment against the exact supplied working-copy root.
@@ -32,8 +32,12 @@ Normal `execute` consumes canonical Engine-produced schema 1.0 manifests
 directly. Optional `assemblyMutations` and `partMutations` support suppression,
 visibility, and conservative deletion. Assembly precedes Part; within each
 section, suppression precedes visibility and deletion. Focused native tests
-also cover each capability independently. Schema 2.0 metadata and strict
-validation remain a separate surface; normal `execute` rejects schema 2.0.
+also cover each capability independently. Standalone validation and normal
+`execute` accept the canonical schema 1.0 manifest and reject schema 2.0.
+Traversal requests require `schemaVersion: "1.0"` and `externalTargets` (an
+empty array is valid). Raw traversal evidence retains object type, source
+property, reference mechanism, endpoint identity, and resolution state under
+schema 1.0.
 Requested target-state observation reads live native state after successful
 mutation and persistence and emits raw evidence. Engine owns expected-versus-
 observed verification and normalized records. Mutation and lifecycle failures

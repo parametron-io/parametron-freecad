@@ -28,6 +28,8 @@ def load_observation_request(path: Path) -> Mapping[str, Any]:
 
     try:
         loaded = load_parametron_verification_v1(path)
+        if loaded.data.get("schemaVersion") != "1.0":
+            raise ObservationRequestError("unsupported verification schemaVersion")
         require_engine_verification_expectations_compatible(loaded.data)
         requested_target_state(loaded.data)
     except (

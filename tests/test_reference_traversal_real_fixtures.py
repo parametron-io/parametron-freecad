@@ -168,7 +168,7 @@ def _expected_payload(*, mapped: bool) -> dict[str, object]:
             _node(2, kind="object", document_path=SOURCE_DOCUMENT, object_name="InternalTarget", label="InternalTarget")
         )
     return {
-        "schemaVersion": "2.0",
+        "schemaVersion": "1.0",
         "kind": "raw_reference_traversal",
         "boundary": "reference_traversal_entrypoint",
         "operation": "reference_traversal",
@@ -215,8 +215,8 @@ class RealReferenceTraversalFixtureTests(unittest.TestCase):
 
     def _write_request(self, path: Path, *, mapped: bool = True) -> None:
         path.write_bytes(_canonical_bytes({
-            "schemaVersion": "2.0" if mapped else "1.0",
-            **({"externalTargets": MAPPINGS} if mapped else {}),
+            "schemaVersion": "1.0",
+            "externalTargets": MAPPINGS if mapped else [],
         }))
 
     def _direct_payload(self, bundle: Path, *, mapped: bool = True) -> bytes:
@@ -348,7 +348,7 @@ finally:
                         expected_documents[property_path].resolve(),
                     )
 
-    def test_real_fixture_direct_traversal_matches_exact_schema_2_payload(self) -> None:
+    def test_real_fixture_direct_traversal_matches_exact_canonical_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             bundle = Path(temporary) / "direct-real-bundle"
             self._copy_bundle(bundle)
@@ -369,13 +369,6 @@ finally:
             sum(edge["target"] == FROZEN_NODE_IDS[("object", "references/reference-a.FCStd", "SharedTarget")] for edge in expected["edges"]),
             2,
         )
-
-    def test_schema_1_request_behavior_remains_internal_only(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            bundle = Path(temporary) / "legacy-real-bundle"
-            self._copy_bundle(bundle)
-            emitted = self._direct_payload(bundle, mapped=False)
-        self.assertEqual(emitted, _canonical_bytes(_expected_payload(mapped=False)))
 
     def _run_runtime(self, working_root: Path) -> bytes:
         self._copy_bundle(working_root)

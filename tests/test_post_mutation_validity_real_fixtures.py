@@ -13,7 +13,7 @@ after each test class runs. The empty-Body invalid-state proof creates its
 document entirely in memory and never touches the committed fixture file.
 
 This module deliberately does not exercise deletion, suppression, visibility
-mutation, save, or schema-2 execute wiring: those remain out of scope for
+mutation, save, or canonical execute wiring: those remain out of scope for
 the read-only validity/dependency inspection primitives under test.
 """
 

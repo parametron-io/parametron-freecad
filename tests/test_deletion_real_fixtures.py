@@ -12,7 +12,7 @@ after each test class runs. The invalid-post-delete-state proof creates its
 document entirely in memory and never touches the committed fixture file.
 
 This module deliberately does not exercise suppression, visibility
-mutation, save/reopen, or schema-2 execute wiring: those remain out of
+mutation, save/reopen, or canonical execute wiring: those remain out of
 scope for the native deletion consumer under test.
 """
 

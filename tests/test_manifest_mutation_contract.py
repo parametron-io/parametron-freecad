@@ -1,4 +1,4 @@
-"""Contract metadata for canonical schema 1.0 and the retained V2 validation API."""
+"""Canonical schema-1 manifest mutation contract metadata."""
 
 from __future__ import annotations
 
@@ -129,36 +129,8 @@ class TestV1ClosurePermanent(unittest.TestCase):
             self.assertTrue(hasattr(self.mc, name), f"Missing public V1 name: {name}")
 
 
-class TestV2SchemaVersion(unittest.TestCase):
-    """schema 2.0 version constant is exact and distinct from the V1 default."""
-
-    def setUp(self):
-        import parametron_freecad.execution.manifest_contract as mc
-
-        self.mc = mc
-
-    def test_v2_schema_version_constant_exact(self):
-        self.assertEqual(self.mc.EXPORT_MANIFEST_SCHEMA_VERSION_V2, "2.0")
-
-    def test_v2_contract_schema_version_matches_constant(self):
-        self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.schema_version,
-            self.mc.EXPORT_MANIFEST_SCHEMA_VERSION_V2,
-        )
-
-    def test_v2_does_not_replace_v1_default_schema_constant(self):
-        self.assertEqual(self.mc.EXPORT_MANIFEST_SCHEMA_VERSION, "1.0")
-        self.assertNotEqual(
-            self.mc.EXPORT_MANIFEST_SCHEMA_VERSION,
-            self.mc.EXPORT_MANIFEST_SCHEMA_VERSION_V2,
-        )
-
-    def test_v1_contract_schema_version_still_1_0_after_v2_addition(self):
-        self.assertEqual(self.mc.EXPORT_MANIFEST_V1_CONTRACT.schema_version, "1.0")
-
-
-class TestV2TopLevelFields(unittest.TestCase):
-    """Exact required/optional/allowed top-level V2 fields, order included."""
+class TestCanonicalTopLevelFields(unittest.TestCase):
+    """Exact required/optional/allowed top-level canonical fields, order included."""
 
     def setUp(self):
         import parametron_freecad.execution.manifest_contract as mc
@@ -167,19 +139,19 @@ class TestV2TopLevelFields(unittest.TestCase):
 
     def test_required_top_level_fields_exact(self):
         self.assertEqual(
-            self.mc.V2_REQUIRED_TOP_LEVEL_FIELDS,
+            self.mc.REQUIRED_TOP_LEVEL_FIELDS,
             ("schemaVersion", "sourceDocument", "parameterAssignments", "outputs"),
         )
 
     def test_optional_top_level_fields_exact(self):
         self.assertEqual(
-            self.mc.V2_OPTIONAL_TOP_LEVEL_FIELDS,
+            self.mc.OPTIONAL_TOP_LEVEL_FIELDS,
             ("assemblyMutations", "partMutations"),
         )
 
     def test_all_top_level_fields_exact_order(self):
         self.assertEqual(
-            self.mc.V2_TOP_LEVEL_FIELDS,
+            self.mc.TOP_LEVEL_FIELDS,
             (
                 "schemaVersion",
                 "sourceDocument",
@@ -192,89 +164,44 @@ class TestV2TopLevelFields(unittest.TestCase):
 
     def test_all_top_level_fields_is_required_plus_optional(self):
         self.assertEqual(
-            self.mc.V2_TOP_LEVEL_FIELDS,
-            self.mc.V2_REQUIRED_TOP_LEVEL_FIELDS + self.mc.V2_OPTIONAL_TOP_LEVEL_FIELDS,
+            self.mc.TOP_LEVEL_FIELDS,
+            self.mc.REQUIRED_TOP_LEVEL_FIELDS + self.mc.OPTIONAL_TOP_LEVEL_FIELDS,
         )
 
     def test_required_fields_are_tuple(self):
-        self.assertIsInstance(self.mc.V2_REQUIRED_TOP_LEVEL_FIELDS, tuple)
+        self.assertIsInstance(self.mc.REQUIRED_TOP_LEVEL_FIELDS, tuple)
 
     def test_optional_fields_are_tuple(self):
-        self.assertIsInstance(self.mc.V2_OPTIONAL_TOP_LEVEL_FIELDS, tuple)
+        self.assertIsInstance(self.mc.OPTIONAL_TOP_LEVEL_FIELDS, tuple)
 
     def test_all_fields_are_tuple(self):
-        self.assertIsInstance(self.mc.V2_TOP_LEVEL_FIELDS, tuple)
+        self.assertIsInstance(self.mc.TOP_LEVEL_FIELDS, tuple)
 
     def test_required_top_level_fields_reuse_v1_top_level_fields_object(self):
         # Both schemas share the four required core fields.
-        self.assertIs(self.mc.V2_REQUIRED_TOP_LEVEL_FIELDS, self.mc.REQUIRED_TOP_LEVEL_FIELDS)
+        self.assertIs(self.mc.REQUIRED_TOP_LEVEL_FIELDS, self.mc.REQUIRED_TOP_LEVEL_FIELDS)
 
-    def test_v2_contract_required_fields_match_module_constant(self):
+    def test_canonical_contract_required_fields_match_module_constant(self):
         self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.required_top_level_fields,
-            self.mc.V2_REQUIRED_TOP_LEVEL_FIELDS,
+            self.mc.EXPORT_MANIFEST_V1_CONTRACT.required_top_level_fields,
+            self.mc.REQUIRED_TOP_LEVEL_FIELDS,
         )
 
-    def test_v2_contract_optional_fields_match_module_constant(self):
+    def test_canonical_contract_optional_fields_match_module_constant(self):
         self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.optional_top_level_fields,
-            self.mc.V2_OPTIONAL_TOP_LEVEL_FIELDS,
+            self.mc.EXPORT_MANIFEST_V1_CONTRACT.optional_top_level_fields,
+            self.mc.OPTIONAL_TOP_LEVEL_FIELDS,
         )
 
-    def test_v2_contract_all_top_level_fields_match_module_constant(self):
+    def test_canonical_contract_all_top_level_fields_match_module_constant(self):
         self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.top_level_fields,
-            self.mc.V2_TOP_LEVEL_FIELDS,
+            self.mc.EXPORT_MANIFEST_V1_CONTRACT.top_level_fields,
+            self.mc.TOP_LEVEL_FIELDS,
         )
 
     def test_individual_mutation_field_name_constants(self):
         self.assertEqual(self.mc.FIELD_ASSEMBLY_MUTATIONS, "assemblyMutations")
         self.assertEqual(self.mc.FIELD_PART_MUTATIONS, "partMutations")
-
-
-class TestTransportFilenameCompatibility(unittest.TestCase):
-    """V1 and V2 resolve to the same existing transport filename."""
-
-    def setUp(self):
-        import parametron_freecad.execution.manifest_contract as mc
-
-        self.mc = mc
-
-    def test_v2_contract_filename_equals_v1_filename_constant(self):
-        self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.filename,
-            self.mc.EXPORT_MANIFEST_V1_FILENAME,
-        )
-
-    def test_v1_contract_filename_equals_v1_filename_constant(self):
-        self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V1_CONTRACT.filename,
-            self.mc.EXPORT_MANIFEST_V1_FILENAME,
-        )
-
-    def test_v1_and_v2_contract_filenames_are_identical_string(self):
-        self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V1_CONTRACT.filename,
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.filename,
-        )
-
-    def test_filename_is_exact_transport_name(self):
-        self.assertEqual(
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.filename, "prm.export-manifest.json"
-        )
-
-    def test_no_v2_filename_constant_exists(self):
-        # The contract must not introduce a separate v2 transport filename;
-        # schema version and transport filename are independent concepts.
-        for name in dir(self.mc):
-            if name.startswith("_"):
-                continue
-            value = getattr(self.mc, name)
-            if isinstance(value, str) and "export_manifest_v2" in value:
-                self.fail(f"Unexpected v2 filename-like constant: {name} = {value!r}")
-
-    def test_no_public_name_literally_named_v2_filename(self):
-        self.assertFalse(hasattr(self.mc, "EXPORT_MANIFEST_V2_FILENAME"))
 
 
 class TestSuppressionMetadata(unittest.TestCase):
@@ -454,13 +381,13 @@ class TestSharedMutationSectionMetadata(unittest.TestCase):
         self.assertIs(contract.deletion_entry, self.mc.DELETION_ENTRY_CONTRACT)
 
     def test_assembly_and_part_mutations_share_same_section_contract_object(self):
-        v2 = self.mc.EXPORT_MANIFEST_V2_CONTRACT
-        self.assertIs(v2.assembly_mutations, v2.part_mutations)
+        canonical = self.mc.EXPORT_MANIFEST_V1_CONTRACT
+        self.assertIs(canonical.assembly_mutations, canonical.part_mutations)
 
     def test_assembly_and_part_mutations_are_the_module_singleton(self):
-        v2 = self.mc.EXPORT_MANIFEST_V2_CONTRACT
-        self.assertIs(v2.assembly_mutations, self.mc.TARGET_MUTATION_SECTION_CONTRACT)
-        self.assertIs(v2.part_mutations, self.mc.TARGET_MUTATION_SECTION_CONTRACT)
+        canonical = self.mc.EXPORT_MANIFEST_V1_CONTRACT
+        self.assertIs(canonical.assembly_mutations, self.mc.TARGET_MUTATION_SECTION_CONTRACT)
+        self.assertIs(canonical.part_mutations, self.mc.TARGET_MUTATION_SECTION_CONTRACT)
 
     def test_no_extra_mutation_collections_beyond_the_three(self):
         allowed = {"suppression", "visibility", "deletion"}
@@ -468,32 +395,32 @@ class TestSharedMutationSectionMetadata(unittest.TestCase):
 
 
 class TestParameterOutputContractReuse(unittest.TestCase):
-    """V1 and V2 reuse the exact same parameter-assignment/output metadata."""
+    """canonical reuse the exact same parameter-assignment/output metadata."""
 
     def setUp(self):
         import parametron_freecad.execution.manifest_contract as mc
 
         self.mc = mc
 
-    def test_v1_and_v2_share_same_parameter_assignment_contract_object(self):
+    def test_v1_and_canonical_share_same_parameter_assignment_contract_object(self):
         v1 = self.mc.EXPORT_MANIFEST_V1_CONTRACT
-        v2 = self.mc.EXPORT_MANIFEST_V2_CONTRACT
-        self.assertIs(v1.parameter_assignment, v2.parameter_assignment)
+        canonical = self.mc.EXPORT_MANIFEST_V1_CONTRACT
+        self.assertIs(v1.parameter_assignment, canonical.parameter_assignment)
 
-    def test_v1_and_v2_share_same_output_contract_object(self):
+    def test_v1_and_canonical_share_same_output_contract_object(self):
         v1 = self.mc.EXPORT_MANIFEST_V1_CONTRACT
-        v2 = self.mc.EXPORT_MANIFEST_V2_CONTRACT
-        self.assertIs(v1.output, v2.output)
+        canonical = self.mc.EXPORT_MANIFEST_V1_CONTRACT
+        self.assertIs(v1.output, canonical.output)
 
-    def test_v2_parameter_assignment_is_module_singleton(self):
+    def test_canonical_parameter_assignment_is_module_singleton(self):
         self.assertIs(
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.parameter_assignment,
+            self.mc.EXPORT_MANIFEST_V1_CONTRACT.parameter_assignment,
             self.mc.PARAMETER_ASSIGNMENT_CONTRACT,
         )
 
-    def test_v2_output_is_module_singleton(self):
+    def test_canonical_output_is_module_singleton(self):
         self.assertIs(
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.output, self.mc.OUTPUT_CONTRACT
+            self.mc.EXPORT_MANIFEST_V1_CONTRACT.output, self.mc.OUTPUT_CONTRACT
         )
 
     def test_parameter_assignment_field_tuple_unchanged(self):
@@ -507,13 +434,13 @@ class TestParameterOutputContractReuse(unittest.TestCase):
     def test_supported_output_formats_unchanged(self):
         self.assertEqual(self.mc.SUPPORTED_OUTPUT_FORMATS, ("csv", "pdf", "step"))
 
-    def test_v2_contract_field_name_attributes_match_v1(self):
+    def test_canonical_contract_field_name_attributes_match_v1(self):
         v1 = self.mc.EXPORT_MANIFEST_V1_CONTRACT
-        v2 = self.mc.EXPORT_MANIFEST_V2_CONTRACT
-        self.assertEqual(v1.schema_version_field, v2.schema_version_field)
-        self.assertEqual(v1.source_document_field, v2.source_document_field)
-        self.assertEqual(v1.parameter_assignments_field, v2.parameter_assignments_field)
-        self.assertEqual(v1.outputs_field, v2.outputs_field)
+        canonical = self.mc.EXPORT_MANIFEST_V1_CONTRACT
+        self.assertEqual(v1.schema_version_field, canonical.schema_version_field)
+        self.assertEqual(v1.source_document_field, canonical.source_document_field)
+        self.assertEqual(v1.parameter_assignments_field, canonical.parameter_assignments_field)
+        self.assertEqual(v1.outputs_field, canonical.outputs_field)
 
 
 class TestForbiddenMutationCollections(unittest.TestCase):
@@ -539,7 +466,7 @@ class TestForbiddenMutationCollections(unittest.TestCase):
         self.assertNotIn("keep", all_entry_fields)
 
     def test_no_keep_top_level_or_section_field(self):
-        self.assertNotIn("keep", self.mc.V2_TOP_LEVEL_FIELDS)
+        self.assertNotIn("keep", self.mc.TOP_LEVEL_FIELDS)
         self.assertNotIn("keep", self.mc.TARGET_MUTATION_SECTION_FIELDS)
 
     def test_section_fields_contain_only_the_three_known_families(self):
@@ -585,7 +512,7 @@ class TestForbiddenTargetFields(unittest.TestCase):
                     self.assertNotIn(forbidden, fields)
 
     def test_no_forbidden_field_in_top_level_or_section_fields(self):
-        combined = self.mc.V2_TOP_LEVEL_FIELDS + self.mc.TARGET_MUTATION_SECTION_FIELDS
+        combined = self.mc.TOP_LEVEL_FIELDS + self.mc.TARGET_MUTATION_SECTION_FIELDS
         for forbidden in self.FORBIDDEN_FIELDS:
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, combined)
@@ -610,16 +537,16 @@ class TestForbiddenTargetFields(unittest.TestCase):
 
 
 class TestImmutability(unittest.TestCase):
-    """New structured V2 metadata is frozen; field collections are tuples."""
+    """New structured Canonical metadata is frozen; field collections are tuples."""
 
     def setUp(self):
         import parametron_freecad.execution.manifest_contract as mc
 
         self.mc = mc
 
-    def test_export_manifest_v2_contract_rejects_field_mutation(self):
+    def test_export_manifest_canonical_contract_rejects_field_mutation(self):
         with self.assertRaises((TypeError, AttributeError, FrozenInstanceError)):
-            self.mc.EXPORT_MANIFEST_V2_CONTRACT.schema_version = "mutated"
+            self.mc.EXPORT_MANIFEST_V1_CONTRACT.schema_version = "mutated"
 
     def test_target_mutation_section_contract_rejects_field_mutation(self):
         with self.assertRaises((TypeError, AttributeError, FrozenInstanceError)):
@@ -637,17 +564,17 @@ class TestImmutability(unittest.TestCase):
         with self.assertRaises((TypeError, AttributeError, FrozenInstanceError)):
             self.mc.DELETION_ENTRY_CONTRACT.object_field = "mutated"
 
-    def test_v2_required_top_level_fields_is_immutable_tuple(self):
+    def test_canonical_required_top_level_fields_is_immutable_tuple(self):
         with self.assertRaises((TypeError, AttributeError)):
-            self.mc.V2_REQUIRED_TOP_LEVEL_FIELDS[0] = "other"
+            self.mc.REQUIRED_TOP_LEVEL_FIELDS[0] = "other"
 
-    def test_v2_optional_top_level_fields_is_immutable_tuple(self):
+    def test_canonical_optional_top_level_fields_is_immutable_tuple(self):
         with self.assertRaises((TypeError, AttributeError)):
-            self.mc.V2_OPTIONAL_TOP_LEVEL_FIELDS[0] = "other"
+            self.mc.OPTIONAL_TOP_LEVEL_FIELDS[0] = "other"
 
-    def test_v2_top_level_fields_is_immutable_tuple(self):
+    def test_canonical_top_level_fields_is_immutable_tuple(self):
         with self.assertRaises((TypeError, AttributeError)):
-            self.mc.V2_TOP_LEVEL_FIELDS[0] = "other"
+            self.mc.TOP_LEVEL_FIELDS[0] = "other"
 
     def test_target_mutation_section_fields_is_immutable_tuple(self):
         with self.assertRaises((TypeError, AttributeError)):
@@ -667,9 +594,9 @@ class TestImmutability(unittest.TestCase):
 
     def test_all_new_field_collections_are_tuples(self):
         for name in (
-            "V2_REQUIRED_TOP_LEVEL_FIELDS",
-            "V2_OPTIONAL_TOP_LEVEL_FIELDS",
-            "V2_TOP_LEVEL_FIELDS",
+            "REQUIRED_TOP_LEVEL_FIELDS",
+            "OPTIONAL_TOP_LEVEL_FIELDS",
+            "TOP_LEVEL_FIELDS",
             "TARGET_MUTATION_SECTION_FIELDS",
             "SUPPRESSION_ENTRY_FIELDS",
             "VISIBILITY_ENTRY_FIELDS",
@@ -679,128 +606,8 @@ class TestImmutability(unittest.TestCase):
                 self.assertIsInstance(getattr(self.mc, name), tuple)
 
 
-class TestTask2Task3Boundary(unittest.TestCase):
-    """Task 2 metadata existence must not activate Task 3 V2 validation/runtime."""
-
-    def _v2_mutation_bearing_payload(self):
-        return {
-            "schemaVersion": "2.0",
-            "sourceDocument": "model.FCStd",
-            "parameterAssignments": [],
-            "outputs": [],
-            "assemblyMutations": {
-                "suppression": [{"object": "Body.Feature", "suppressed": True}],
-                "visibility": [{"object": "Body.Feature", "visible": False}],
-                "deletion": [{"object": "Body.Scrap"}],
-            },
-        }
-
-    def test_v1_validator_does_not_accept_schema_2_0(self):
-        import parametron_freecad.execution.manifest_validation as mv
-
-        result = mv.validate_export_manifest_v1(self._v2_mutation_bearing_payload())
-        self.assertFalse(result.is_valid)
-
-    def test_v1_validator_flags_schema_2_0_as_invalid_schema_version(self):
-        import parametron_freecad.execution.manifest_validation as mv
-
-        result = mv.validate_export_manifest_v1(self._v2_mutation_bearing_payload())
-        codes = [d.code for d in result.diagnostics]
-        self.assertIn(mv.DIAGNOSTIC_INVALID_SCHEMA_VERSION, codes)
-
-    def test_v1_validator_recognizes_assembly_mutations_even_when_version_is_invalid(self):
-        import parametron_freecad.execution.manifest_validation as mv
-
-        result = mv.validate_export_manifest_v1(self._v2_mutation_bearing_payload())
-        unknown_paths = [
-            d.path for d in result.diagnostics if d.code == mv.DIAGNOSTIC_UNKNOWN_FIELD
-        ]
-        self.assertNotIn("assemblyMutations", unknown_paths)
-
-    def test_v2_validation_api_exists_but_runtime_remains_v1_only(self):
-        # Task 3 supersedes the Task 2 absence invariant: V2 validation and
-        # generic version dispatch now exist as production APIs, but the
-        # runtime execution entrypoint still resolves only the V1 validator.
-        # See tests/test_manifest_v2_validation.py for full Task 3 coverage.
-        import parametron_freecad.execution.manifest_validation as mv
-        from parametron_freecad.runtime import entrypoints
-
-        self.assertTrue(callable(getattr(mv, "validate_export_manifest_v2", None)))
-        self.assertTrue(callable(getattr(mv, "validate_export_manifest", None)))
-
-        self.assertTrue(hasattr(entrypoints, "validate_export_manifest_v1"))
-        self.assertFalse(hasattr(entrypoints, "validate_export_manifest_v2"))
-        self.assertFalse(hasattr(entrypoints, "validate_export_manifest"))
-
-    def test_v1_validator_module_has_no_version_dispatch_helper(self):
-        import parametron_freecad.execution.manifest_validation as mv
-
-        for name in dir(mv):
-            self.assertNotIn("dispatch", name.lower())
-
-    def test_loader_does_not_expose_mutation_parsing(self):
-        import parametron_freecad.execution.manifest_loader as ml
-
-        for name in dir(ml):
-            lowered = name.lower()
-            self.assertNotIn("mutation", lowered)
-
-    def test_loader_still_loads_v2_payload_as_plain_decoded_data(self):
-        # The strict loader is schema-agnostic; it must still just decode
-        # JSON without interpreting or rejecting v2 mutation sections.
-        import json
-        import tempfile
-        from pathlib import Path
-
-        import parametron_freecad.execution.manifest_loader as ml
-
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "manifest.json"
-            path.write_text(
-                json.dumps(self._v2_mutation_bearing_payload()), encoding="utf-8"
-            )
-            result = ml.load_export_manifest_v1(path)
-        self.assertIn("assemblyMutations", result.data)
-
-    def test_engine_manifest_compat_module_has_no_mutation_normalization(self):
-        import parametron_freecad.execution.engine_manifest_compat as emc
-
-        for name in dir(emc):
-            lowered = name.lower()
-            self.assertNotIn("mutation", lowered)
-
-    def test_runtime_entrypoints_module_source_has_no_v2_symbols(self):
-        import inspect
-
-        from parametron_freecad.runtime import entrypoints
-
-        source = inspect.getsource(entrypoints)
-        for forbidden in (
-            "EXPORT_MANIFEST_V2_CONTRACT",
-            "assemblyMutations",
-            "partMutations",
-            "validate_export_manifest_v2",
-        ):
-            with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, source)
-
-    def test_manifest_contract_module_itself_exposes_no_validation_function(self):
-        # Task 2 is metadata-only; the contract module must not gain a
-        # validation entrypoint of its own.
-        import parametron_freecad.execution.manifest_contract as mc
-
-        for name in dir(mc):
-            lowered = name.lower()
-            self.assertNotIn("validate", lowered)
-            self.assertNotIn("execute", lowered)
-            self.assertNotIn("apply_mutation", lowered)
-            self.assertNotIn("suppress_object", lowered)
-            self.assertNotIn("delete_object", lowered)
-            self.assertNotIn("set_visibility", lowered)
-
-
-class TestNoRuntimeBehaviorExposedOnV2Surface(unittest.TestCase):
-    """The V2 metadata surface must not expose execution/runtime helpers."""
+class TestNoRuntimeBehaviorExposedOnCanonicalSurface(unittest.TestCase):
+    """The Canonical metadata surface must not expose execution/runtime helpers."""
 
     def setUp(self):
         import parametron_freecad.execution.manifest_contract as mc
@@ -824,8 +631,8 @@ class TestNoRuntimeBehaviorExposedOnV2Surface(unittest.TestCase):
     def test_no_execute_mutations(self):
         self._assert_absent("execute_mutations")
 
-    def test_no_validate_export_manifest_v2(self):
-        self._assert_absent("validate_export_manifest_v2")
+    def test_no_validate_export_manifest_canonical(self):
+        self._assert_absent("validate_export_manifest_canonical")
 
     def test_no_parse_mutations(self):
         self._assert_absent("parse_mutations")

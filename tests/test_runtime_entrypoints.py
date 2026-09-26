@@ -19,9 +19,9 @@ from parametron_freecad.execution.manifest_validation import (
     ManifestDiagnostic,
     ManifestValidationResult,
 )
-from parametron_freecad.runtime.reference_traversal_output_contract import (
-    RawReferenceTraversalEdge,
-    RawReferenceTraversalNode,
+from parametron_freecad.runtime.reference_traversal_output import (
+    RawReferenceTraversalEdge as CanonicalReferenceTraversalEdge,
+    RawReferenceTraversalNode as CanonicalReferenceTraversalNode,
 )
 
 
@@ -375,7 +375,7 @@ class RuntimeExecutionEntrypointTests(unittest.TestCase):
             ), mock.patch.object(
                 entrypoints,
                 "load_reference_traversal_request",
-                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0"),
+                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0", external_targets=()),
             ), self.assertRaises(
                 entrypoints.ExecutionEntrypointError
             ) as caught:
@@ -1099,7 +1099,7 @@ class HeadlessExecuteAdapterEntrypointTests(unittest.TestCase):
             output = working / "output"
             output.mkdir()
             request = working / "parametron.reference-traversal-request.json"
-            request.write_text('{"schemaVersion":"1.0"}', encoding="utf-8")
+            request.write_text('{"schemaVersion":"1.0","externalTargets":[]}', encoding="utf-8")
             observation = working / "parametron.verification.json"
             observation.write_text("{}", encoding="utf-8")
 
@@ -1334,72 +1334,6 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             write_reference_traversal_output_atomically=write_traversal_output,
         )
 
-    def test_legacy_execution_result_adapts_to_schema_2(self) -> None:
-        from parametron_freecad.runtime import entrypoints
-
-        source = RawReferenceTraversalNode(
-            id="source", kind="object", state="resolved",
-            document_path="model.FCStd", object_name="Source",
-        )
-        target = RawReferenceTraversalNode(
-            id="target", kind="object", state="resolved",
-            document_path="model.FCStd", object_name="Target",
-        )
-        edge = RawReferenceTraversalEdge(
-            source="source", target="target",
-            kind="document_internal_reference", state="resolved",
-        )
-        result = entrypoints.ReferenceTraversalExecutionResult(
-            status="succeeded", nodes=(source, target), edges=(edge,), diagnostics=()
-        )
-
-        nodes, edges = entrypoints._adapt_execution_result_to_v2(result)
-
-        self.assertEqual([node.object_name for node in nodes], ["Source", "Target"])
-        self.assertTrue(all(node.object_type is None for node in nodes))
-        self.assertIs(edges[0].source, nodes[0])
-        self.assertIs(edges[0].target, nodes[1])
-        self.assertIsNone(edges[0].source_property)
-        self.assertIsNone(edges[0].reference_mechanism)
-
-    def test_legacy_adapter_missing_document_path_is_controlled_and_chained(self) -> None:
-        from parametron_freecad.runtime import entrypoints
-
-        result = entrypoints.ReferenceTraversalExecutionResult(
-            status="succeeded",
-            nodes=(RawReferenceTraversalNode(
-                id="source", kind="document", state="resolved",
-            ),),
-            edges=(), diagnostics=(),
-        )
-        with self.assertRaisesRegex(
-            entrypoints.ReferenceTraversalExecutionError,
-            "requires node documentPath",
-        ) as caught:
-            entrypoints._adapt_execution_result_to_v2(result)
-        self.assertIsInstance(caught.exception.__cause__, ValueError)
-
-    def test_legacy_adapter_dangling_endpoint_is_controlled_and_chained(self) -> None:
-        from parametron_freecad.runtime import entrypoints
-
-        node = RawReferenceTraversalNode(
-            id="source", kind="document", state="resolved",
-            document_path="model.FCStd",
-        )
-        edge = RawReferenceTraversalEdge(
-            source="source", target="missing",
-            kind="document_internal_reference", state="resolved",
-        )
-        result = entrypoints.ReferenceTraversalExecutionResult(
-            status="succeeded", nodes=(node,), edges=(edge,), diagnostics=()
-        )
-        with self.assertRaisesRegex(
-            entrypoints.ReferenceTraversalExecutionError,
-            "requires edge endpoints in nodes",
-        ) as caught:
-            entrypoints._adapt_execution_result_to_v2(result)
-        self.assertIsInstance(caught.exception.__cause__, KeyError)
-
     def test_request_is_loaded_exactly_once_before_freecad_and_document_work(
         self,
     ) -> None:
@@ -1427,7 +1361,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             def load(received_path):
                 self.assertEqual(received_path, request)
                 calls.append("load-traversal-request")
-                return ReferenceTraversalRequest(schema_version="1.0")
+                return ReferenceTraversalRequest(schema_version="1.0", external_targets=())
 
             def resolve_freecad():
                 calls.append("resolve-freecad")
@@ -1526,7 +1460,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 result = working / "result.json"
                 calls: list[str] = []
                 normalized_request = entrypoints.ReferenceTraversalRequest(
-                    schema_version="1.0"
+                    schema_version="1.0", external_targets=()
                 )
 
                 def run_traversal(document, request, **kwargs):
@@ -1651,7 +1585,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             with patches[0], patches[1], patches[2], mock.patch.object(
                 entrypoints,
                 "load_reference_traversal_request",
-                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0"),
+                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0", external_targets=()),
             ), mock.patch.object(
                 entrypoints, "load_observation_request", return_value={"observe": {}}
             ), self.assertRaisesRegex(
@@ -1679,87 +1613,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 substring="reference traversal returned failed status",
             )
 
-    def test_execution_error_preserves_exports_skips_observation_and_chains(self) -> None:
-        from parametron_freecad.runtime import entrypoints
-
-        with tempfile.TemporaryDirectory() as tmp:
-            working = Path(tmp)
-            manifest = working / "manifest.json"
-            source = working / "model.FCStd"
-            source.write_bytes(b"source")
-            result = working / "result.json"
-            calls: list[str] = []
-            legacy_node = RawReferenceTraversalNode(
-                id="legacy", kind="document", state="resolved",
-                document_path="model.FCStd",
-            )
-            v2_node = entrypoints.RawReferenceTraversalNodeV2(
-                kind="document", state="resolved", document_path="model.FCStd"
-            )
-            v2_edge = entrypoints.RawReferenceTraversalEdgeV2(
-                v2_node, v2_node, "document_internal_reference", "resolved"
-            )
-            original = None
-            try:
-                entrypoints.ReferenceTraversalExecutionResult(
-                    status="succeeded", nodes=(legacy_node,), edges=(v2_edge,),
-                    diagnostics=(),
-                )
-            except entrypoints.ReferenceTraversalExecutionError as caught_original:
-                original = caught_original
-            else:  # pragma: no cover - assertion guard
-                self.fail("cross-generation result must be rejected")
-
-            self.assertIsNotNone(original)
-
-            def run_traversal(*args, **kwargs):
-                del args, kwargs
-                calls.append("traversal")
-                raise original
-
-            dependencies = self._dependencies(
-                entrypoints,
-                calls,
-                run_traversal=run_traversal,
-                run_observation=lambda *args, **kwargs: calls.append("observation"),
-            )
-            patches = self._valid_manifest_patches(
-                entrypoints,
-                working_copy=working,
-                manifest_path=manifest,
-                source_path=source,
-            )
-            with patches[0], patches[1], patches[2], mock.patch.object(
-                entrypoints,
-                "load_reference_traversal_request",
-                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0"),
-            ), mock.patch.object(
-                entrypoints, "load_observation_request", return_value={"observe": {}}
-            ), self.assertRaises(entrypoints.ExecutionEntrypointError) as caught:
-                entrypoints.run_execution_entrypoint(
-                    working_copy=working,
-                    manifest_path=manifest,
-                    result_path=result,
-                    output_directory=working / "output",
-                    observation_request_path=working / "observation.json",
-                    reference_traversal_request_path=working / "traversal.json",
-                    freecad_module=object(),
-                    _dependencies=dependencies,
-                )
-
-            self.assertIs(caught.exception.__cause__, original)
-            self.assertIsInstance(original.__cause__, ValueError)
-            self.assertEqual(
-                calls,
-                ["open", "assign", "recompute", "save", "step", "csv", "pdf", "traversal", "close"],
-            )
-            self._assert_failed_result(
-                result,
-                stage="reference_traversal",
-                substring="nodes and edges must use the same schema generation",
-            )
-
-    def test_schema_2_edge_identity_conflict_is_contained_and_chained(self) -> None:
+    def test_canonical_edge_identity_conflict_is_contained_and_chained(self) -> None:
         from parametron_freecad.runtime import entrypoints
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1769,19 +1623,19 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             source_path.write_bytes(b"source")
             result = working / "result.json"
             calls: list[str] = []
-            source = entrypoints.RawReferenceTraversalNodeV2(
+            source = CanonicalReferenceTraversalNode(
                 kind="object", state="resolved", document_path="model.FCStd",
                 object_name="Source",
             )
-            target = entrypoints.RawReferenceTraversalNodeV2(
+            target = CanonicalReferenceTraversalNode(
                 kind="object", state="resolved", document_path="refs/a.FCStd",
                 object_name="Target",
             )
-            resolved = entrypoints.RawReferenceTraversalEdgeV2(
+            resolved = CanonicalReferenceTraversalEdge(
                 source, target, "external_document_reference", "resolved",
                 "Parts", "App::PropertyXLinkList",
             )
-            conflicting = entrypoints.RawReferenceTraversalEdgeV2(
+            conflicting = CanonicalReferenceTraversalEdge(
                 source, target, "external_document_reference", "missing",
                 "Parts", "App::PropertyXLinkList",
             )
@@ -1815,7 +1669,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 entrypoints,
                 "load_reference_traversal_request",
                 return_value=entrypoints.ReferenceTraversalRequest(
-                    schema_version="1.0"
+                    schema_version="1.0", external_targets=()
                 ),
             ), self.assertRaises(entrypoints.ExecutionEntrypointError) as caught:
                 entrypoints.run_execution_entrypoint(
@@ -1835,11 +1689,11 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 result,
                 stage="reference_traversal",
                 substring=(
-                    "duplicate schema-2 edge identity has conflicting raw evidence"
+                    "duplicate canonical edge identity has conflicting raw evidence"
                 ),
             )
 
-    def test_schema_2_node_identity_conflict_is_contained_and_chained(self) -> None:
+    def test_canonical_node_identity_conflict_is_contained_and_chained(self) -> None:
         from parametron_freecad.runtime import entrypoints
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1850,11 +1704,11 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             result = working / "result.json"
             output_directory = working / "output"
             calls: list[str] = []
-            resolved = entrypoints.RawReferenceTraversalNodeV2(
+            resolved = CanonicalReferenceTraversalNode(
                 kind="object", state="resolved", document_path="model.FCStd",
                 object_name="Source", label="Source label",
             )
-            conflicting = entrypoints.RawReferenceTraversalNodeV2(
+            conflicting = CanonicalReferenceTraversalNode(
                 kind="object", state="missing", document_path="model.FCStd",
                 object_name="Source", label="Source label",
             )
@@ -1888,7 +1742,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 entrypoints,
                 "load_reference_traversal_request",
                 return_value=entrypoints.ReferenceTraversalRequest(
-                    schema_version="1.0"
+                    schema_version="1.0", external_targets=()
                 ),
             ), self.assertRaises(entrypoints.ExecutionEntrypointError) as caught:
                 entrypoints.run_execution_entrypoint(
@@ -1912,7 +1766,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 result,
                 stage="reference_traversal",
                 substring=(
-                    "duplicate schema-2 node identity has conflicting raw evidence"
+                    "duplicate canonical node identity has conflicting raw evidence"
                 ),
             )
 
@@ -1932,7 +1786,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 calls,
                 run_observation=lambda *args, **kwargs: calls.append("observation"),
                 write_traversal_output=(
-                    entrypoints.write_reference_traversal_output_v2_atomically
+                    entrypoints.write_reference_traversal_output_atomically
                 ),
             )
             patches = self._valid_manifest_patches(
@@ -1945,7 +1799,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             with patches[0], patches[1], patches[2], mock.patch.object(
                 entrypoints,
                 "load_reference_traversal_request",
-                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0"),
+                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0", external_targets=()),
             ), mock.patch.object(
                 entrypoints, "load_observation_request", return_value={"observe": {}}
             ), self.assertRaises(entrypoints.ExecutionEntrypointError) as caught:
@@ -1990,7 +1844,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 entrypoints,
                 calls,
                 write_traversal_output=(
-                    entrypoints.write_reference_traversal_output_v2_atomically
+                    entrypoints.write_reference_traversal_output_atomically
                 ),
             )
             patches = self._valid_manifest_patches(
@@ -2003,7 +1857,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             with patches[0], patches[1], patches[2], mock.patch.object(
                 entrypoints,
                 "load_reference_traversal_request",
-                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0"),
+                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0", external_targets=()),
             ):
                 entrypoints.run_execution_entrypoint(
                     working_copy=working,
@@ -2025,7 +1879,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                     "kind": "raw_reference_traversal",
                     "nodes": [],
                     "operation": "reference_traversal",
-                    "schemaVersion": "2.0",
+                    "schemaVersion": "1.0",
                     "sourceDocument": "model.FCStd",
                     "status": "succeeded",
                 },
@@ -2076,7 +1930,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                     entrypoints,
                     "load_reference_traversal_request",
                     return_value=entrypoints.ReferenceTraversalRequest(
-                        schema_version="1.0"
+                        schema_version="1.0", external_targets=()
                     ),
                 ), self.assertRaises(entrypoints.ExecutionEntrypointError) as caught:
                     entrypoints.run_execution_entrypoint(
@@ -2153,7 +2007,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             manifest = working / "manifest.json"
             source = working / "model.FCStd"
             request = working / "request.json"
-            request.write_text('{"schemaVersion":"1.0","extra":true}', encoding="utf-8")
+            request.write_text('{"schemaVersion":"1.0","externalTargets":[],"extra":true}', encoding="utf-8")
             result = working / "result.json"
             output = working / "output"
             output.mkdir()
@@ -2162,7 +2016,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 entrypoints,
                 calls,
                 write_traversal_output=(
-                    entrypoints.write_reference_traversal_output_v2_atomically
+                    entrypoints.write_reference_traversal_output_atomically
                 ),
             )
             patches = self._valid_manifest_patches(
@@ -2194,7 +2048,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                     encoding="utf-8"
                 )
             )
-            self.assertEqual(payload["schemaVersion"], "2.0")
+            self.assertEqual(payload["schemaVersion"], "1.0")
             self.assertEqual(payload["status"], "failed")
             self.assertEqual(payload["sourceDocument"], "model.FCStd")
             self.assertEqual(payload["nodes"], [])
@@ -2291,7 +2145,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             with patches[0], patches[1], patches[2], mock.patch.object(
                 entrypoints,
                 "load_reference_traversal_request",
-                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0"),
+                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0", external_targets=()),
             ), self.assertRaises(entrypoints.ExecutionEntrypointError) as caught:
                 entrypoints.run_execution_entrypoint(
                     working_copy=working,
@@ -2388,7 +2242,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             ), mock.patch.object(
                 entrypoints,
                 "load_reference_traversal_request",
-                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0"),
+                return_value=entrypoints.ReferenceTraversalRequest(schema_version="1.0", external_targets=()),
             ):
                 entrypoints.run_execution_entrypoint(
                     working_copy=working,

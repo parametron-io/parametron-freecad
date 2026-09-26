@@ -21,28 +21,22 @@ from parametron_freecad.runtime.reference_traversal_output_contract import (
     REFERENCE_TRAVERSAL_STATUS_SUCCEEDED,
     REFERENCE_TRAVERSAL_STAGE_REFERENCE_DISCOVERY,
     RawReferenceTraversalDiagnostic,
-    RawReferenceTraversalEdge,
-    RawReferenceTraversalNode,
     order_reference_traversal_diagnostics,
-    order_reference_traversal_edges,
-    order_reference_traversal_nodes,
 )
 from parametron_freecad.runtime.reference_traversal_request import (
     REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION,
-    REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION_V2,
     ReferenceTraversalExternalTarget,
     ReferenceTraversalRequest,
-    ReferenceTraversalRequestV2,
     _external_target_key,
     _normalize_external_target,
     _validate_external_target_conflicts,
 )
-from parametron_freecad.runtime.reference_traversal_output_v2 import (
-    RawReferenceTraversalEdgeV2,
-    RawReferenceTraversalNodeV2,
-    build_reference_traversal_edge_identity_key_v2,
-    build_reference_traversal_node_id_v2,
-    build_reference_traversal_node_identity_key_v2,
+from parametron_freecad.runtime.reference_traversal_output import (
+    RawReferenceTraversalEdge,
+    RawReferenceTraversalNode,
+    build_reference_traversal_edge_identity_key,
+    build_reference_traversal_node_id,
+    build_reference_traversal_node_identity_key,
 )
 
 REFERENCE_TRAVERSAL_EXECUTION_STATUSES = (
@@ -86,8 +80,8 @@ class ReferenceTraversalExecutionResult:
     """Immutable raw runtime evidence returned by reference traversal."""
 
     status: str
-    nodes: tuple[RawReferenceTraversalNode | RawReferenceTraversalNodeV2, ...]
-    edges: tuple[RawReferenceTraversalEdge | RawReferenceTraversalEdgeV2, ...]
+    nodes: tuple[RawReferenceTraversalNode, ...]
+    edges: tuple[RawReferenceTraversalEdge, ...]
     diagnostics: tuple[RawReferenceTraversalDiagnostic, ...]
 
     def __post_init__(self) -> None:
@@ -104,29 +98,11 @@ def _validate_execution_result(result: ReferenceTraversalExecutionResult) -> Non
             "status must use the documented reference traversal vocabulary"
         )
     _require_typed_tuple(
-        result.nodes, (RawReferenceTraversalNode, RawReferenceTraversalNodeV2), "nodes"
+        result.nodes, RawReferenceTraversalNode, "nodes"
     )
     _require_typed_tuple(
-        result.edges, (RawReferenceTraversalEdge, RawReferenceTraversalEdgeV2), "edges"
+        result.edges, RawReferenceTraversalEdge, "edges"
     )
-    if result.nodes and not (
-        all(isinstance(node, RawReferenceTraversalNode) for node in result.nodes)
-        or all(isinstance(node, RawReferenceTraversalNodeV2) for node in result.nodes)
-    ):
-        raise ValueError("nodes must not mix schema-1 and schema-2 evidence")
-    if result.edges and not (
-        all(isinstance(edge, RawReferenceTraversalEdge) for edge in result.edges)
-        or all(isinstance(edge, RawReferenceTraversalEdgeV2) for edge in result.edges)
-    ):
-        raise ValueError("edges must not mix schema-1 and schema-2 evidence")
-    node_generation = _evidence_schema_generation(result.nodes)
-    edge_generation = _evidence_schema_generation(result.edges)
-    if (
-        node_generation is not None
-        and edge_generation is not None
-        and node_generation != edge_generation
-    ):
-        raise ValueError("nodes and edges must use the same schema generation")
     _require_typed_tuple(
         result.diagnostics,
         RawReferenceTraversalDiagnostic,
@@ -146,66 +122,42 @@ def _require_typed_tuple(value: object, item_type: type | tuple[type, ...], fiel
         raise ValueError(f"{field_name} contains an invalid raw evidence item")
 
 
-def _evidence_schema_generation(value: tuple[object, ...]) -> int | None:
-    if not value:
-        return None
-    return 2 if isinstance(value[0], (RawReferenceTraversalNodeV2, RawReferenceTraversalEdgeV2)) else 1
-
-
-def _canonicalize_execution_result(
-    result: ReferenceTraversalExecutionResult,
-) -> None:
-    if _evidence_schema_generation(result.nodes) == 2:
-        nodes = tuple(
-            sorted(_deduplicate_schema_2_nodes(result.nodes), key=_node_order)
-        )
-    else:
-        nodes = order_reference_traversal_nodes(result.nodes)
-    if _evidence_schema_generation(result.edges) == 2:
-        edges = tuple(
-            sorted(_deduplicate_schema_2_edges(result.edges), key=_edge_order)
-        )
-    else:
-        edges = order_reference_traversal_edges(result.edges)
-    if (
-        _evidence_schema_generation(result.nodes) == 2
-        or _evidence_schema_generation(result.edges) == 2
-    ):
-        diagnostics = order_reference_traversal_diagnostics(
-            tuple(dict.fromkeys(result.diagnostics))
-        )
-    else:
-        diagnostics = order_reference_traversal_diagnostics(result.diagnostics)
+def _canonicalize_execution_result(result: ReferenceTraversalExecutionResult) -> None:
+    nodes = tuple(sorted(_deduplicate_nodes(result.nodes), key=_node_order))
+    edges = tuple(sorted(_deduplicate_edges(result.edges), key=_edge_order))
+    diagnostics = order_reference_traversal_diagnostics(
+        tuple(dict.fromkeys(result.diagnostics))
+    )
     object.__setattr__(result, "nodes", nodes)
     object.__setattr__(result, "edges", edges)
     object.__setattr__(result, "diagnostics", diagnostics)
 
 
-def _deduplicate_schema_2_edges(
-    edges: tuple[RawReferenceTraversalEdgeV2, ...],
-) -> tuple[RawReferenceTraversalEdgeV2, ...]:
-    unique: dict[tuple[Any, ...], RawReferenceTraversalEdgeV2] = {}
+def _deduplicate_edges(
+    edges: tuple[RawReferenceTraversalEdge, ...],
+) -> tuple[RawReferenceTraversalEdge, ...]:
+    unique: dict[tuple[Any, ...], RawReferenceTraversalEdge] = {}
     for edge in edges:
-        identity = build_reference_traversal_edge_identity_key_v2(edge)
+        identity = build_reference_traversal_edge_identity_key(edge)
         previous = unique.get(identity)
         if previous is not None and previous != edge:
             raise ValueError(
-                "duplicate schema-2 edge identity has conflicting raw evidence"
+                "duplicate canonical edge identity has conflicting raw evidence"
             )
         unique[identity] = edge
     return tuple(unique.values())
 
 
-def _deduplicate_schema_2_nodes(
-    nodes: tuple[RawReferenceTraversalNodeV2, ...],
-) -> tuple[RawReferenceTraversalNodeV2, ...]:
-    unique: dict[tuple[str, ...], RawReferenceTraversalNodeV2] = {}
+def _deduplicate_nodes(
+    nodes: tuple[RawReferenceTraversalNode, ...],
+) -> tuple[RawReferenceTraversalNode, ...]:
+    unique: dict[tuple[str, ...], RawReferenceTraversalNode] = {}
     for node in nodes:
-        identity = build_reference_traversal_node_identity_key_v2(node)
+        identity = build_reference_traversal_node_identity_key(node)
         previous = unique.get(identity)
         if previous is not None and previous != node:
             raise ValueError(
-                "duplicate schema-2 node identity has conflicting raw evidence"
+                "duplicate canonical node identity has conflicting raw evidence"
             )
         unique[identity] = node
     return tuple(unique.values())
@@ -227,8 +179,8 @@ def _optional_observed_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-def _object_node(value: Any, source_document: str) -> RawReferenceTraversalNodeV2:
-    return RawReferenceTraversalNodeV2(
+def _object_node(value: Any, source_document: str) -> RawReferenceTraversalNode:
+    return RawReferenceTraversalNode(
         kind=REFERENCE_TRAVERSAL_NODE_KIND_OBJECT,
         state=REFERENCE_TRAVERSAL_STATE_RESOLVED,
         document_path=source_document,
@@ -245,8 +197,8 @@ def _mapped_external_node(
     *,
     state: str,
     observed: Any | None = None,
-) -> RawReferenceTraversalNodeV2:
-    return RawReferenceTraversalNodeV2(
+) -> RawReferenceTraversalNode:
+    return RawReferenceTraversalNode(
         kind=REFERENCE_TRAVERSAL_NODE_KIND_OBJECT,
         state=state,
         document_path=mapping.target_document_path,
@@ -297,11 +249,11 @@ def _optional_order(value: str | None) -> tuple[int, str]:
     return (0, "") if value is None else (1, value)
 
 
-def _node_order(node: RawReferenceTraversalNodeV2) -> tuple[Any, ...]:
+def _node_order(node: RawReferenceTraversalNode) -> tuple[Any, ...]:
     return (
         node.document_path,
         node.kind,
-        build_reference_traversal_node_id_v2(node),
+        build_reference_traversal_node_id(node),
         _optional_order(node.object_name),
         _optional_order(node.object_type),
         _optional_order(node.label),
@@ -310,10 +262,10 @@ def _node_order(node: RawReferenceTraversalNodeV2) -> tuple[Any, ...]:
     )
 
 
-def _edge_order(edge: RawReferenceTraversalEdgeV2) -> tuple[Any, ...]:
+def _edge_order(edge: RawReferenceTraversalEdge) -> tuple[Any, ...]:
     return (
-        build_reference_traversal_node_id_v2(edge.source),
-        build_reference_traversal_node_id_v2(edge.target),
+        build_reference_traversal_node_id(edge.source),
+        build_reference_traversal_node_id(edge.target),
         edge.kind,
         _optional_order(edge.source_property),
         _optional_order(edge.reference_mechanism),
@@ -336,14 +288,14 @@ def _execute_reference_traversal(
     label = getattr(document, "Label", None)
     if not isinstance(label, str) or not label:
         label = None
-    source_node = RawReferenceTraversalNodeV2(
+    source_node = RawReferenceTraversalNode(
         kind=REFERENCE_TRAVERSAL_NODE_KIND_DOCUMENT,
         state=REFERENCE_TRAVERSAL_STATE_RESOLVED,
         document_path=source_document,
         label=label,
     )
-    participating_nodes: dict[str, RawReferenceTraversalNodeV2] = {}
-    edges_by_identity: dict[tuple[Any, ...], RawReferenceTraversalEdgeV2] = {}
+    participating_nodes: dict[str, RawReferenceTraversalNode] = {}
+    edges_by_identity: dict[tuple[Any, ...], RawReferenceTraversalEdge] = {}
     diagnostics_by_identity: dict[
         tuple[str | None, str, str, str], RawReferenceTraversalDiagnostic
     ] = {}
@@ -359,15 +311,15 @@ def _execute_reference_traversal(
         )
         mappings_by_property[key] = (*mappings_by_property.get(key, ()), mapping)
 
-    def retain_node(node: RawReferenceTraversalNodeV2) -> None:
-        node_id = build_reference_traversal_node_id_v2(node)
+    def retain_node(node: RawReferenceTraversalNode) -> None:
+        node_id = build_reference_traversal_node_id(node)
         previous = participating_nodes.get(node_id)
         if previous is not None and previous != node:
             raise ValueError("duplicate object identity has conflicting raw evidence")
         participating_nodes[node_id] = node
 
-    def retain_edge(edge: RawReferenceTraversalEdgeV2) -> None:
-        edge_identity = build_reference_traversal_edge_identity_key_v2(edge)
+    def retain_edge(edge: RawReferenceTraversalEdge) -> None:
+        edge_identity = build_reference_traversal_edge_identity_key(edge)
         previous_edge = edges_by_identity.get(edge_identity)
         if previous_edge is not None and previous_edge != edge:
             raise ValueError("duplicate edge identity has conflicting raw evidence")
@@ -438,7 +390,7 @@ def _execute_reference_traversal(
                 )
                 retain_node(source_object_node)
                 retain_node(target_object_node)
-                retain_edge(RawReferenceTraversalEdgeV2(
+                retain_edge(RawReferenceTraversalEdge(
                     source=source_object_node,
                     target=target_object_node,
                     kind=REFERENCE_TRAVERSAL_EDGE_KIND_EXTERNAL_DOCUMENT_REFERENCE,
@@ -453,7 +405,7 @@ def _execute_reference_traversal(
                 target_object_node = _object_node(target_object, source_document)
                 for object_node in (source_object_node, target_object_node):
                     retain_node(object_node)
-                edge = RawReferenceTraversalEdgeV2(
+                edge = RawReferenceTraversalEdge(
                     source=source_object_node,
                     target=target_object_node,
                     kind=REFERENCE_TRAVERSAL_EDGE_KIND_DOCUMENT_INTERNAL_REFERENCE,
@@ -498,21 +450,8 @@ def run_reference_traversal(
             raise ValueError("document must not be None")
         if not isinstance(request, ReferenceTraversalRequest):
             raise ValueError("request must be a ReferenceTraversalRequest")
-        if request.schema_version not in (
-            REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION,
-            REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION_V2,
-        ):
+        if request.schema_version != REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION:
             raise ValueError("request schema_version is unsupported")
-        if (
-            request.schema_version == REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION
-            and isinstance(request, ReferenceTraversalRequestV2)
-        ):
-            raise ValueError("schema-1 request must not contain external targets")
-        if (
-            request.schema_version == REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION_V2
-            and not isinstance(request, ReferenceTraversalRequestV2)
-        ):
-            raise ValueError("schema-2 request must contain external targets")
         external_targets = getattr(request, "external_targets", ())
         if not isinstance(external_targets, tuple):
             raise ValueError("request external_targets must be a tuple")
