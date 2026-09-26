@@ -10,15 +10,12 @@ from pathlib import Path
 from parametron_freecad.runtime.reference_traversal_output_contract import (
     ReferenceTraversalOutputContractError,
     RawReferenceTraversalDiagnostic,
+    resolve_reference_traversal_output_path as _resolve_output_path,
+)
+from parametron_freecad.runtime.reference_traversal_output import (
     RawReferenceTraversalEdge,
     RawReferenceTraversalNode,
-    resolve_reference_traversal_output_path as _resolve_output_path,
     serialize_reference_traversal_output,
-)
-from parametron_freecad.runtime.reference_traversal_output_v2 import (
-    RawReferenceTraversalEdgeV2,
-    RawReferenceTraversalNodeV2,
-    serialize_reference_traversal_output_v2,
 )
 
 
@@ -73,33 +70,6 @@ def write_reference_traversal_output_atomically(
         working_copy,
         output_path,
         serializer=serialize_reference_traversal_output,
-        boundary=boundary,
-        operation=operation,
-        status=status,
-        source_document=source_document,
-        nodes=nodes,
-        edges=edges,
-        diagnostics=diagnostics,
-    )
-
-
-def write_reference_traversal_output_v2_atomically(
-    working_copy: str | Path,
-    output_path: str | Path,
-    *,
-    boundary: str,
-    operation: str,
-    status: str,
-    source_document: str,
-    nodes: Sequence[RawReferenceTraversalNodeV2],
-    edges: Sequence[RawReferenceTraversalEdgeV2],
-    diagnostics: Sequence[RawReferenceTraversalDiagnostic] = (),
-) -> None:
-    """Atomically write schema-2 raw traversal bytes within ``working_copy``."""
-    _write_reference_traversal_output_atomically(
-        working_copy,
-        output_path,
-        serializer=serialize_reference_traversal_output_v2,
         boundary=boundary,
         operation=operation,
         status=status,
@@ -190,5 +160,4 @@ __all__ = [
     "ReferenceTraversalOutputWriteError",
     "write_reference_traversal_output",
     "write_reference_traversal_output_atomically",
-    "write_reference_traversal_output_v2_atomically",
 ]

@@ -7,7 +7,7 @@ operates on a temporary copy of the committed fixture; the committed
 ``.FCStd`` bytes are proven unchanged before and after each test class runs.
 
 This module deliberately does not exercise recompute, save, reopen,
-suppression mutation, deletion, or schema-2 execute wiring: those remain out
+suppression mutation, deletion, or full runtime execution: those remain out
 of scope for the native visibility primitive under test.
 
 Per the committed fixture's semantic contract (see

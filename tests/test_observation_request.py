@@ -18,10 +18,10 @@ class ObservationRequestLoaderTests(unittest.TestCase):
 
     def test_loads_valid_request(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._write(tmp, '{"observe":{"metadata":true}}')
+            path = self._write(tmp, '{"schemaVersion":"1.0","observe":{"metadata":true}}')
             self.assertEqual(
                 observation_request.load_observation_request(path),
-                {"observe": {"metadata": True}},
+                {"schemaVersion": "1.0", "observe": {"metadata": True}},
             )
 
     def test_malformed_json_is_wrapped_with_original_cause(self) -> None:
@@ -58,14 +58,14 @@ class ObservationRequestLoaderTests(unittest.TestCase):
 
     def test_unsupported_request_structure_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._write(tmp, '{"observe":{"unknown":true}}')
+            path = self._write(tmp, '{"schemaVersion":"1.0","observe":{"unknown":true}}')
             with self.assertRaisesRegex(
                 observation_request.ObservationRequestError, "not compatible"
             ):
                 observation_request.load_observation_request(path)
 
     def test_delegates_compatibility_and_does_not_mutate_loaded_data(self) -> None:
-        decoded = {"observe": {"metadata": True}, "expected": {"metadata": []}}
+        decoded = {"schemaVersion": "1.0", "observe": {"metadata": True}, "expected": {"metadata": []}}
         before = copy.deepcopy(decoded)
         loaded = mock.Mock(data=decoded)
         with mock.patch.object(
@@ -80,8 +80,8 @@ class ObservationRequestLoaderTests(unittest.TestCase):
         self.assertEqual(decoded, before)
 
     def test_equivalent_json_inputs_load_to_equal_deterministic_data(self) -> None:
-        first = {"observe": {"metadata": True}, "expected": {"metadata": []}}
-        second = {"expected": {"metadata": []}, "observe": {"metadata": True}}
+        first = {"schemaVersion": "1.0", "observe": {"metadata": True}, "expected": {"metadata": []}}
+        second = {"expected": {"metadata": []}, "observe": {"metadata": True}, "schemaVersion": "1.0"}
         with tempfile.TemporaryDirectory() as tmp:
             path_a = self._write(tmp, json.dumps(first))
             loaded_a = observation_request.load_observation_request(path_a)
@@ -89,6 +89,15 @@ class ObservationRequestLoaderTests(unittest.TestCase):
             path_b.write_text(json.dumps(second), encoding="utf-8")
             loaded_b = observation_request.load_observation_request(path_b)
         self.assertEqual(loaded_a, loaded_b)
+
+    def test_noncanonical_version_is_rejected_without_target_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, '{"schemaVersion":"9.9","observe":{"metadata":true}}')
+            with self.assertRaisesRegex(
+                observation_request.ObservationRequestError,
+                "unsupported verification schemaVersion",
+            ):
+                observation_request.load_observation_request(path)
 
 
 if __name__ == "__main__":

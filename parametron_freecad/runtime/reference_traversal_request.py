@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any, Iterable, NoReturn
 
 REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION = "1.0"
-REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION_V2 = "2.0"
 REFERENCE_TRAVERSAL_REQUEST_FILENAME = (
     "prm.reference-traversal-request.json"
 )
@@ -31,13 +30,7 @@ class ReferenceTraversalRequest:
     """Immutable normalized request for optional reference traversal."""
 
     schema_version: str
-
-
-@dataclass(frozen=True, slots=True)
-class ReferenceTraversalRequestV2(ReferenceTraversalRequest):
-    """Immutable normalized schema-2 request with Engine target mappings."""
-
-    external_targets: tuple[ReferenceTraversalExternalTarget, ...] = ()
+    external_targets: tuple[ReferenceTraversalExternalTarget, ...]
 
 
 _SUPPORTED_REFERENCE_MECHANISMS = (
@@ -121,14 +114,9 @@ def _normalize_request(decoded: Any) -> ReferenceTraversalRequest:
     if "schemaVersion" not in decoded:
         raise ValueError("request requires field 'schemaVersion'")
     schema_version = decoded["schemaVersion"]
-    if schema_version == REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION:
-        expected_fields = {"schemaVersion"}
-    elif schema_version == REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION_V2:
-        expected_fields = {"schemaVersion", "externalTargets"}
-    else:
-        raise ValueError(
-            "request field 'schemaVersion' must equal '1.0' or '2.0'"
-        )
+    if schema_version != REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION:
+        raise ValueError("request field 'schemaVersion' must equal '1.0'")
+    expected_fields = {"schemaVersion", "externalTargets"}
     actual_fields = set(decoded)
     missing_fields = expected_fields - actual_fields
     unknown_fields = actual_fields - expected_fields
@@ -137,9 +125,6 @@ def _normalize_request(decoded: Any) -> ReferenceTraversalRequest:
     if unknown_fields:
         rendered = ", ".join(repr(field) for field in sorted(unknown_fields))
         raise ValueError(f"request contains unknown field(s): {rendered}")
-
-    if schema_version == REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION:
-        return ReferenceTraversalRequest(schema_version=schema_version)
 
     raw_targets = decoded["externalTargets"]
     if not isinstance(raw_targets, list):
@@ -150,7 +135,7 @@ def _normalize_request(decoded: Any) -> ReferenceTraversalRequest:
     )
     ordered = tuple(sorted(targets, key=_external_target_key))
     _validate_external_target_conflicts(ordered)
-    return ReferenceTraversalRequestV2(
+    return ReferenceTraversalRequest(
         schema_version=schema_version,
         external_targets=ordered,
     )
@@ -270,7 +255,7 @@ def _validate_external_target_conflicts(
 def load_reference_traversal_request(
     path: str | Path,
 ) -> ReferenceTraversalRequest:
-    """Load the closed version-1 request schema without runtime side effects."""
+    """Load the canonical mapped request without runtime side effects."""
 
     request_path = Path(path)
     try:
@@ -288,10 +273,8 @@ __all__ = [
     "REFERENCE_TRAVERSAL_REQUEST_CLI_FLAG",
     "REFERENCE_TRAVERSAL_REQUEST_FILENAME",
     "REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION",
-    "REFERENCE_TRAVERSAL_REQUEST_SCHEMA_VERSION_V2",
     "ReferenceTraversalExternalTarget",
     "ReferenceTraversalRequest",
-    "ReferenceTraversalRequestV2",
     "ReferenceTraversalRequestError",
     "load_reference_traversal_request",
 ]

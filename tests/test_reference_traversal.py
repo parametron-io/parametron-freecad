@@ -18,14 +18,13 @@ from parametron_freecad.runtime.reference_traversal_output_contract import (
 from parametron_freecad.runtime.reference_traversal_request import (
     ReferenceTraversalExternalTarget,
     ReferenceTraversalRequest,
-    ReferenceTraversalRequestV2,
 )
-from parametron_freecad.runtime.reference_traversal_output_v2 import (
-    RawReferenceTraversalEdgeV2,
-    RawReferenceTraversalNodeV2,
-    build_reference_traversal_node_id_v2,
-    build_reference_traversal_output_payload_v2,
-    serialize_reference_traversal_output_v2,
+from parametron_freecad.runtime.reference_traversal_output import (
+    RawReferenceTraversalEdge as CanonicalReferenceTraversalEdge,
+    RawReferenceTraversalNode as CanonicalReferenceTraversalNode,
+    build_reference_traversal_node_id,
+    build_reference_traversal_output_payload,
+    serialize_reference_traversal_output,
 )
 
 
@@ -59,11 +58,11 @@ class _TraversalDocument:
 
 class ReferenceTraversalBoundaryTests(unittest.TestCase):
     def _request(self) -> ReferenceTraversalRequest:
-        return ReferenceTraversalRequest(schema_version="1.0")
+        return ReferenceTraversalRequest(schema_version="1.0", external_targets=())
 
     def _mapped_request(self, *targets) -> ReferenceTraversalRequest:
-        return ReferenceTraversalRequestV2(
-            schema_version="2.0", external_targets=tuple(targets)
+        return ReferenceTraversalRequest(
+            schema_version="1.0", external_targets=tuple(targets)
         )
 
     def _mapping(
@@ -94,8 +93,8 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         return traversal.ReferenceTraversalExecutionResult(
             status=status,
             nodes=(
-                RawReferenceTraversalNode(
-                    id="document:assembly.FCStd",
+                CanonicalReferenceTraversalNode(
+
                     kind="document",
                     state="resolved",
                     document_path="assembly.FCStd",
@@ -233,9 +232,11 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
             message="target could not be resolved",
             stage="traversal",
         )
-        edge = RawReferenceTraversalEdge(
-            source="source",
-            target="target",
+        source = CanonicalReferenceTraversalNode("object", "resolved", "assembly.FCStd", "Source")
+        target = CanonicalReferenceTraversalNode("object", "unresolved", "assembly.FCStd", "Target")
+        edge = CanonicalReferenceTraversalEdge(
+            source=source,
+            target=target,
             kind="external_document_reference",
             state="unresolved",
             diagnostic="target could not be resolved",
@@ -244,7 +245,7 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
             with self.subTest(status=status):
                 result = traversal.ReferenceTraversalExecutionResult(
                     status=status,
-                    nodes=(),
+                    nodes=(source, target),
                     edges=(edge,),
                     diagnostics=(diagnostic,),
                 )
@@ -256,8 +257,8 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
                     )
                 self.assertIs(returned, result)
 
-    def test_schema_2_raw_node_tuple_is_representable(self) -> None:
-        node = RawReferenceTraversalNodeV2(
+    def test_canonical_raw_node_tuple_is_representable(self) -> None:
+        node = CanonicalReferenceTraversalNode(
             kind="object",
             state="resolved",
             document_path="assembly.FCStd",
@@ -269,123 +270,21 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         )
         self.assertIs(result.nodes[0], node)
 
-    def test_cross_field_schema_generations_are_rejected_with_chaining(self) -> None:
-        legacy_node = RawReferenceTraversalNode(
-            id="legacy",
-            kind="object",
-            state="resolved",
-            document_path="assembly.FCStd",
-            object_name="Bolt",
-        )
-        v2_node = RawReferenceTraversalNodeV2(
-            kind="object",
-            state="resolved",
-            document_path="assembly.FCStd",
-            object_name="Bolt",
-        )
-        legacy_edge = RawReferenceTraversalEdge(
-            source="legacy",
-            target="legacy",
-            kind="document_internal_reference",
-            state="resolved",
-        )
-        v2_edge = RawReferenceTraversalEdgeV2(
-            source=v2_node,
-            target=v2_node,
-            kind="document_internal_reference",
-            state="resolved",
-        )
-
-        for nodes, edges in (((legacy_node,), (v2_edge,)), ((v2_node,), (legacy_edge,))):
-            with self.subTest(nodes=nodes, edges=edges), self.assertRaisesRegex(
-                traversal.ReferenceTraversalExecutionError,
-                "nodes and edges must use the same schema generation",
-            ) as caught:
-                traversal.ReferenceTraversalExecutionResult(
-                    status="succeeded", nodes=nodes, edges=edges, diagnostics=()
-                )
-            self.assertIsInstance(caught.exception.__cause__, ValueError)
-
-    def test_same_generation_and_single_nonempty_evidence_fields_remain_valid(self) -> None:
-        legacy_node = RawReferenceTraversalNode(
-            id="legacy", kind="document", state="resolved",
-            document_path="assembly.FCStd",
-        )
-        v2_node = RawReferenceTraversalNodeV2(
-            kind="document", state="resolved", document_path="assembly.FCStd"
-        )
-        legacy_edge = RawReferenceTraversalEdge(
-            source="source", target="target",
-            kind="document_internal_reference", state="resolved",
-        )
-        v2_edge = RawReferenceTraversalEdgeV2(
-            source=v2_node, target=v2_node,
-            kind="document_internal_reference", state="resolved",
-        )
-        cases = (
-            ((legacy_node,), ()),
-            ((v2_node,), ()),
-            ((), (legacy_edge,)),
-            ((), (v2_edge,)),
-        )
-        for nodes, edges in cases:
-            with self.subTest(nodes=nodes, edges=edges):
-                result = traversal.ReferenceTraversalExecutionResult(
-                    status="succeeded", nodes=nodes, edges=edges, diagnostics=()
-                )
-                self.assertEqual(result.nodes, nodes)
-                self.assertEqual(result.edges, edges)
-
-    def test_typed_result_canonicalizes_schema_1_nodes_edges_and_diagnostics(self) -> None:
-        first = RawReferenceTraversalNode(
-            id="object:a", kind="object", state="missing",
-            document_path="a.FCStd", object_name="A",
-        )
-        second = RawReferenceTraversalNode(
-            id="object:b", kind="object", state="unresolved",
-            document_path="b.FCStd", object_name="B",
-        )
-        first_edge = RawReferenceTraversalEdge(
-            source="object:a", target="object:b",
-            kind="external_document_reference", state="missing",
-        )
-        second_edge = RawReferenceTraversalEdge(
-            source="object:b", target="object:a",
-            kind="external_document_reference", state="unresolved",
-        )
-        first_diagnostic = RawReferenceTraversalDiagnostic(
-            severity="warning", code="a", message="first", stage="a"
-        )
-        second_diagnostic = RawReferenceTraversalDiagnostic(
-            severity="warning", code="b", message="second", stage="b"
-        )
-        result = traversal.ReferenceTraversalExecutionResult(
-            status="succeeded",
-            nodes=(second, first),
-            edges=(second_edge, first_edge),
-            diagnostics=(second_diagnostic, first_diagnostic),
-        )
-        self.assertEqual(result.nodes, (first, second))
-        self.assertEqual(result.edges, (first_edge, second_edge))
-        self.assertEqual(
-            result.diagnostics, (first_diagnostic, second_diagnostic)
-        )
-
-    def test_typed_result_canonicalizes_schema_2_missing_unresolved_evidence(self) -> None:
-        missing = RawReferenceTraversalNodeV2(
+    def test_typed_result_canonicalizes_canonical_missing_unresolved_evidence(self) -> None:
+        missing = CanonicalReferenceTraversalNode(
             kind="object", state="missing", document_path="refs/a.FCStd",
             object_name="A",
         )
-        unresolved = RawReferenceTraversalNodeV2(
+        unresolved = CanonicalReferenceTraversalNode(
             kind="object", state="unresolved", document_path="refs/b.FCStd",
             object_name="B",
         )
-        missing_edge = RawReferenceTraversalEdgeV2(
+        missing_edge = CanonicalReferenceTraversalEdge(
             source=missing, target=unresolved,
             kind="external_document_reference", state="missing",
             source_property="A", reference_mechanism="App::PropertyXLinkList",
         )
-        unresolved_edge = RawReferenceTraversalEdgeV2(
+        unresolved_edge = CanonicalReferenceTraversalEdge(
             source=unresolved, target=missing,
             kind="external_document_reference", state="unresolved",
             source_property="B", reference_mechanism="App::PropertyXLinkList",
@@ -400,18 +299,18 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(reverse, forward)
 
-    def test_schema_2_equal_edges_collapse_for_every_evidence_state(self) -> None:
-        source = RawReferenceTraversalNodeV2(
+    def test_canonical_equal_edges_collapse_for_every_evidence_state(self) -> None:
+        source = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source",
         )
         for state in ("resolved", "missing", "unresolved"):
             with self.subTest(state=state):
-                target = RawReferenceTraversalNodeV2(
+                target = CanonicalReferenceTraversalNode(
                     kind="object", state=state, document_path="refs/part.FCStd",
                     object_name="Target",
                 )
-                edge = RawReferenceTraversalEdgeV2(
+                edge = CanonicalReferenceTraversalEdge(
                     source=source, target=target,
                     kind="external_document_reference", state=state,
                     source_property="Parts",
@@ -423,24 +322,24 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
                 )
                 self.assertEqual(result.edges, (edge,))
 
-    def test_schema_2_duplicates_separated_by_other_evidence_collapse(self) -> None:
-        source = RawReferenceTraversalNodeV2(
+    def test_canonical_duplicates_separated_by_other_evidence_collapse(self) -> None:
+        source = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source",
         )
-        first_target = RawReferenceTraversalNodeV2(
+        first_target = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="refs/a.FCStd",
             object_name="A",
         )
-        second_target = RawReferenceTraversalNodeV2(
+        second_target = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="refs/b.FCStd",
             object_name="B",
         )
-        first = RawReferenceTraversalEdgeV2(
+        first = CanonicalReferenceTraversalEdge(
             source, first_target, "external_document_reference", "resolved",
             "Parts", "App::PropertyXLinkList",
         )
-        second = RawReferenceTraversalEdgeV2(
+        second = CanonicalReferenceTraversalEdge(
             source, second_target, "external_document_reference", "resolved",
             "Parts", "App::PropertyXLinkList",
         )
@@ -451,35 +350,35 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         self.assertEqual(len(result.edges), 2)
         self.assertEqual(set(result.edges), {first, second})
 
-    def test_schema_2_complete_identity_preserves_every_distinct_component(self) -> None:
-        source_a = RawReferenceTraversalNodeV2(
+    def test_canonical_complete_identity_preserves_every_distinct_component(self) -> None:
+        source_a = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="SourceA",
         )
-        source_b = RawReferenceTraversalNodeV2(
+        source_b = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="SourceB",
         )
-        source_other_document = RawReferenceTraversalNodeV2(
+        source_other_document = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="other.FCStd",
             object_name="SourceA",
         )
-        target_a = RawReferenceTraversalNodeV2(
+        target_a = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="refs/a.FCStd",
             object_name="Target",
         )
-        target_b = RawReferenceTraversalNodeV2(
+        target_b = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="refs/b.FCStd",
             object_name="Target",
         )
         edges = (
-            RawReferenceTraversalEdgeV2(source_a, target_a, "external_document_reference", "resolved", "First", "App::PropertyXLink"),
-            RawReferenceTraversalEdgeV2(source_b, target_a, "external_document_reference", "resolved", "First", "App::PropertyXLink"),
-            RawReferenceTraversalEdgeV2(source_other_document, target_a, "external_document_reference", "resolved", "First", "App::PropertyXLink"),
-            RawReferenceTraversalEdgeV2(source_a, target_b, "external_document_reference", "resolved", "First", "App::PropertyXLink"),
-            RawReferenceTraversalEdgeV2(source_a, target_a, "external_document_reference", "resolved", "Second", "App::PropertyXLink"),
-            RawReferenceTraversalEdgeV2(source_a, target_a, "external_document_reference", "resolved", "First", "App::PropertyXLinkSub"),
-            RawReferenceTraversalEdgeV2(source_a, target_a, "document_internal_reference", "resolved", "First", "App::PropertyXLink"),
+            CanonicalReferenceTraversalEdge(source_a, target_a, "external_document_reference", "resolved", "First", "App::PropertyXLink"),
+            CanonicalReferenceTraversalEdge(source_b, target_a, "external_document_reference", "resolved", "First", "App::PropertyXLink"),
+            CanonicalReferenceTraversalEdge(source_other_document, target_a, "external_document_reference", "resolved", "First", "App::PropertyXLink"),
+            CanonicalReferenceTraversalEdge(source_a, target_b, "external_document_reference", "resolved", "First", "App::PropertyXLink"),
+            CanonicalReferenceTraversalEdge(source_a, target_a, "external_document_reference", "resolved", "Second", "App::PropertyXLink"),
+            CanonicalReferenceTraversalEdge(source_a, target_a, "external_document_reference", "resolved", "First", "App::PropertyXLinkSub"),
+            CanonicalReferenceTraversalEdge(source_a, target_a, "document_internal_reference", "resolved", "First", "App::PropertyXLink"),
         )
         result = traversal.ReferenceTraversalExecutionResult(
             status="succeeded",
@@ -489,28 +388,28 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         self.assertEqual(len(result.edges), len(edges))
         self.assertEqual(set(result.edges), set(edges))
 
-    def test_schema_2_identity_conflict_fails_deterministically_with_chaining(self) -> None:
-        source = RawReferenceTraversalNodeV2(
+    def test_canonical_identity_conflict_fails_deterministically_with_chaining(self) -> None:
+        source = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source",
         )
-        target = RawReferenceTraversalNodeV2(
+        target = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="refs/a.FCStd",
             object_name="Target",
         )
-        resolved = RawReferenceTraversalEdgeV2(
+        resolved = CanonicalReferenceTraversalEdge(
             source, target, "external_document_reference", "resolved",
             "Parts", "App::PropertyXLinkList",
         )
-        conflicting = RawReferenceTraversalEdgeV2(
+        conflicting = CanonicalReferenceTraversalEdge(
             source, target, "external_document_reference", "missing",
             "Parts", "App::PropertyXLinkList",
         )
-        source_with_conflicting_label = RawReferenceTraversalNodeV2(
+        source_with_conflicting_label = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source", label="different evidence",
         )
-        conflicting_endpoint = RawReferenceTraversalEdgeV2(
+        conflicting_endpoint = CanonicalReferenceTraversalEdge(
             source_with_conflicting_label, target,
             "external_document_reference", "resolved",
             "Parts", "App::PropertyXLinkList",
@@ -522,7 +421,7 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(
                 traversal.ReferenceTraversalExecutionError,
-                "duplicate schema-2 edge identity has conflicting raw evidence",
+                "duplicate canonical edge identity has conflicting raw evidence",
             ) as caught:
                 traversal.ReferenceTraversalExecutionResult(
                     status="succeeded", nodes=(source, target),
@@ -530,15 +429,15 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
                 )
             self.assertIsInstance(caught.exception.__cause__, ValueError)
 
-    def test_schema_2_equal_nodes_collapse_for_every_evidence_state(self) -> None:
+    def test_canonical_equal_nodes_collapse_for_every_evidence_state(self) -> None:
         for state in ("resolved", "missing", "unresolved"):
             with self.subTest(state=state):
-                node = RawReferenceTraversalNodeV2(
+                node = CanonicalReferenceTraversalNode(
                     kind="object", state=state, document_path="assembly.FCStd",
                     object_name="Source", object_type="Part::Feature",
                     label="Source label",
                 )
-                duplicate = RawReferenceTraversalNodeV2(
+                duplicate = CanonicalReferenceTraversalNode(
                     kind="object", state=state, document_path="assembly.FCStd",
                     object_name="Source", object_type="Part::Feature",
                     label="Source label",
@@ -549,18 +448,18 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
                 )
                 self.assertEqual(result.nodes, (node,))
 
-    def test_schema_2_node_duplicates_and_one_conflict_fail_deterministically(
+    def test_canonical_node_duplicates_and_one_conflict_fail_deterministically(
         self,
     ) -> None:
-        first_target = RawReferenceTraversalNodeV2(
+        first_target = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="refs/a.FCStd",
             object_name="A",
         )
-        second_target = RawReferenceTraversalNodeV2(
+        second_target = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="refs/b.FCStd",
             object_name="B",
         )
-        conflicting_second_target = RawReferenceTraversalNodeV2(
+        conflicting_second_target = CanonicalReferenceTraversalNode(
             kind="object", state="missing", document_path="refs/b.FCStd",
             object_name="B",
         )
@@ -570,37 +469,37 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         ):
             with self.subTest(nodes=nodes), self.assertRaisesRegex(
                 traversal.ReferenceTraversalExecutionError,
-                "duplicate schema-2 node identity has conflicting raw evidence",
+                "duplicate canonical node identity has conflicting raw evidence",
             ) as caught:
                 traversal.ReferenceTraversalExecutionResult(
                     status="succeeded", nodes=nodes, edges=(), diagnostics=(),
                 )
             self.assertIsInstance(caught.exception.__cause__, ValueError)
 
-    def test_schema_2_node_identity_conflict_fails_deterministically_with_chaining(
+    def test_canonical_node_identity_conflict_fails_deterministically_with_chaining(
         self,
     ) -> None:
-        resolved = RawReferenceTraversalNodeV2(
+        resolved = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source", object_type="Part::Feature",
             label="Source label",
         )
-        conflicting_state = RawReferenceTraversalNodeV2(
+        conflicting_state = CanonicalReferenceTraversalNode(
             kind="object", state="missing", document_path="assembly.FCStd",
             object_name="Source", object_type="Part::Feature",
             label="Source label",
         )
-        conflicting_object_type = RawReferenceTraversalNodeV2(
+        conflicting_object_type = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source", object_type="Part::Box",
             label="Source label",
         )
-        conflicting_label = RawReferenceTraversalNodeV2(
+        conflicting_label = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source", object_type="Part::Feature",
             label="different evidence",
         )
-        conflicting_diagnostic = RawReferenceTraversalNodeV2(
+        conflicting_diagnostic = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source", object_type="Part::Feature",
             label="Source label", diagnostic="unexpected",
@@ -614,22 +513,22 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         ):
             with self.subTest(nodes=nodes), self.assertRaisesRegex(
                 traversal.ReferenceTraversalExecutionError,
-                "duplicate schema-2 node identity has conflicting raw evidence",
+                "duplicate canonical node identity has conflicting raw evidence",
             ) as caught:
                 traversal.ReferenceTraversalExecutionResult(
                     status="succeeded", nodes=nodes, edges=(), diagnostics=(),
                 )
             self.assertIsInstance(caught.exception.__cause__, ValueError)
 
-    def test_schema_2_non_conflicting_nodes_retain_canonical_ordering(self) -> None:
-        document = RawReferenceTraversalNodeV2(
+    def test_canonical_non_conflicting_nodes_retain_canonical_ordering(self) -> None:
+        document = CanonicalReferenceTraversalNode(
             kind="document", state="resolved", document_path="assembly.FCStd",
         )
-        source = RawReferenceTraversalNodeV2(
+        source = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source",
         )
-        target = RawReferenceTraversalNodeV2(
+        target = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="refs/a.FCStd",
             object_name="Target",
         )
@@ -645,18 +544,18 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
                 )
                 self.assertEqual(forward.nodes, expected)
 
-    def test_schema_2_node_sequence_assigned_only_after_dedup_and_conflict_enforcement(
+    def test_canonical_node_sequence_assigned_only_after_dedup_and_conflict_enforcement(
         self,
     ) -> None:
-        node = RawReferenceTraversalNodeV2(
+        node = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source",
         )
-        duplicate = RawReferenceTraversalNodeV2(
+        duplicate = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source",
         )
-        other = RawReferenceTraversalNodeV2(
+        other = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Other",
         )
@@ -665,7 +564,7 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
             edges=(), diagnostics=(),
         )
         self.assertEqual(result.nodes, (node, other))
-        payload = build_reference_traversal_output_payload_v2(
+        payload = build_reference_traversal_output_payload(
             boundary="reference_traversal_entrypoint",
             operation="reference_traversal",
             status=result.status,
@@ -677,28 +576,8 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         self.assertEqual([entry["sequence"] for entry in payload["nodes"]], [0, 1])
         self.assertEqual(len(payload["nodes"]), 2)
 
-    def test_schema_1_duplicates_and_unrelated_evidence_remain_unchanged(self) -> None:
-        node = RawReferenceTraversalNode(
-            id="object:source", kind="object", state="resolved",
-            document_path="assembly.FCStd", object_name="Source",
-        )
-        edge = RawReferenceTraversalEdge(
-            source="source", target="target",
-            kind="external_document_reference", state="resolved",
-        )
-        diagnostic = RawReferenceTraversalDiagnostic(
-            severity="warning", code="duplicate", message="kept", stage="test"
-        )
-        result = traversal.ReferenceTraversalExecutionResult(
-            status="succeeded", nodes=(node, node), edges=(edge, edge),
-            diagnostics=(diagnostic, diagnostic),
-        )
-        self.assertEqual(result.nodes, (node, node))
-        self.assertEqual(result.edges, (edge, edge))
-        self.assertEqual(result.diagnostics, (diagnostic, diagnostic))
-
-    def test_schema_2_exact_duplicate_diagnostics_collapse_before_ordering(self) -> None:
-        node = RawReferenceTraversalNodeV2(
+    def test_canonical_exact_duplicate_diagnostics_collapse_before_ordering(self) -> None:
+        node = CanonicalReferenceTraversalNode(
             kind="document", state="resolved", document_path="assembly.FCStd"
         )
         first = RawReferenceTraversalDiagnostic(
@@ -720,7 +599,7 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         self.assertEqual(results[1].diagnostics, (second, first))
 
         emitted = tuple(
-            serialize_reference_traversal_output_v2(
+            serialize_reference_traversal_output(
                 boundary="reference_traversal_entrypoint",
                 operation="reference_traversal",
                 status=result.status,
@@ -734,20 +613,20 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         self.assertEqual(emitted[0], emitted[1])
         self.assertEqual(emitted[0].count(b'"code":"z"'), 1)
 
-    def test_schema_2_post_dedup_sequences_and_bytes_are_deterministic(self) -> None:
-        source = RawReferenceTraversalNodeV2(
+    def test_canonical_post_dedup_sequences_and_bytes_are_deterministic(self) -> None:
+        source = CanonicalReferenceTraversalNode(
             kind="object", state="resolved", document_path="assembly.FCStd",
             object_name="Source",
         )
         targets = tuple(
-            RawReferenceTraversalNodeV2(
+            CanonicalReferenceTraversalNode(
                 kind="object", state="resolved", document_path=f"refs/{name}.FCStd",
                 object_name=name,
             )
             for name in ("A", "B")
         )
         edges = tuple(
-            RawReferenceTraversalEdgeV2(
+            CanonicalReferenceTraversalEdge(
                 source, target, "external_document_reference", "resolved",
                 "Parts", "App::PropertyXLinkList",
             )
@@ -759,13 +638,13 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
                 status="succeeded", nodes=(source, *targets),
                 edges=raw_edges, diagnostics=(),
             )
-            emitted.append(serialize_reference_traversal_output_v2(
+            emitted.append(serialize_reference_traversal_output(
                 boundary="reference_traversal_entrypoint",
                 operation="reference_traversal", status=result.status,
                 source_document="assembly.FCStd", nodes=result.nodes,
                 edges=result.edges, diagnostics=result.diagnostics,
             ))
-            payload = build_reference_traversal_output_payload_v2(
+            payload = build_reference_traversal_output_payload(
                 boundary="reference_traversal_entrypoint",
                 operation="reference_traversal", status=result.status,
                 source_document="assembly.FCStd", nodes=result.nodes,
@@ -785,7 +664,7 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         self.assertEqual(
             result.nodes,
             (
-                RawReferenceTraversalNodeV2(
+                CanonicalReferenceTraversalNode(
                     kind="document",
                     state="resolved",
                     document_path="assembly.FCStd",
@@ -1005,7 +884,7 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
             ],
         )
 
-    def test_internal_reference_has_exact_schema_2_identity_and_provenance(self) -> None:
+    def test_internal_reference_has_exact_canonical_identity_and_provenance(self) -> None:
         target = _TraversalObject("Target", type_id="Part::Feature")
         source = _TraversalObject("Source", type_id="App::FeaturePython")
         source._properties = {
@@ -1015,7 +894,7 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         result = traversal.run_reference_traversal(
             _TraversalDocument((source, target)), self._request(), **self._kwargs()
         )
-        payload = build_reference_traversal_output_payload_v2(
+        payload = build_reference_traversal_output_payload(
             boundary="reference_traversal_entrypoint",
             operation="reference_traversal",
             status=result.status,
@@ -1028,10 +907,10 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         target_node = next(node for node in result.nodes if node.object_name == "Target")
         edge_payload = payload["edges"][0]
         self.assertEqual(
-            edge_payload["source"], build_reference_traversal_node_id_v2(source_node)
+            edge_payload["source"], build_reference_traversal_node_id(source_node)
         )
         self.assertEqual(
-            edge_payload["target"], build_reference_traversal_node_id_v2(target_node)
+            edge_payload["target"], build_reference_traversal_node_id(target_node)
         )
         self.assertEqual(edge_payload["sourceProperty"], "Support")
         self.assertEqual(edge_payload["referenceMechanism"], "App::PropertyLinkSub")
@@ -1076,19 +955,19 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         self.assertEqual([node.kind for node in result.nodes], ["document"])
         self.assertEqual(result.edges, ())
 
-    def test_empty_schema_2_mapping_preserves_internal_output_exactly(self) -> None:
+    def test_empty_canonical_mapping_preserves_internal_output_exactly(self) -> None:
         target = _TraversalObject("Target")
         source = _TraversalObject("Source")
         source._properties = {"Link": ("App::PropertyLink", target)}
         source.PropertiesList = ["Link"]
         document = _TraversalDocument((source, target))
-        legacy = traversal.run_reference_traversal(
+        unmapped = traversal.run_reference_traversal(
             document, self._request(), **self._kwargs()
         )
         mapped = traversal.run_reference_traversal(
             document, self._mapped_request(), **self._kwargs()
         )
-        self.assertEqual(mapped, legacy)
+        self.assertEqual(mapped, unmapped)
 
     def test_mapped_resolved_external_target_uses_complete_coordinate(self) -> None:
         external = _TraversalObject(
@@ -1251,7 +1130,7 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
             result = traversal.run_reference_traversal(
                 _TraversalDocument((source,)), self._mapped_request(*request_values), **self._kwargs()
             )
-            payloads.append(build_reference_traversal_output_payload_v2(
+            payloads.append(build_reference_traversal_output_payload(
                 boundary="reference_traversal_entrypoint", operation="reference_traversal",
                 status=result.status, source_document="assembly.FCStd",
                 nodes=result.nodes, edges=result.edges,
@@ -1267,13 +1146,13 @@ class ReferenceTraversalBoundaryTests(unittest.TestCase):
         result = traversal.run_reference_traversal(
             _TraversalDocument((source,)), self._mapped_request(self._mapping()), **self._kwargs()
         )
-        payload = build_reference_traversal_output_payload_v2(
+        payload = build_reference_traversal_output_payload(
             boundary="reference_traversal_entrypoint", operation="reference_traversal",
             status=result.status, source_document="assembly.FCStd",
             nodes=result.nodes, edges=result.edges,
         )
         target = next(node for node in result.nodes if node.document_path.startswith("references/"))
-        self.assertEqual(payload["edges"][0]["target"], build_reference_traversal_node_id_v2(target))
+        self.assertEqual(payload["edges"][0]["target"], build_reference_traversal_node_id(target))
 
     def test_internal_result_preserves_exact_available_raw_evidence(self) -> None:
         target = _TraversalObject("Target", label="", type_id="")

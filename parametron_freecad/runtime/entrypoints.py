@@ -122,11 +122,6 @@ from parametron_freecad.runtime.reference_traversal_output_contract import (
 from parametron_freecad.runtime.reference_traversal_output_writer import (
     ReferenceTraversalOutputWriteError,
     write_reference_traversal_output_atomically,
-    write_reference_traversal_output_v2_atomically,
-)
-from parametron_freecad.runtime.reference_traversal_output_v2 import (
-    RawReferenceTraversalEdgeV2,
-    RawReferenceTraversalNodeV2,
 )
 from parametron_freecad.runtime.reference_traversal import (
     ReferenceTraversalExecutionError,
@@ -187,60 +182,11 @@ class _ExecutionEntrypointDependencies:
         run_reference_traversal
     )
     write_reference_traversal_output_atomically: Callable[..., None] = (
-        write_reference_traversal_output_v2_atomically
+        write_reference_traversal_output_atomically
     )
 
 
 _MANIFEST_VALIDATION_FAILURE_PREFIX = "manifest validation failed with "
-
-
-def _adapt_execution_result_to_v2(
-    result: ReferenceTraversalExecutionResult,
-) -> tuple[tuple[RawReferenceTraversalNodeV2, ...], tuple[RawReferenceTraversalEdgeV2, ...]]:
-    if all(isinstance(node, RawReferenceTraversalNodeV2) for node in result.nodes) and all(
-        isinstance(edge, RawReferenceTraversalEdgeV2) for edge in result.edges
-    ):
-        return result.nodes, result.edges  # type: ignore[return-value]
-    nodes_by_legacy_id: dict[str, RawReferenceTraversalNodeV2] = {}
-    nodes: list[RawReferenceTraversalNodeV2] = []
-    for node in result.nodes:
-        if node.document_path is None:
-            cause = ValueError("legacy node document_path is unavailable")
-            raise ReferenceTraversalExecutionError(
-                "schema-2 runtime emission requires node documentPath"
-            ) from cause
-        adapted = RawReferenceTraversalNodeV2(
-            kind=node.kind,
-            state=node.state,
-            document_path=node.document_path,
-            object_name=node.object_name,
-            object_type=None,
-            label=node.label,
-            diagnostic=node.diagnostic,
-        )
-        nodes_by_legacy_id[node.id] = adapted
-        nodes.append(adapted)
-    edges: list[RawReferenceTraversalEdgeV2] = []
-    for edge in result.edges:
-        try:
-            source = nodes_by_legacy_id[edge.source]
-            target = nodes_by_legacy_id[edge.target]
-        except KeyError as exc:
-            raise ReferenceTraversalExecutionError(
-                "schema-2 runtime emission requires edge endpoints in nodes"
-            ) from exc
-        edges.append(
-            RawReferenceTraversalEdgeV2(
-                source=source,
-                target=target,
-                kind=edge.kind,
-                state=edge.state,
-                source_property=None,
-                reference_mechanism=None,
-                diagnostic=edge.diagnostic,
-            )
-        )
-    return tuple(nodes), tuple(edges)
 
 
 def _normalize_failure_message(message: str) -> str:
@@ -564,9 +510,6 @@ def run_execution_entrypoint(
                 traversal_output_path = (
                     output_directory / REFERENCE_TRAVERSAL_OUTPUT_FILENAME
                 )
-                traversal_nodes_v2, traversal_edges_v2 = _adapt_execution_result_to_v2(
-                    traversal_result
-                )
                 _dependencies.write_reference_traversal_output_atomically(
                     working_copy,
                     traversal_output_path,
@@ -576,8 +519,8 @@ def run_execution_entrypoint(
                     operation=REFERENCE_TRAVERSAL_OPERATION_REFERENCE_TRAVERSAL,
                     status=traversal_result.status,
                     source_document=source_document,
-                    nodes=traversal_nodes_v2,
-                    edges=traversal_edges_v2,
+                    nodes=traversal_result.nodes,
+                    edges=traversal_result.edges,
                     diagnostics=traversal_result.diagnostics,
                 )
             if observation_request is not None:

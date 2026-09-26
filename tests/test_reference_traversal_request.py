@@ -35,40 +35,44 @@ class ReferenceTraversalRequestContractTests(unittest.TestCase):
 
     def test_loads_exact_closed_schema_into_immutable_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._write_bytes(tmp, b'{"schemaVersion":"1.0"}')
+            path = self._write_bytes(tmp, b'{"schemaVersion":"1.0","externalTargets":[]}')
             loaded = contract.load_reference_traversal_request(path)
 
         self.assertEqual(
             loaded,
-            contract.ReferenceTraversalRequest(schema_version="1.0"),
+            contract.ReferenceTraversalRequest(schema_version="1.0", external_targets=()),
         )
         self.assertEqual(
             tuple(field.name for field in fields(contract.ReferenceTraversalRequest)),
-            ("schema_version",),
+            ("schema_version", "external_targets"),
         )
         with self.assertRaises(FrozenInstanceError):
             loaded.schema_version = "2.0"  # type: ignore[misc]
 
-    def test_loads_exact_schema_2_empty_mapping(self) -> None:
+    def test_loads_exact_canonical_empty_mapping(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write_bytes(
-                tmp, b'{"schemaVersion":"2.0","externalTargets":[]}'
+                tmp, b'{"schemaVersion":"1.0","externalTargets":[]}'
             )
             loaded = contract.load_reference_traversal_request(path)
         self.assertEqual(
             loaded,
-            contract.ReferenceTraversalRequestV2(
-                schema_version="2.0", external_targets=()
+            contract.ReferenceTraversalRequest(
+                schema_version="1.0", external_targets=()
             ),
         )
 
-    def test_schema_1_remains_closed_against_external_targets(self) -> None:
+    def test_canonical_model_requires_explicit_external_targets(self) -> None:
+        with self.assertRaises(TypeError):
+            contract.ReferenceTraversalRequest(schema_version="1.0")
+
+    def test_canonical_request_requires_external_targets(self) -> None:
         self._assert_invalid(
-            b'{"schemaVersion":"1.0","externalTargets":[]}',
-            "unknown field(s): 'externalTargets'",
+            b'{"schemaVersion":"1.0"}',
+            "requires field 'externalTargets'",
         )
 
-    def test_schema_2_parses_exact_entry_and_canonicalizes_order(self) -> None:
+    def test_canonical_parses_exact_entry_and_canonicalizes_order(self) -> None:
         values = [
             {
                 "sourceObjectName": "B",
@@ -89,7 +93,7 @@ class ReferenceTraversalRequestContractTests(unittest.TestCase):
             path = self._write_bytes(
                 tmp,
                 json.dumps(
-                    {"schemaVersion": "2.0", "externalTargets": values}
+                    {"schemaVersion": "1.0", "externalTargets": values}
                 ).encode(),
             )
             loaded = contract.load_reference_traversal_request(path)
@@ -98,7 +102,7 @@ class ReferenceTraversalRequestContractTests(unittest.TestCase):
             ["A", "B"],
         )
 
-    def test_schema_2_entry_is_closed_and_complete(self) -> None:
+    def test_canonical_entry_is_closed_and_complete(self) -> None:
         base = {
             "sourceObjectName": "AssemblyLink",
             "sourceProperty": "LinkedParts",
@@ -116,11 +120,11 @@ class ReferenceTraversalRequestContractTests(unittest.TestCase):
         ):
             with self.subTest(mutation=mutation):
                 self._assert_invalid(
-                    json.dumps({"schemaVersion": "2.0", "externalTargets": [mutation]}).encode(),
+                    json.dumps({"schemaVersion": "1.0", "externalTargets": [mutation]}).encode(),
                     message,
                 )
 
-    def test_schema_2_rejects_duplicates_conflicts_and_cardinality(self) -> None:
+    def test_canonical_rejects_duplicates_conflicts_and_cardinality(self) -> None:
         base = {
             "sourceObjectName": "Source", "sourceProperty": "Link",
             "referenceMechanism": "App::PropertyXLink",
@@ -134,17 +138,17 @@ class ReferenceTraversalRequestContractTests(unittest.TestCase):
         for entries, message in cases:
             with self.subTest(message=message):
                 self._assert_invalid(
-                    json.dumps({"schemaVersion": "2.0", "externalTargets": entries}).encode(),
+                    json.dumps({"schemaVersion": "1.0", "externalTargets": entries}).encode(),
                     message,
                 )
 
     def test_equivalent_json_formatting_produces_equal_models(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            first = self._write_bytes(tmp, b'{"schemaVersion":"1.0"}')
+            first = self._write_bytes(tmp, b'{"schemaVersion":"1.0","externalTargets":[]}')
             loaded_first = contract.load_reference_traversal_request(first)
             second = Path(tmp) / "second.json"
             second.write_text(
-                json.dumps({"schemaVersion": "1.0"}, indent=2), encoding="utf-8"
+                json.dumps({"schemaVersion": "1.0", "externalTargets": []}, indent=2), encoding="utf-8"
             )
             loaded_second = contract.load_reference_traversal_request(second)
         self.assertEqual(loaded_first, loaded_second)
@@ -157,13 +161,13 @@ class ReferenceTraversalRequestContractTests(unittest.TestCase):
 
     def test_unknown_fields_are_rejected_with_cause(self) -> None:
         self._assert_invalid(
-            b'{"schemaVersion":"1.0","sourceDocument":"part.FCStd"}',
+            b'{"schemaVersion":"1.0","externalTargets":[],"sourceDocument":"part.FCStd"}',
             "unknown field(s): 'sourceDocument'",
         )
 
-    def test_schema_2_requires_external_targets_with_cause(self) -> None:
+    def test_missing_external_targets_is_rejected_with_cause(self) -> None:
         self._assert_invalid(
-            b'{"schemaVersion":"2.0"}', "requires field 'externalTargets'"
+            b'{"schemaVersion":"1.0"}', "requires field 'externalTargets'"
         )
 
     def test_non_string_schema_version_is_rejected_with_cause(self) -> None:
@@ -171,15 +175,21 @@ class ReferenceTraversalRequestContractTests(unittest.TestCase):
             b'{"schemaVersion":1.0}', "'schemaVersion' must equal '1.0'"
         )
 
+    def test_retired_schema_2_is_rejected_with_mappings(self) -> None:
+        self._assert_invalid(
+            b'{"schemaVersion":"2.0","externalTargets":[]}',
+            "'schemaVersion' must equal '1.0'",
+        )
+
     def test_duplicate_keys_are_rejected_with_cause(self) -> None:
         self._assert_invalid(
-            b'{"schemaVersion":"1.0","schemaVersion":"1.0"}',
+            b'{"schemaVersion":"1.0","schemaVersion":"1.0","externalTargets":[]}',
             "duplicate object key",
         )
 
     def test_non_standard_json_constants_are_rejected_with_cause(self) -> None:
         self._assert_invalid(
-            b'{"schemaVersion":NaN}', "non-standard JSON constant"
+            b'{"schemaVersion":NaN,"externalTargets":[]}', "non-standard JSON constant"
         )
 
     def test_malformed_json_is_rejected_with_cause(self) -> None:
@@ -197,7 +207,7 @@ class ReferenceTraversalRequestContractTests(unittest.TestCase):
 
     def test_loader_has_no_freecad_import_or_write_side_effect(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._write_bytes(tmp, b'{"schemaVersion":"1.0"}')
+            path = self._write_bytes(tmp, b'{"schemaVersion":"1.0","externalTargets":[]}')
             original_import = builtins.__import__
 
             def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):

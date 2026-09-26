@@ -12,8 +12,8 @@ from parametron_freecad.runtime.reference_traversal_output_contract import (
     REFERENCE_TRAVERSAL_BOUNDARY_REFERENCE_TRAVERSAL_ENTRYPOINT,
     REFERENCE_TRAVERSAL_OPERATION_REFERENCE_TRAVERSAL,
 )
-from parametron_freecad.runtime.reference_traversal_output_v2 import (
-    serialize_reference_traversal_output_v2,
+from parametron_freecad.runtime.reference_traversal_output import (
+    serialize_reference_traversal_output,
 )
 from parametron_freecad.runtime.reference_traversal_request import (
     load_reference_traversal_request,
@@ -62,7 +62,7 @@ def main() -> None:
             source_document="reference-root.FCStd",
             source_document_path=root_path,
         )
-        output_path.write_bytes(serialize_reference_traversal_output_v2(
+        output_path.write_bytes(serialize_reference_traversal_output(
             boundary=REFERENCE_TRAVERSAL_BOUNDARY_REFERENCE_TRAVERSAL_ENTRYPOINT,
             operation=REFERENCE_TRAVERSAL_OPERATION_REFERENCE_TRAVERSAL,
             status=result.status,

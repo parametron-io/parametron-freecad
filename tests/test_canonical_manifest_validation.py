@@ -1,4 +1,4 @@
-"""Closed canonical schema-1 mutation contract, independent of V2 dispatch."""
+"""Closed canonical schema-1 mutation contract, with one canonical version."""
 import copy
 
 import pytest
