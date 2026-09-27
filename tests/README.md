@@ -46,10 +46,14 @@ Optional environment-gated smoke tests use a real `freecadcmd` binary:
 - Tests skip by default when the configured binary is unusable.
 - Set `PARAMETRON_FREECAD_STRICT_SMOKE=1` to turn a skipped smoke test into a failure.
 
-The ordinary native execute rehearsal uses the public `parametron-freecad execute`
-wrapper on a temporary copy of the canonical lifecycle fixture. It then opens
-the saved `.FCStd` in a separate real-FreeCAD inspection process to check the
-persisted parameter values. Run it with `python -m pytest
+The ordinary native execute rehearsal runs the public `parametron-freecad execute`
+wrapper independently from fresh copies of the canonical lifecycle fixture in
+flat and nested arbitrary working roots, with `outputs: []`. Each saved `.FCStd`
+is reopened by a separate real-FreeCAD inspection process. The test compares
+persisted parameter values and canonical result bytes across runs, checks that
+the result contains no working-root or fixture paths, and confirms the committed
+fixture hash is unchanged. It does not compare generated `.FCStd` archive bytes.
+Run it with `python -m pytest
 tests/test_execute_real_rehearsal.py`; set `PARAMETRON_FREECAD_STRICT_SMOKE=1`
 to require the wrapper and real FreeCAD host.
 

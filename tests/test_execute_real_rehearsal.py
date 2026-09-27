@@ -54,37 +54,49 @@ def _inspect_persisted_document(host: str, document: Path, facts: Path) -> dict:
     return json.loads(facts.read_text(encoding="utf-8"))
 
 
+def _run_ordinary_native_rehearsal(wrapper: str, host: str, root: Path) -> tuple[bytes, dict]:
+    source_dir = root / "source"
+    source_dir.mkdir(parents=True)
+    working_document = source_dir / "cube.FCStd"
+    shutil.copyfile(SOURCE, working_document)
+    manifest = {
+        "schemaVersion": "1.0",
+        "sourceDocument": "source/cube.FCStd",
+        "parameterAssignments": [
+            {"target": f"VarSet.{name}", "value": value, "valueKind": "float"}
+            for name, value in VALUES.items()
+        ],
+        "outputs": [],
+    }
+    (root / "prm.export-manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+
+    _run_production_execute(wrapper, root)
+    result_bytes = (root / "prm.result.json").read_bytes()
+    result = json.loads(result_bytes)
+    assert result == {"schemaVersion": "1.0", "status": "succeeded", "artifacts": []}
+    facts = _inspect_persisted_document(
+        host, working_document, root / "native-parameter-facts.json"
+    )
+    assert facts == VALUES
+    return result_bytes, facts
+
+
 def test_public_execute_persists_ordinary_parameters(tmp_path: Path) -> None:
     wrapper = _required_executable("parametron-freecad", "production wrapper")
     host = _required_executable(
         os.environ.get("PARAMETRON_FREECAD_BIN", "freecadcmd"), "real FreeCAD host"
     )
     source_hash = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
+    roots = (tmp_path / "alpha", tmp_path / "nested" / "beta")
     try:
-        source_dir = tmp_path / "source"
-        source_dir.mkdir()
-        working_document = source_dir / "cube.FCStd"
-        shutil.copyfile(SOURCE, working_document)
-        manifest = {
-            "schemaVersion": "1.0",
-            "sourceDocument": "source/cube.FCStd",
-            "parameterAssignments": [
-                {"target": f"VarSet.{name}", "value": value, "valueKind": "float"}
-                for name, value in VALUES.items()
-            ],
-            "outputs": [],
-        }
-        (tmp_path / "prm.export-manifest.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
-
-        _run_production_execute(wrapper, tmp_path)
-        result = json.loads((tmp_path / "prm.result.json").read_text(encoding="utf-8"))
-        assert result == {"schemaVersion": "1.0", "status": "succeeded", "artifacts": []}
-
-        facts = _inspect_persisted_document(
-            host, working_document, tmp_path / "native-parameter-facts.json"
-        )
-        assert facts == VALUES
+        outcomes = [
+            _run_ordinary_native_rehearsal(wrapper, host, root) for root in roots
+        ]
+        assert outcomes[0] == outcomes[1]
+        for result_bytes, _ in outcomes:
+            for path in (SOURCE, ROOT, tmp_path, *roots):
+                assert str(path).encode("utf-8") not in result_bytes
     finally:
         assert hashlib.sha256(SOURCE.read_bytes()).hexdigest() == source_hash
