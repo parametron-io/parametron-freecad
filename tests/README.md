@@ -58,6 +58,10 @@ existing invalid `.FCStd` files and `outputs: []`. Real FreeCAD rejects each
 native open, and the canonical failed `prm.result.json` retains the
 `document_open` classification and native diagnostic. The test compares stable
 failure semantics across the two working roots.
+It also runs a schema-valid assignment to a missing native object against fresh
+copies of the valid `.FCStd` fixture in two working roots. Each execution reaches
+`parameter_assignment`, emits a failed canonical result with the target and
+missing-object diagnostic, and preserves the committed fixture bytes.
 Run it with `python -m pytest
 tests/test_execute_real_rehearsal.py`; set `PARAMETRON_FREECAD_STRICT_SMOKE=1`
 to require the wrapper and real FreeCAD host.

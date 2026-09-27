@@ -41,6 +41,21 @@ def _run_production_execute(wrapper: str, root: Path) -> subprocess.CompletedPro
     return subprocess.run(command, capture_output=True, text=True, timeout=90)
 
 
+def _load_failed_result(root: Path, completed: subprocess.CompletedProcess[str]) -> dict:
+    assert completed.returncode == 70, completed.stdout + completed.stderr
+    result_path = root / "prm.result.json"
+    assert result_path.is_file(), completed.stdout + completed.stderr
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    assert set(result) == {"schemaVersion", "status", "failure"}
+    assert result["schemaVersion"] == "1.0"
+    assert result["status"] == "failed"
+    assert set(result["failure"]) == {
+        "boundary", "category", "code", "message", "stage"
+    }
+    assert "artifacts" not in result
+    return result
+
+
 def _inspect_persisted_document(host: str, document: Path, facts: Path) -> dict:
     command = [
         host, "-P", str(ROOT), str(INSPECTOR),
@@ -120,15 +135,8 @@ def _run_invalid_native_document_rehearsal(wrapper: str, root: Path) -> tuple[st
     )
 
     completed = _run_production_execute(wrapper, root)
-    assert completed.returncode == 70, completed.stdout + completed.stderr
-    result_path = root / "prm.result.json"
-    assert result_path.is_file(), completed.stdout + completed.stderr
-    result = json.loads(result_path.read_text(encoding="utf-8"))
-    assert set(result) == {"schemaVersion", "status", "failure"}
-    assert result["schemaVersion"] == "1.0"
-    assert result["status"] == "failed"
+    result = _load_failed_result(root, completed)
     failure = result["failure"]
-    assert set(failure) == {"boundary", "category", "code", "message", "stage"}
     identity = (
         failure["boundary"], failure["category"], failure["code"], failure["stage"]
     )
@@ -140,7 +148,6 @@ def _run_invalid_native_document_rehearsal(wrapper: str, root: Path) -> tuple[st
     assert "Invalid project file" in message
     assert "Traceback" not in message
     assert message == " ".join(message.split())
-    assert "artifacts" not in result
     return (result["status"], *identity)
 
 
@@ -152,3 +159,59 @@ def test_public_execute_reports_native_document_open_failure(tmp_path: Path) -> 
     roots = (tmp_path / "invalid-first", tmp_path / "nested" / "invalid-second")
     outcomes = [_run_invalid_native_document_rehearsal(wrapper, root) for root in roots]
     assert outcomes[0] == outcomes[1]
+
+
+def _run_missing_parameter_object_rehearsal(wrapper: str, root: Path) -> tuple[str, ...]:
+    source_dir = root / "source"
+    source_dir.mkdir(parents=True)
+    working_document = source_dir / "cube.FCStd"
+    shutil.copyfile(SOURCE, working_document)
+    assert working_document.is_file()
+
+    missing_target = "MissingParameterObject.boxLength"
+    manifest = {
+        "schemaVersion": "1.0",
+        "sourceDocument": "source/cube.FCStd",
+        "parameterAssignments": [
+            {"target": missing_target, "value": 10, "valueKind": "float"}
+        ],
+        "outputs": [],
+    }
+    (root / "prm.export-manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+
+    completed = _run_production_execute(wrapper, root)
+    result = _load_failed_result(root, completed)
+    failure = result["failure"]
+    identity = (
+        failure["boundary"], failure["category"], failure["code"], failure["stage"]
+    )
+    assert identity == (
+        "execution_entrypoint", "execution", "runtime_failure", "parameter_assignment"
+    )
+    message = failure["message"]
+    assert "assignment[0]" in message
+    assert missing_target in message
+    assert "object 'MissingParameterObject' was not found" in message
+    assert "Traceback" not in message
+    assert message == " ".join(message.split())
+    return (result["status"], *identity)
+
+
+def test_public_execute_reports_native_parameter_assignment_failure(
+    tmp_path: Path,
+) -> None:
+    wrapper = _required_executable("parametron-freecad", "production wrapper")
+    _required_executable(
+        os.environ.get("PARAMETRON_FREECAD_BIN", "freecadcmd"), "real FreeCAD host"
+    )
+    source_hash = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
+    roots = (tmp_path / "assignment-first", tmp_path / "nested" / "assignment-second")
+    try:
+        outcomes = [
+            _run_missing_parameter_object_rehearsal(wrapper, root) for root in roots
+        ]
+        assert outcomes[0] == outcomes[1]
+    finally:
+        assert hashlib.sha256(SOURCE.read_bytes()).hexdigest() == source_hash
