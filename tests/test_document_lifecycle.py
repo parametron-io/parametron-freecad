@@ -374,7 +374,7 @@ class OpenFreeCADDocumentTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             path = self._make_temp_file(tmp_dir)
-            original = RuntimeError("original cause")
+            original = RuntimeError("native archive error\ninvalid header")
 
             class FailingFreeCAD:
                 def openDocument(self, p: str) -> None:
@@ -385,6 +385,33 @@ class OpenFreeCADDocumentTests(unittest.TestCase):
                 self.fail("expected DocumentOpenError")
             except DocumentOpenError as exc:
                 self.assertIs(exc.__cause__, original)
+                self.assertEqual(
+                    str(exc),
+                    f"FreeCAD failed to open document: {path}: native archive error invalid header",
+                )
+                self.assertNotIn("Traceback", str(exc))
+
+    def test_empty_native_open_diagnostic_keeps_document_context(self) -> None:
+        from parametron_freecad.runtime.document_lifecycle import (
+            DocumentOpenError,
+            open_freecad_document,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = self._make_temp_file(tmp_dir)
+            original = RuntimeError("")
+
+            class FailingFreeCAD:
+                def openDocument(self, p: str) -> None:
+                    raise original
+
+            with self.assertRaises(DocumentOpenError) as caught:
+                open_freecad_document(FailingFreeCAD(), path)
+
+            self.assertEqual(
+                str(caught.exception), f"FreeCAD failed to open document: {path}"
+            )
+            self.assertIs(caught.exception.__cause__, original)
 
     def test_document_without_name_attribute_raises_document_open_error(self) -> None:
         from parametron_freecad.runtime.document_lifecycle import (
