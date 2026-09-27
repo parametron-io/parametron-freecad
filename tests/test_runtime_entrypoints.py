@@ -1000,6 +1000,62 @@ class RuntimeExecutionEntrypointTests(unittest.TestCase):
             self.assertEqual(str(ctx.exception), "original assignment boom")
             self.assertFalse(result_path.exists())
 
+    def test_native_document_open_diagnostic_reaches_structured_result(self) -> None:
+        from parametron_freecad.runtime import entrypoints
+        from parametron_freecad.runtime.document_lifecycle import DocumentOpenError
+
+        with tempfile.TemporaryDirectory() as tmp:
+            working = Path(tmp)
+            source = working / "invalid.FCStd"
+            source.write_bytes(b"invalid native document")
+            manifest = working / "prm.export-manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": "1.0",
+                        "sourceDocument": source.name,
+                        "parameterAssignments": [],
+                        "outputs": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = working / "prm.result.json"
+            native_error = RuntimeError("invalid archive header\nfrom FreeCAD")
+
+            class FailingFreeCAD:
+                def openDocument(self, path: str) -> None:
+                    assert Path(path) == source
+                    raise native_error
+
+            with self.assertRaises(entrypoints.ExecutionEntrypointError) as caught:
+                entrypoints.run_execution_entrypoint(
+                    working_copy=working,
+                    manifest_path=manifest,
+                    result_path=result,
+                    freecad_module=FailingFreeCAD(),
+                )
+
+            self.assertIsInstance(caught.exception.__cause__, DocumentOpenError)
+            self.assertIs(caught.exception.__cause__.__cause__, native_error)
+            payload = json.loads(result.read_text(encoding="utf-8"))
+            self.assertEqual(set(payload), {"schemaVersion", "status", "failure"})
+            self.assertEqual(payload["schemaVersion"], "1.0")
+            self.assertEqual(payload["status"], "failed")
+            self.assertEqual(
+                payload["failure"],
+                {
+                    "boundary": "execution_entrypoint",
+                    "category": "execution",
+                    "code": "runtime_failure",
+                    "message": (
+                        f"FreeCAD failed to open document: {source}: "
+                        "invalid archive header from FreeCAD"
+                    ),
+                    "stage": "document_open",
+                },
+            )
+
 
 class HeadlessExecuteAdapterEntrypointTests(unittest.TestCase):
     def _make_execute_paths(self, tmp_dir: str) -> tuple[Path, Path, Path]:

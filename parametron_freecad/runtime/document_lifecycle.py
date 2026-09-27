@@ -75,9 +75,11 @@ def open_freecad_document(freecad_module: Any, path: Path) -> OpenedDocument:
     try:
         document = open_document(str(resolved_path))
     except Exception as exc:
-        raise DocumentOpenError(
-            f"FreeCAD failed to open document: {resolved_path}"
-        ) from exc
+        native_diagnostic = " ".join(str(exc).split())
+        message = f"FreeCAD failed to open document: {resolved_path}"
+        if native_diagnostic:
+            message = f"{message}: {native_diagnostic}"
+        raise DocumentOpenError(message) from exc
 
     document_name = getattr(document, "Name", None)
     if not isinstance(document_name, str) or document_name == "":
