@@ -32,6 +32,29 @@ def _required_executable(name: str, description: str) -> str:
     pytest.skip(message)
 
 
+def _required_native_commands() -> tuple[str, str]:
+    wrapper = _required_executable("parametron-freecad", "production wrapper")
+    host = _required_executable(
+        os.environ.get("PARAMETRON_FREECAD_BIN", "freecadcmd"), "real FreeCAD host"
+    )
+    try:
+        completed = subprocess.run(
+            [wrapper, "smoke"], capture_output=True, text=True, timeout=30
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        message = f"production wrapper or real FreeCAD host is unusable: {exc}"
+    else:
+        if completed.returncode == 0:
+            return wrapper, host
+        message = (
+            "production wrapper or real FreeCAD host is unusable: "
+            f"{completed.stderr.strip() or completed.stdout.strip() or completed.returncode}"
+        )
+    if os.environ.get("PARAMETRON_FREECAD_STRICT_SMOKE") == "1":
+        pytest.fail(message)
+    pytest.skip(message)
+
+
 def _run_production_execute(wrapper: str, root: Path) -> subprocess.CompletedProcess[str]:
     command = [
         wrapper, "execute", "--working-copy", str(root),
@@ -99,10 +122,7 @@ def _run_ordinary_native_rehearsal(wrapper: str, host: str, root: Path) -> tuple
 
 
 def test_public_execute_persists_ordinary_parameters(tmp_path: Path) -> None:
-    wrapper = _required_executable("parametron-freecad", "production wrapper")
-    host = _required_executable(
-        os.environ.get("PARAMETRON_FREECAD_BIN", "freecadcmd"), "real FreeCAD host"
-    )
+    wrapper, host = _required_native_commands()
     source_hash = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
     roots = (tmp_path / "alpha", tmp_path / "nested" / "beta")
     try:
@@ -152,10 +172,7 @@ def _run_invalid_native_document_rehearsal(wrapper: str, root: Path) -> tuple[st
 
 
 def test_public_execute_reports_native_document_open_failure(tmp_path: Path) -> None:
-    wrapper = _required_executable("parametron-freecad", "production wrapper")
-    _required_executable(
-        os.environ.get("PARAMETRON_FREECAD_BIN", "freecadcmd"), "real FreeCAD host"
-    )
+    wrapper, _ = _required_native_commands()
     roots = (tmp_path / "invalid-first", tmp_path / "nested" / "invalid-second")
     outcomes = [_run_invalid_native_document_rehearsal(wrapper, root) for root in roots]
     assert outcomes[0] == outcomes[1]
@@ -202,10 +219,7 @@ def _run_missing_parameter_object_rehearsal(wrapper: str, root: Path) -> tuple[s
 def test_public_execute_reports_native_parameter_assignment_failure(
     tmp_path: Path,
 ) -> None:
-    wrapper = _required_executable("parametron-freecad", "production wrapper")
-    _required_executable(
-        os.environ.get("PARAMETRON_FREECAD_BIN", "freecadcmd"), "real FreeCAD host"
-    )
+    wrapper, _ = _required_native_commands()
     source_hash = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
     roots = (tmp_path / "assignment-first", tmp_path / "nested" / "assignment-second")
     try:

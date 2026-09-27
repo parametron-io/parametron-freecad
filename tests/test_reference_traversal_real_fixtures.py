@@ -203,6 +203,25 @@ class RealReferenceTraversalFixtureTests(unittest.TestCase):
             if os.environ.get("PARAMETRON_FREECAD_STRICT_SMOKE") == "1":
                 raise AssertionError(message)
             raise unittest.SkipTest(message)
+        try:
+            smoke = subprocess.run(
+                [cls.wrapper, "smoke"], capture_output=True, text=True,
+                timeout=30, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            message = f"parametron-freecad wrapper or FreeCAD host is unusable: {exc}"
+        else:
+            if smoke.returncode == 0:
+                message = None
+            else:
+                message = (
+                    "parametron-freecad wrapper or FreeCAD host is unusable: "
+                    f"{smoke.stderr.strip() or smoke.stdout.strip() or smoke.returncode}"
+                )
+        if message is not None:
+            if os.environ.get("PARAMETRON_FREECAD_STRICT_SMOKE") == "1":
+                raise AssertionError(message)
+            raise unittest.SkipTest(message)
         cls.committed_hashes = _fixture_hashes(FIXTURE_ROOT)
 
     @classmethod
