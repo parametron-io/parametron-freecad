@@ -29,8 +29,10 @@ real reference-traversal fixture unit; `reference-root.FCStd` depends on its
 bundle to an arbitrary temporary location and use FreeCAD directly to verify
 the persisted internal and external links without a traversal request or
 `externalTargets` mappings. They run in the normal Nix suite when the repository
-FreeCAD wrapper and `freecadcmd` are available. Maintain a semantic replacement
-bundle in a new directory with:
+FreeCAD wrapper and `freecadcmd` are available. The same suite runs fresh bundle
+copies through public `parametron-freecad execute` in independent flat and nested
+working roots and compares the emitted canonical traversal bytes with frozen
+evidence across runs. Maintain a semantic replacement bundle in a new directory with:
 
 ```
 nix develop --command freecadcmd scripts/generate_reference_traversal_fixtures.py --pass=/absolute/new/output-directory
