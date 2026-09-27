@@ -53,6 +53,11 @@ is reopened by a separate real-FreeCAD inspection process. The test compares
 persisted parameter values and canonical result bytes across runs, checks that
 the result contains no working-root or fixture paths, and confirms the committed
 fixture hash is unchanged. It does not compare generated `.FCStd` archive bytes.
+The same rehearsal also invokes the public wrapper twice with independent,
+existing invalid `.FCStd` files and `outputs: []`. Real FreeCAD rejects each
+native open, and the canonical failed `prm.result.json` retains the
+`document_open` classification and native diagnostic. The test compares stable
+failure semantics across the two working roots.
 Run it with `python -m pytest
 tests/test_execute_real_rehearsal.py`; set `PARAMETRON_FREECAD_STRICT_SMOKE=1`
 to require the wrapper and real FreeCAD host.
