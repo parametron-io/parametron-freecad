@@ -42,11 +42,20 @@ Generated `.FCStd` archive bytes need not match; the real fixture tests compare
 their semantic traversal output. Tracked fixtures must remain byte-for-byte
 unchanged during tests.
 
-Optional environment-gated smoke tests use a real `freecadcmd` binary:
+Environment-gated real-FreeCAD rehearsals require a usable public
+`parametron-freecad` wrapper and native host. They do not fall back to direct
+Python entrypoint execution when the wrapper is unavailable:
 
-- Set `PARAMETRON_FREECAD_BIN` to the path of a `freecadcmd` wrapper.
-- Tests skip by default when the configured binary is unusable.
-- Set `PARAMETRON_FREECAD_STRICT_SMOKE=1` to turn a skipped smoke test into a failure.
+- `PARAMETRON_FREECAD_BIN` selects the native host; when unset, the launcher and
+  rehearsals use `freecadcmd` from `PATH`.
+- In normal development mode, a missing or unusable wrapper or host skips the
+  native rehearsal. A skip supplies no evidence that native behavior passed.
+- `PARAMETRON_FREECAD_STRICT_SMOKE=1` requires usable native prerequisites;
+  their absence or failure makes validation unsuccessful rather than skipped.
+
+The Nix development environment supplies the intended wrapper and host for
+strict native validation. The ordinary Python and fake-FreeCAD tests do not
+require real FreeCAD.
 
 The ordinary native execute rehearsal runs the public `parametron-freecad execute`
 wrapper independently from fresh copies of the canonical lifecycle fixture in
@@ -54,7 +63,10 @@ flat and nested arbitrary working roots, with `outputs: []`. Each saved `.FCStd`
 is reopened by a separate real-FreeCAD inspection process. The test compares
 persisted parameter values and canonical result bytes across runs, checks that
 the result contains no working-root or fixture paths, and confirms the committed
-fixture hash is unchanged. It does not compare generated `.FCStd` archive bytes.
+fixture hash is unchanged. This is native working-document persistence, not a
+derived-output rehearsal; successful results contain `artifacts: []`. It does
+not compare generated `.FCStd` archive bytes.
+
 The same rehearsal also invokes the public wrapper twice with independent,
 existing invalid `.FCStd` files and `outputs: []`. Real FreeCAD rejects each
 native open, and the canonical failed `prm.result.json` retains the
@@ -64,6 +76,10 @@ It also runs a schema-valid assignment to a missing native object against fresh
 copies of the valid `.FCStd` fixture in two working roots. Each execution reaches
 `parameter_assignment`, emits a failed canonical result with the target and
 missing-object diagnostic, and preserves the committed fixture bytes.
+These are representative native failures. Other controlled-failure stages have
+separate lower-layer coverage; this rehearsal does not establish exhaustive
+real-native failure conformance.
+
 Run it with `python -m pytest
 tests/test_execute_real_rehearsal.py`; set `PARAMETRON_FREECAD_STRICT_SMOKE=1`
 to require the wrapper and real FreeCAD host.
