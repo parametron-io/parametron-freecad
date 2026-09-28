@@ -2,7 +2,7 @@
 
 Input provenance (all three engine_generated JSON files):
 Engine e261458a34014caff64802bf2467e07a0532f906; source is the committed
-fixtures/canonical_lifecycle/parametron.project.json and cube.project.dsl.
+fixtures/canonical_lifecycle/prm.project.json and cube.project.dsl.
 Source cube.FCStd SHA-256:
 9376277c131ac3f361f05412b3a6b455f8574eabf99f1e02d1fa75d3fca82250
 Generated SHA-256 (copied bytes were compared with the materialized files):
@@ -54,7 +54,7 @@ def test_engine_inputs_load_directly():
     source_hash = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
     assert request['expected']['metadata'] == [
         {'key': 'working_copy_sha256', 'value': source_hash}]
-    capture = json.loads((SOURCE.parent.parent / 'parametron.cad.json').read_text())
+    capture = json.loads((SOURCE.parent.parent / 'prm.cad.json').read_text())
     assert capture['sourceDocument']['fingerprint'] == 'sha256:' + source_hash
     load_reference_traversal_request(CORPUS / 'prm.reference-traversal-request.json')
     assert sorted(p.name for p in CORPUS.iterdir()) == [
