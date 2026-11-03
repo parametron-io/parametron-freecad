@@ -24,7 +24,7 @@ import Part
 import Sketcher  # noqa: F401 - registers Sketcher::SketchObject with FreeCAD
 
 
-EXPECTED_FREECAD_VERSION = ("1", "1", "1")
+EXPECTED_FREECAD_VERSION = ("1", "1", "4")
 PASS_PREFIX = "--pass="
 DOCUMENT_NAME = "PartDesignMutations"
 DOCUMENT_LABEL = "partdesign-mutations"
@@ -60,7 +60,9 @@ def _require_environment() -> None:
         raise RuntimeError("fixture generation must run inside nix develop")
     if tuple(App.Version()[:3]) != EXPECTED_FREECAD_VERSION:
         raise RuntimeError(
-            "fixture generation requires FreeCAD 1.1.1; observed "
+            "fixture generation requires FreeCAD "
+            + ".".join(EXPECTED_FREECAD_VERSION)
+            + "; observed "
             + ".".join(App.Version()[:3])
         )
 
