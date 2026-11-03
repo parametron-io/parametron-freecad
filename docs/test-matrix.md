@@ -4,9 +4,9 @@ This matrix records current validation coverage for `parametron-freecad`.
 It distinguishes contract/helper, fake-FreeCAD, and real-FreeCAD coverage,
 including rejection of unsupported requests. It does not create new requirements.
 Recorded counts in older sections are historical and must not be summed.
-The current canonical schema-1 consolidation passed 3,714 full-suite tests
+The current canonical schema-1 consolidation passed 3,723 full-suite tests
 and 1,675 subtests in the Nix environment. Strict native fixture checks
-passed on FreeCAD 1.1.1; compileall and the project smoke command passed.
+passed on FreeCAD 1.1.4; compileall and the project smoke command passed.
 
 ## Command Rules
 
@@ -221,7 +221,7 @@ uses the rich `reference_traversal_output` serializer and one atomic writer.
 | Traversal request absence compatibility | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_runtime_invocation.py`, `tests/test_headless_cli_arguments.py`, `tests/test_step_export.py`, `tests/test_csv_export.py`, `tests/test_pdf_export.py` | Explicit regression proof preserves manifest load/validation, source resolution, document lifecycle, assignment, recompute, all export families, observation, success results, and exact Engine invocation fields/delegation when traversal is absent. |
 | Traversal request execution wiring and emission | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_headless_cli_arguments.py`, `tests/test_reference_traversal_output_writer.py` | Traversal runs after recompute and all STEP/CSV/PDF exports and before observation; `succeeded`/`partial` are atomically emitted to the canonical filename beneath the existing output directory, then continue; the exact working copy is the sole containment root; runtime/writer create no directories; failed traversal and controlled containment/write errors skip observation while completed exports remain. Stable `runtime_failure` stages cover traversal and output containment/write failures; malformed-request raw output is covered separately. |
 | Typed reference traversal callable boundary / discovery | Covered | `tests/test_reference_traversal.py` | Exact public signature; immutable four-field result; exact status vocabulary; representable partial/failed evidence; raw tuple type enforcement; chained public error; source-root and participating-object discovery; supported internal and Engine-mapped external relationships; unsupported-value-shape partial diagnostics; and FreeCAD-independent import. Serialization, writing, containment, Engine normalization, and durable storage behavior remain outside the callable. |
-| Reference traversal fixtures | Covered | `tests/test_reference_traversal_real_fixtures.py`, `scripts/generate_reference_traversal_fixtures.py`, `tests/fixtures/reference_traversal/` | One root and two referenced documents cover internal, external, shared-target, and mapped missing evidence. The Nix/FreeCAD 1.1.1 maintenance generator guarantees semantic reproducibility; the small binary bundle is stored directly in Git without LFS. |
+| Reference traversal fixtures | Covered | `tests/test_reference_traversal_real_fixtures.py`, `scripts/generate_reference_traversal_fixtures.py`, `tests/fixtures/reference_traversal/` | One root and two referenced documents cover internal, external, shared-target, and mapped missing evidence. The Nix/FreeCAD 1.1.4 maintenance generator guarantees semantic reproducibility; the small binary bundle is stored directly in Git without LFS. |
 | Reference traversal ordering/deduplication/cycle guards | Covered | `tests/test_reference_traversal_output_contract.py`, `tests/test_reference_traversal.py`, `tests/test_reference_traversal_output.py`, `tests/test_runtime_entrypoints.py` | Typed canonical results collapse equal resolved/missing/unresolved nodes and edges by complete identity before deterministic ordering/sequencing, at the same aligned canonicalization boundary for both; distinct identity components, shared targets, multiple outgoing edges, byte stability, permutation independence, and controlled conflict chaining (including node-only conflicts and no partial committed output) are covered. |
 | Reference traversal writer repeated-run byte equality | Covered | `tests/test_reference_traversal_output_writer.py` | Repeated atomic writes and reordered inputs are byte-identical through the canonical rich serializer. Real traversal repeatability is covered by the native fixture tests. |
 | Reference traversal runtime-emitted file | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_reference_traversal_real_fixtures.py` | Atomic writer integration proves the exact canonical destination and trailing newline. Production-entrypoint traversal of relocated real fixtures is byte-identical across repeated, arbitrary-basename, and nested working roots, with no absolute-path leakage or fixture mutation. |
@@ -1124,7 +1124,7 @@ Coverage:
 - zero-derived-output execution (`outputs: []`) persists native document and produces `artifacts: []`
 - save failure emits structured failed `prm.result.json` at stage `document_save` and short-circuits downstream stages
 - observation uses the live persisted post-mutation document
-- real FreeCAD 1.1.1 persistence round-trip: creates fixture, applies `Probe.Value = 42`, saves via runtime entrypoint, closes, reopens in real FreeCAD, and verifies `Probe.Value == 42`
+- real FreeCAD 1.1.4 persistence round-trip: creates fixture, applies `Probe.Value = 42`, saves via runtime entrypoint, closes, reopens in real FreeCAD, and verifies `Probe.Value == 42`
 
 ### Verification-boundary tests that remain applicable
 
