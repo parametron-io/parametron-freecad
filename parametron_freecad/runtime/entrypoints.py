@@ -17,18 +17,6 @@ from parametron_freecad.execution.deletion import (
     DeletionValidityError,
     apply_deletion_mutations,
 )
-from parametron_freecad.execution.suppression import (
-    SuppressionMutationError,
-    apply_suppression_mutations,
-)
-from parametron_freecad.execution.visibility import (
-    VisibilityMutationError,
-    apply_visibility_mutations,
-)
-from parametron_freecad.execution.post_mutation_validity import (
-    PostMutationValidityError,
-    inspect_document_post_mutation_validity,
-)
 from parametron_freecad.execution.document_recompute import (
     DocumentRecomputeError,
     recompute_document,
@@ -57,6 +45,10 @@ from parametron_freecad.execution.pdf_export import (
     PdfArtifactExportError,
     export_pdf_artifacts,
 )
+from parametron_freecad.execution.post_mutation_validity import (
+    PostMutationValidityError,
+    inspect_document_post_mutation_validity,
+)
 from parametron_freecad.execution.result_writer import (
     ResultWriteError,
     write_success_result,
@@ -64,6 +56,14 @@ from parametron_freecad.execution.result_writer import (
 from parametron_freecad.execution.step_export import (
     StepArtifactExportError,
     export_step_artifacts,
+)
+from parametron_freecad.execution.suppression import (
+    SuppressionMutationError,
+    apply_suppression_mutations,
+)
+from parametron_freecad.execution.visibility import (
+    VisibilityMutationError,
+    apply_visibility_mutations,
 )
 from parametron_freecad.observation.observed_output import (
     ObservedOutputError,
@@ -84,29 +84,31 @@ from parametron_freecad.runtime.failure_output_contract import (
     FAILURE_CODE_FREECAD_UNAVAILABLE,
     FAILURE_CODE_RUNTIME_FAILURE,
     FAILURE_STAGE_ARTIFACT_EXPORT,
+    FAILURE_STAGE_DELETION,
+    FAILURE_STAGE_DOCUMENT_CLOSE,
     FAILURE_STAGE_DOCUMENT_OPEN,
     FAILURE_STAGE_DOCUMENT_SAVE,
     FAILURE_STAGE_FREECAD_RESOLUTION,
-    FAILURE_STAGE_DOCUMENT_CLOSE,
-    FAILURE_STAGE_SUPPRESSION,
-    FAILURE_STAGE_VISIBILITY,
-    FAILURE_STAGE_DELETION,
-    FAILURE_STAGE_POST_MUTATION_VALIDITY,
+    FAILURE_STAGE_INTEGRITY_BASELINE,
+    FAILURE_STAGE_INTEGRITY_EVIDENCE,
+    FAILURE_STAGE_INTEGRITY_RESULT,
     FAILURE_STAGE_MANIFEST_LOADING,
     FAILURE_STAGE_MANIFEST_VALIDATION,
     FAILURE_STAGE_OBSERVATION,
+    FAILURE_STAGE_OCCURRENCE_EVIDENCE,
+    FAILURE_STAGE_OCCURRENCE_REQUEST,
     FAILURE_STAGE_PARAMETER_ASSIGNMENT,
+    FAILURE_STAGE_POST_MUTATION_VALIDITY,
     FAILURE_STAGE_RECOMPUTE,
     FAILURE_STAGE_REFERENCE_TRAVERSAL,
     FAILURE_STAGE_REFERENCE_TRAVERSAL_OUTPUT_CONTAINMENT,
     FAILURE_STAGE_REFERENCE_TRAVERSAL_OUTPUT_WRITE,
     FAILURE_STAGE_RESOURCE_INVENTORY,
-    FAILURE_STAGE_INTEGRITY_BASELINE,
-    FAILURE_STAGE_INTEGRITY_RESULT,
-    FAILURE_STAGE_INTEGRITY_EVIDENCE,
     FAILURE_STAGE_RESULT_WRITE,
     FAILURE_STAGE_SOURCE_DOCUMENT_RESOLUTION,
+    FAILURE_STAGE_SUPPRESSION,
     FAILURE_STAGE_UNKNOWN,
+    FAILURE_STAGE_VISIBILITY,
     StructuredFailure,
 )
 from parametron_freecad.runtime.failure_result_writer import write_failure_result
@@ -123,6 +125,29 @@ from parametron_freecad.runtime.observation_request import (
     ObservationRequestError,
     load_observation_request,
 )
+from parametron_freecad.runtime.occurrence_access import (
+    OccurrenceNativeAccessError,
+)
+from parametron_freecad.runtime.occurrence_evidence import (
+    OccurrenceObservationError,
+    inspect_occurrence_evidence,
+    prepare_occurrence_evidence,
+    require_occurrence_parent_source,
+    resolve_freecad_version,
+    resolver_from_inventory,
+    resolver_from_selected_source,
+    write_occurrence_evidence,
+)
+from parametron_freecad.runtime.occurrence_request import (
+    OccurrenceRequestError,
+    discover_occurrence_request,
+    load_occurrence_request,
+)
+from parametron_freecad.runtime.reference_traversal import (
+    ReferenceTraversalExecutionError,
+    ReferenceTraversalExecutionResult,
+    run_reference_traversal,
+)
 from parametron_freecad.runtime.reference_traversal_output_contract import (
     REFERENCE_TRAVERSAL_BOUNDARY_REFERENCE_TRAVERSAL_ENTRYPOINT,
     REFERENCE_TRAVERSAL_DIAGNOSTIC_CODE_MALFORMED_REQUEST,
@@ -135,11 +160,6 @@ from parametron_freecad.runtime.reference_traversal_output_contract import (
 from parametron_freecad.runtime.reference_traversal_output_writer import (
     ReferenceTraversalOutputWriteError,
     write_reference_traversal_output_atomically,
-)
-from parametron_freecad.runtime.reference_traversal import (
-    ReferenceTraversalExecutionError,
-    ReferenceTraversalExecutionResult,
-    run_reference_traversal,
 )
 from parametron_freecad.runtime.reference_traversal_request import (
     REFERENCE_TRAVERSAL_OUTPUT_FILENAME,
@@ -177,8 +197,12 @@ class ValidatedExecutionManifest:
 
 @dataclass(frozen=True, slots=True)
 class _ExecutionEntrypointDependencies:
-    apply_parameter_assignments: Callable[[Any, Any], None] = apply_parameter_assignments
-    apply_suppression_mutations: Callable[[Any, Any], None] = apply_suppression_mutations
+    apply_parameter_assignments: Callable[[Any, Any], None] = (
+        apply_parameter_assignments
+    )
+    apply_suppression_mutations: Callable[[Any, Any], None] = (
+        apply_suppression_mutations
+    )
     apply_visibility_mutations: Callable[[Any, Any], None] = apply_visibility_mutations
     apply_deletion_mutations: Callable[[Any, Any], None] = apply_deletion_mutations
     inspect_document_post_mutation_validity: Callable[[Any], Any] = (
@@ -233,6 +257,10 @@ def _failure_stage_for_exception(exc: BaseException) -> str:
         return FAILURE_STAGE_INTEGRITY_EVIDENCE
     if isinstance(source, IntegrityObservationError):
         return FAILURE_STAGE_INTEGRITY_EVIDENCE
+    if isinstance(source, OccurrenceRequestError):
+        return FAILURE_STAGE_OCCURRENCE_REQUEST
+    if isinstance(source, (OccurrenceObservationError, OccurrenceNativeAccessError)):
+        return FAILURE_STAGE_OCCURRENCE_EVIDENCE
     if isinstance(source, DocumentCloseError):
         return FAILURE_STAGE_DOCUMENT_CLOSE
     if isinstance(source, DocumentLifecycleError):
@@ -428,6 +456,9 @@ def run_execution_entrypoint(
             working_copy=working_copy,
             manifest_path=manifest_path,
         )
+        source_document = validated_manifest.loaded_manifest.data[
+            EXPORT_MANIFEST_V1_CONTRACT.source_document_field
+        ]
         reference_traversal_request: ReferenceTraversalRequest | None = None
         if reference_traversal_request_path is not None:
             if output_directory is None:
@@ -439,9 +470,6 @@ def run_execution_entrypoint(
                     reference_traversal_request_path
                 )
             except ReferenceTraversalRequestError as exc:
-                source_document = validated_manifest.loaded_manifest.data[
-                    EXPORT_MANIFEST_V1_CONTRACT.source_document_field
-                ]
                 diagnostic_source = exc.__cause__ if exc.__cause__ is not None else exc
                 _dependencies.write_reference_traversal_output_atomically(
                     working_copy,
@@ -456,9 +484,7 @@ def run_execution_entrypoint(
                     edges=(),
                     diagnostics=(
                         RawReferenceTraversalDiagnostic(
-                            severity=(
-                                REFERENCE_TRAVERSAL_DIAGNOSTIC_SEVERITY_ERROR
-                            ),
+                            severity=(REFERENCE_TRAVERSAL_DIAGNOSTIC_SEVERITY_ERROR),
                             code=REFERENCE_TRAVERSAL_DIAGNOSTIC_CODE_MALFORMED_REQUEST,
                             message=_normalize_failure_message(str(diagnostic_source)),
                             stage=REFERENCE_TRAVERSAL_STAGE_REQUEST_VALIDATION,
@@ -485,6 +511,7 @@ def run_execution_entrypoint(
                 ) from exc
 
         integrity_observation = None
+        inventory = None
         if integrity_request_path is not None:
             inventory = load_resource_inventory(
                 integrity_request_path,
@@ -496,6 +523,32 @@ def run_execution_entrypoint(
                 working_copy=working_copy,
                 output_directory=output_directory,
             )
+
+        occurrence_request = None
+        occurrence_resolver = None
+        occurrence_request_path = discover_occurrence_request(working_copy)
+        if occurrence_request_path is not None:
+            prepare_occurrence_evidence(
+                working_copy=working_copy,
+                output_directory=output_directory,
+            )
+            occurrence_request = load_occurrence_request(occurrence_request_path)
+            if inventory is not None:
+                require_occurrence_parent_source(
+                    occurrence_request,
+                    inventory,
+                    source_document=source_document,
+                )
+                occurrence_resolver = resolver_from_inventory(
+                    inventory,
+                    project_id=(occurrence_request.scope.parent.resource.project_id),
+                )
+            else:
+                occurrence_resolver = resolver_from_selected_source(
+                    parent_resource=occurrence_request.scope.parent.resource,
+                    source_document=source_document,
+                    source_path=validated_manifest.source_document_path,
+                )
 
         resolved_freecad_module = freecad_module
         if resolved_freecad_module is None and resolve_freecad_module is not None:
@@ -509,6 +562,7 @@ def run_execution_entrypoint(
         outputs = validated_manifest.loaded_manifest.data[
             EXPORT_MANIFEST_V1_CONTRACT.outputs_field
         ]
+        occurrence_observation = None
         with _dependencies.opened_freecad_document(
             resolved_freecad_module,
             validated_manifest.source_document_path,
@@ -523,6 +577,18 @@ def run_execution_entrypoint(
                     integrity_observation,
                     document=opened.document,
                     opened_path=opened.path,
+                )
+            if occurrence_request is not None:
+                if occurrence_resolver is None:
+                    raise OccurrenceObservationError(
+                        "occurrence resource resolver is unavailable"
+                    )
+                occurrence_observation = inspect_occurrence_evidence(
+                    opened.document,
+                    occurrence_request,
+                    source_document=source_document,
+                    resolver=occurrence_resolver,
+                    freecad_version=resolve_freecad_version(resolved_freecad_module),
                 )
             _dependencies.export_step_artifacts(
                 opened.document,
@@ -540,9 +606,6 @@ def run_execution_entrypoint(
                 working_copy=working_copy,
             )
             if reference_traversal_request is not None:
-                source_document = validated_manifest.loaded_manifest.data[
-                    EXPORT_MANIFEST_V1_CONTRACT.source_document_field
-                ]
                 traversal_result = _dependencies.run_reference_traversal(
                     opened.document,
                     reference_traversal_request,
@@ -581,6 +644,12 @@ def run_execution_entrypoint(
                     working_copy_sha256=source_document_sha256,
                     output_directory=output_directory,
                 )
+        if occurrence_observation is not None:
+            write_occurrence_evidence(
+                occurrence_observation,
+                working_copy=working_copy,
+                output_directory=output_directory,
+            )
         if integrity_observation is not None:
             write_integrity_evidence(
                 integrity_observation,
@@ -609,6 +678,9 @@ def run_execution_entrypoint(
         ReferenceTraversalOutputWriteError,
         ResourceInventoryError,
         IntegrityObservationError,
+        OccurrenceRequestError,
+        OccurrenceObservationError,
+        OccurrenceNativeAccessError,
     ) as exc:
         _try_emit_failure_result(result_path, exc)
         if isinstance(exc, ExecutionEntrypointError):

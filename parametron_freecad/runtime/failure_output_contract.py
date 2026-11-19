@@ -38,6 +38,8 @@ FAILURE_STAGE_RESOURCE_INVENTORY = "resource_inventory"
 FAILURE_STAGE_INTEGRITY_BASELINE = "integrity_baseline"
 FAILURE_STAGE_INTEGRITY_RESULT = "integrity_result"
 FAILURE_STAGE_INTEGRITY_EVIDENCE = "integrity_evidence"
+FAILURE_STAGE_OCCURRENCE_REQUEST = "occurrence_request"
+FAILURE_STAGE_OCCURRENCE_EVIDENCE = "occurrence_evidence"
 FAILURE_STAGE_DOCUMENT_OPEN = "document_open"
 FAILURE_STAGE_DOCUMENT_CLOSE = "document_close"
 FAILURE_STAGE_PARAMETER_ASSIGNMENT = "parameter_assignment"
@@ -87,7 +89,9 @@ def _require_optional_stage(value: object) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str) or not value:
-        raise FailureOutputContractError("stage must be a non-empty string when provided")
+        raise FailureOutputContractError(
+            "stage must be a non-empty string when provided"
+        )
     return value
 
 
@@ -163,6 +167,8 @@ __all__ = [
     "FAILURE_STAGE_INTEGRITY_BASELINE",
     "FAILURE_STAGE_INTEGRITY_RESULT",
     "FAILURE_STAGE_INTEGRITY_EVIDENCE",
+    "FAILURE_STAGE_OCCURRENCE_REQUEST",
+    "FAILURE_STAGE_OCCURRENCE_EVIDENCE",
     "FAILURE_STAGE_UNKNOWN",
     "FailureOutputContractError",
     "StructuredFailure",
