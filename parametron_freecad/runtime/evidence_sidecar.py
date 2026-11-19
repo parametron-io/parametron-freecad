@@ -76,6 +76,48 @@ def resolve_evidence_sidecar_path(
     return target
 
 
+def remove_evidence_sidecar(
+    *,
+    working_copy: str | Path,
+    output_directory: str | Path,
+    filename: str,
+) -> None:
+    """Remove one confined stale evidence sidecar without following symlinks."""
+    resolve_evidence_sidecar_path(
+        working_copy=working_copy,
+        output_directory=output_directory,
+        filename=filename,
+    )
+
+    try:
+        resolved_working_copy = require_existing_directory(working_copy)
+        resolved_output_directory = require_existing_directory(
+            output_directory,
+            base=resolved_working_copy,
+        )
+    except ValueError as exc:
+        raise EvidenceSidecarContainmentError(
+            "evidence sidecar location is not usable"
+        ) from exc
+
+    lexical_target = resolved_output_directory / _validated_filename(filename)
+    if lexical_target.is_symlink():
+        raise EvidenceSidecarContainmentError(
+            "evidence sidecar path must not be a symbolic link"
+        )
+    if lexical_target.is_dir():
+        raise EvidenceSidecarContainmentError(
+            "evidence sidecar path must not be an existing directory"
+        )
+
+    try:
+        lexical_target.unlink(missing_ok=True)
+    except OSError as exc:
+        raise EvidenceSidecarWriteError(
+            f"failed to remove evidence sidecar {filename!r}"
+        ) from exc
+
+
 def write_canonical_json_sidecar_atomically(
     *,
     working_copy: str | Path,
@@ -151,6 +193,7 @@ __all__ = [
     "EvidenceSidecarContainmentError",
     "EvidenceSidecarError",
     "EvidenceSidecarWriteError",
+    "remove_evidence_sidecar",
     "resolve_evidence_sidecar_path",
     "write_canonical_json_sidecar_atomically",
 ]
