@@ -101,12 +101,24 @@ from parametron_freecad.runtime.failure_output_contract import (
     FAILURE_STAGE_REFERENCE_TRAVERSAL_OUTPUT_CONTAINMENT,
     FAILURE_STAGE_REFERENCE_TRAVERSAL_OUTPUT_WRITE,
     FAILURE_STAGE_RESOURCE_INVENTORY,
+    FAILURE_STAGE_INTEGRITY_BASELINE,
+    FAILURE_STAGE_INTEGRITY_RESULT,
+    FAILURE_STAGE_INTEGRITY_EVIDENCE,
     FAILURE_STAGE_RESULT_WRITE,
     FAILURE_STAGE_SOURCE_DOCUMENT_RESOLUTION,
     FAILURE_STAGE_UNKNOWN,
     StructuredFailure,
 )
 from parametron_freecad.runtime.failure_result_writer import write_failure_result
+from parametron_freecad.runtime.integrity_observation import (
+    IntegrityBaselineError,
+    IntegrityEvidenceError,
+    IntegrityObservationError,
+    IntegrityResultError,
+    observe_persisted_result,
+    prepare_integrity_observation,
+    write_integrity_evidence,
+)
 from parametron_freecad.runtime.observation_request import (
     ObservationRequestError,
     load_observation_request,
@@ -213,6 +225,14 @@ def _failure_stage_for_exception(exc: BaseException) -> str:
         return FAILURE_STAGE_SOURCE_DOCUMENT_RESOLUTION
     if isinstance(source, ResourceInventoryError):
         return FAILURE_STAGE_RESOURCE_INVENTORY
+    if isinstance(source, IntegrityBaselineError):
+        return FAILURE_STAGE_INTEGRITY_BASELINE
+    if isinstance(source, IntegrityResultError):
+        return FAILURE_STAGE_INTEGRITY_RESULT
+    if isinstance(source, IntegrityEvidenceError):
+        return FAILURE_STAGE_INTEGRITY_EVIDENCE
+    if isinstance(source, IntegrityObservationError):
+        return FAILURE_STAGE_INTEGRITY_EVIDENCE
     if isinstance(source, DocumentCloseError):
         return FAILURE_STAGE_DOCUMENT_CLOSE
     if isinstance(source, DocumentLifecycleError):
@@ -464,11 +484,17 @@ def run_execution_entrypoint(
                     "unable to hash source document for observation"
                 ) from exc
 
+        integrity_observation = None
         if integrity_request_path is not None:
-            load_resource_inventory(
+            inventory = load_resource_inventory(
                 integrity_request_path,
                 working_copy=working_copy,
                 expected_source_path=validated_manifest.source_document_path,
+            )
+            integrity_observation = prepare_integrity_observation(
+                inventory,
+                working_copy=working_copy,
+                output_directory=output_directory,
             )
 
         resolved_freecad_module = freecad_module
@@ -492,6 +518,12 @@ def run_execution_entrypoint(
                 opened.document, validated_manifest.loaded_manifest.data, _dependencies
             )
             _dependencies.save_document(opened.document)
+            if integrity_observation is not None:
+                integrity_observation = observe_persisted_result(
+                    integrity_observation,
+                    document=opened.document,
+                    opened_path=opened.path,
+                )
             _dependencies.export_step_artifacts(
                 opened.document,
                 outputs,
@@ -549,6 +581,12 @@ def run_execution_entrypoint(
                     working_copy_sha256=source_document_sha256,
                     output_directory=output_directory,
                 )
+        if integrity_observation is not None:
+            write_integrity_evidence(
+                integrity_observation,
+                working_copy=working_copy,
+                output_directory=output_directory,
+            )
         _dependencies.write_success_result(result_path, outputs)
     except (
         SuppressionMutationError,
@@ -570,6 +608,7 @@ def run_execution_entrypoint(
         ReferenceTraversalExecutionError,
         ReferenceTraversalOutputWriteError,
         ResourceInventoryError,
+        IntegrityObservationError,
     ) as exc:
         _try_emit_failure_result(result_path, exc)
         if isinstance(exc, ExecutionEntrypointError):

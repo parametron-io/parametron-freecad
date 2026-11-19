@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
@@ -19,7 +20,6 @@ from parametron_freecad.runtime.resource_inventory import (
     INTEGRITY_REQUEST_ENVIRONMENT_VARIABLE,
 )
 
-_DIGEST_A = "a" * 64
 _DIGEST_B = "b" * 64
 
 
@@ -47,8 +47,12 @@ class ResourceInventoryRuntimeTests(unittest.TestCase):
         self,
         path: Path,
         *,
-        selected_digest: str = _DIGEST_A,
+        selected_digest: str | None = None,
     ) -> Path:
+        if selected_digest is None:
+            selected_digest = hashlib.sha256(
+                (path.parent / "source/Assembly.FCStd").read_bytes()
+            ).hexdigest()
         path.write_text(
             json.dumps(
                 {
@@ -101,9 +105,11 @@ class ResourceInventoryRuntimeTests(unittest.TestCase):
             self.assertEqual(failure["status"], "failed")
             self.assertEqual(failure["failure"]["stage"], "resource_inventory")
 
-    def test_valid_inventory_is_consumed_without_writing_evidence(self) -> None:
+    def test_valid_inventory_is_consumed_with_integrity_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             working, manifest, result = self._paths(tmp_dir)
+            outputs = working / "outputs"
+            outputs.mkdir()
             request = self._request(working / "prm.integrity-request.json")
             opened_calls: list[Path] = []
 
@@ -127,6 +133,7 @@ class ResourceInventoryRuntimeTests(unittest.TestCase):
                     working_copy=working,
                     manifest_path=manifest,
                     result_path=result,
+                    output_directory=outputs,
                     integrity_request_path=request,
                     freecad_module=object(),
                     _dependencies=_ExecutionEntrypointDependencies(
@@ -143,9 +150,13 @@ class ResourceInventoryRuntimeTests(unittest.TestCase):
 
             self.assertEqual(opened_calls, [working / "source" / "Assembly.FCStd"])
             write_success_result.assert_called_once()
-            self.assertFalse((working / "prm.integrity-evidence.json").exists())
-            self.assertFalse(
-                (working / "outputs" / "prm.integrity-evidence.json").exists()
+            evidence = json.loads(
+                (outputs / "prm.integrity-evidence.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(evidence["schemaVersion"], "1.0")
+            self.assertEqual(
+                [resource["logicalId"] for resource in evidence["resources"]],
+                ["assembly", "component"],
             )
 
     def test_headless_forwards_environment_integrity_request_path(self) -> None:

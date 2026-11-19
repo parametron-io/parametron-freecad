@@ -12,6 +12,7 @@ from parametron_freecad.runtime.evidence_sidecar import (
     EvidenceSidecarContainmentError,
     EvidenceSidecarError,
     EvidenceSidecarWriteError,
+    remove_evidence_sidecar,
     resolve_evidence_sidecar_path,
     write_canonical_json_sidecar_atomically,
 )
@@ -181,6 +182,52 @@ class EvidenceSidecarTests(unittest.TestCase):
                 sorted(path.name for path in (working / "outputs").iterdir()),
                 [],
             )
+
+    def test_removes_existing_stale_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            working = self._working_copy(tmp_dir)
+            target = working / "outputs" / "prm.evidence.json"
+            target.write_bytes(b"stale")
+
+            remove_evidence_sidecar(
+                working_copy=working,
+                output_directory=working / "outputs",
+                filename="prm.evidence.json",
+            )
+
+            self.assertFalse(target.exists())
+
+    def test_remove_missing_sidecar_is_a_no_op(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            working = self._working_copy(tmp_dir)
+
+            remove_evidence_sidecar(
+                working_copy=working,
+                output_directory=working / "outputs",
+                filename="prm.evidence.json",
+            )
+
+            self.assertFalse((working / "outputs" / "prm.evidence.json").exists())
+
+    def test_remove_rejects_symlink_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            working = self._working_copy(tmp_dir)
+            real = working / "real.json"
+            real.write_bytes(b"real")
+            target = working / "outputs" / "prm.evidence.json"
+            target.symlink_to(real)
+
+            with self.assertRaisesRegex(
+                EvidenceSidecarContainmentError,
+                "must not be a symbolic link",
+            ):
+                remove_evidence_sidecar(
+                    working_copy=working,
+                    output_directory=working / "outputs",
+                    filename="prm.evidence.json",
+                )
+
+            self.assertTrue(real.exists())
 
     def test_non_serializable_payload_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
