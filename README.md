@@ -25,6 +25,16 @@ orchestration and durable product storage/indexing are outside this repository.
 - Optional non-recursive Link/XLink reference discovery for internal objects
   and Engine-mapped external targets, with deterministic rich schema-1 evidence,
   provenance, identity, deduplication, and controlled failures.
+- Optional native occurrence evidence for the supported FreeCAD 1.1.4
+  `Assembly::AssemblyObject.Group` direct-member mechanism, with the complete
+  group inventory, per-member classification, explicit completeness, and
+  declared-resource target binding.
+- Optional bounded engineering-fact evidence for explicitly bound native
+  properties, with typed values, explicit opaque unit tokens, and
+  `observed`/`unavailable`/`unsupported` availability.
+- Optional per-resource integrity evidence: pre-mutation baseline hashing for
+  every declared resource and post-save persisted-result hashing for the primary
+  configured result.
 - Canonical success and handled-failure `prm.result.json` output, with path
   containment against the exact supplied working-copy root.
 
@@ -45,6 +55,32 @@ use the existing structured failure boundary; cleanup is attempted and a
 required-stage failure prevents a success result.
 See the
 [target-mutation contract](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/target-mutations.md).
+
+The occurrence, bounded-fact, and integrity surfaces add no command-line
+argument. Engine places `prm.occurrence-request.json` and
+`prm.fact-request.json` at the working-copy root and publishes the integrity
+request through `PARAMETRON_RUNTIME_INTEGRITY_REQUEST`. When any of them is
+enabled, `--output-dir` is required and the runtime writes
+`prm.occurrence-evidence.json`, `prm.fact-evidence.json`, and/or
+`prm.integrity-evidence.json` there. Declared baselines are hashed before the
+document is opened, the persisted configured result is hashed immediately after
+save, and occurrence/fact inspection runs on the same open, mutated, recomputed,
+and persisted document before close.
+
+## Current limitations
+
+- Supported occurrence scope is the direct `Assembly::AssemblyObject.Group`
+  member mechanism only. Nested assemblies, `Assembly::AssemblyLink`,
+  `LinkArray`/`ElementCount` arrays, and non-empty `Assembly::JointGroup` are
+  unsupported or incomplete.
+- Non-empty occurrence context is unsupported. Generic references are not
+  occurrences and do not imply quantity.
+- Facts are bounded to `bound_property`. There is no material database, unit
+  algebra, unit conversion, or computed physical mass.
+- A baseline mismatch fails before mutation. The runtime never reads, enforces,
+  or rewrites `prm.project-lock.json`.
+- Verification decisions and normalized engineering records remain
+  Engine-owned.
 
 ## Headless usage
 
@@ -77,6 +113,11 @@ The launcher selects `PARAMETRON_FREECAD_BIN` when configured, otherwise
 directory. Optional observation and traversal requests require `--output-dir`.
 The caller prepares the working copy and output directories.
 
+Occurrence and fact request sidecars are discovered only as plain files at the
+working-copy root; the integrity request is read only from
+`PARAMETRON_RUNTIME_INTEGRITY_REQUEST`. There is no CLI flag for any of them,
+and an invocation without an enabled surface writes none of their evidence.
+
 Execution validates the canonical manifest and supplied requests before native
 execution, opens the prepared source document, applies parameter assignments
 and target mutations, performs required recompute and supported post-mutation
@@ -99,7 +140,7 @@ for exact schema semantics.
 - `parametron_freecad/execution/`: manifests, assignments, persistence, exports,
   and results
 - `parametron_freecad/runtime/`: launcher, CLI, lifecycle, invocation, traversal,
-  and error boundaries
+  occurrence/fact/integrity evidence sidecars, and error boundaries
 - `parametron_freecad/observation/`: requested CAD facts and observed output
 - `scripts/`: development entrypoint and fixture maintenance generators
 - `tests/`: ordinary Python, fake-FreeCAD, and real-FreeCAD coverage
@@ -140,6 +181,10 @@ documentation is maintained in `parametron-docs`:
 - [FreeCAD adapter architecture](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/architecture.md)
 - [FreeCAD runtime](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/runtime.md)
 - [FreeCAD contracts](https://github.com/parametron-io/parametron-docs/tree/main/docs/engine/adapters/freecad/contracts)
+- [Occurrence evidence](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/occurrence-evidence.md)
+- [Bounded fact evidence](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/fact-evidence.md)
+- [Integrity request](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/integrity-request.md)
+  and [integrity evidence](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/integrity-evidence.md)
 
 Repository-local validation coverage is tracked in
 [docs/test-matrix.md](docs/test-matrix.md).
