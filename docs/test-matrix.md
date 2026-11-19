@@ -1565,6 +1565,39 @@ execution before FreeCAD document operations.
 python -m pytest tests/test_manifest_mutation_contract.py tests/test_manifest_mutation_validation.py tests/test_canonical_manifest_validation.py
 ```
 
+## Engine Evidence Acceptance Proof
+
+`scripts/run_engine_evidence_proof.py` delegates to the Engine-owned real
+FreeCAD evidence harness and verifies its recorded acceptance report. Engine
+authors the occurrence, fact, and integrity requests, invokes the production
+`parametron-freecad` launcher on FreeCAD 1.1.4, and validates/normalizes the
+returned evidence. This repository supplies the production runtime and the
+Assembly/property fixture bundles.
+
+```bash
+nix develop --command python scripts/run_engine_evidence_proof.py \
+  --engine-repo ../parametron-engine \
+  --workspace /tmp/parametron-evidence-proof \
+  --report /tmp/parametron-evidence-proof/proof-report.json
+# PASS, ten accepted occurrences and quantity ten
+```
+
+Opt-in pytest rehearsal:
+
+```bash
+nix develop --command env PARAMETRON_RUN_ENGINE_EVIDENCE_PROOF=1 \
+  python -m pytest tests/test_engine_evidence_proof.py -q
+# PASS, 1 passed
+```
+
+The proof requires a sibling `parametron-engine` checkout, `nix`, real FreeCAD
+1.1.4, and Git LFS fixtures. It records the documented FreeCAD executor-layout
+blocker: stored external link targets resolve relative to the source document,
+while the normal executor materializes the source at `source/<basename>`.
+Complete occurrence acceptance is proven through the Engine fixture-layout
+cadruntime path against the unchanged fixture bundle. Do not replace this with a
+FreeCAD-only acceptance substitute.
+
 ## Documentation-Only Validation
 
 For documentation-only changes, review the diff for current implementation and

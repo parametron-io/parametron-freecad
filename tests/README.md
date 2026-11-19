@@ -84,6 +84,46 @@ Run it with `python -m pytest
 tests/test_execute_real_rehearsal.py`; set `PARAMETRON_FREECAD_STRICT_SMOKE=1`
 to require the wrapper and real FreeCAD host.
 
+## Engine evidence acceptance proof
+
+The cross-repository occurrence, fact, and integrity acceptance proof is
+Engine-owned. This repository supplies the production launcher and the real
+Assembly/property fixtures; the proof delegates request composition, strict
+evidence intake, normalization, quantity rollup, and integrity provenance to the
+sibling `parametron-engine` proof harness. The final acceptance step uses Engine
+validators and real FreeCAD 1.1.4, never a fake runtime.
+
+From the repository root, with a sibling `parametron-engine` checkout and `nix`
+available:
+
+```bash
+nix develop --command python scripts/run_engine_evidence_proof.py \
+  --engine-repo ../parametron-engine \
+  --workspace /tmp/parametron-evidence-proof \
+  --report /tmp/parametron-evidence-proof/proof-report.json
+```
+
+The command prints a bounded accepted-evidence summary and exits non-zero if
+Engine does not accept the evidence. The report records the Engine proof
+scenarios, the accepted ten-occurrence quantity, explicit mixed/unavailable/
+unsupported states, required-fact and baseline-mismatch stages, multi-outcome
+evidence, and the documented FreeCAD executor-layout blocker.
+
+Opt-in pytest rehearsal:
+
+```bash
+nix develop --command env PARAMETRON_RUN_ENGINE_EVIDENCE_PROOF=1 \
+  python -m pytest tests/test_engine_evidence_proof.py -q
+```
+
+The proof requires the Engine 1.1.4 evidence harness and Git LFS fixtures. It is
+deliberately opt-in because it builds and runs the Engine proof against real
+FreeCAD. Complete occurrence acceptance is proven through the Engine
+fixture-layout cadruntime path because FreeCAD resolves stored external link
+targets relative to the source document while the normal executor materializes
+the source at `source/<basename>`. The blocker is part of the Engine proof
+report and is not hidden or replaced by a FreeCAD-only acceptance check.
+
 ## Test coverage areas
 
 - Canonical JSON helpers (`test_canonical_json.py`)
