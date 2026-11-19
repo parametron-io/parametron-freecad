@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
@@ -63,6 +64,9 @@ from parametron_freecad.runtime.exit_codes import (
 )
 from parametron_freecad.runtime.reference_traversal_request import (
     REFERENCE_TRAVERSAL_REQUEST_CLI_FLAG,
+)
+from parametron_freecad.runtime.resource_inventory import (
+    INTEGRITY_REQUEST_ENVIRONMENT_VARIABLE,
 )
 
 # Deprecated compatibility surface for callers that imported the old boundary.
@@ -333,6 +337,9 @@ def _run_execute(
             output_directory=invocation.output_dir,
             observation_request_path=invocation.observation_request,
             reference_traversal_request_path=invocation.reference_traversal_request,
+            integrity_request_path=os.environ.get(
+                INTEGRITY_REQUEST_ENVIRONMENT_VARIABLE
+            ),
             freecad_module=freecad_module,
             resolve_freecad_module=lambda: _resolve_freecad_module(None),
             _dependencies=_ExecutionEntrypointDependencies(

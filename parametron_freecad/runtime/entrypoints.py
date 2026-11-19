@@ -100,6 +100,7 @@ from parametron_freecad.runtime.failure_output_contract import (
     FAILURE_STAGE_REFERENCE_TRAVERSAL,
     FAILURE_STAGE_REFERENCE_TRAVERSAL_OUTPUT_CONTAINMENT,
     FAILURE_STAGE_REFERENCE_TRAVERSAL_OUTPUT_WRITE,
+    FAILURE_STAGE_RESOURCE_INVENTORY,
     FAILURE_STAGE_RESULT_WRITE,
     FAILURE_STAGE_SOURCE_DOCUMENT_RESOLUTION,
     FAILURE_STAGE_UNKNOWN,
@@ -133,6 +134,10 @@ from parametron_freecad.runtime.reference_traversal_request import (
     ReferenceTraversalRequest,
     ReferenceTraversalRequestError,
     load_reference_traversal_request,
+)
+from parametron_freecad.runtime.resource_inventory import (
+    ResourceInventoryError,
+    load_resource_inventory,
 )
 
 
@@ -206,6 +211,8 @@ def _failure_stage_for_exception(exc: BaseException) -> str:
         return FAILURE_STAGE_MANIFEST_LOADING
     if isinstance(source, SourceDocumentPathError):
         return FAILURE_STAGE_SOURCE_DOCUMENT_RESOLUTION
+    if isinstance(source, ResourceInventoryError):
+        return FAILURE_STAGE_RESOURCE_INVENTORY
     if isinstance(source, DocumentCloseError):
         return FAILURE_STAGE_DOCUMENT_CLOSE
     if isinstance(source, DocumentLifecycleError):
@@ -389,6 +396,7 @@ def run_execution_entrypoint(
     output_directory: Path | None = None,
     observation_request_path: Path | None = None,
     reference_traversal_request_path: Path | None = None,
+    integrity_request_path: str | Path | None = None,
     freecad_module: Any | None = None,
     resolve_freecad_module: Callable[[], Any | None] | None = None,
     _dependencies: _ExecutionEntrypointDependencies = _ExecutionEntrypointDependencies(),
@@ -455,6 +463,13 @@ def run_execution_entrypoint(
                 raise ObservationRequestError(
                     "unable to hash source document for observation"
                 ) from exc
+
+        if integrity_request_path is not None:
+            load_resource_inventory(
+                integrity_request_path,
+                working_copy=working_copy,
+                expected_source_path=validated_manifest.source_document_path,
+            )
 
         resolved_freecad_module = freecad_module
         if resolved_freecad_module is None and resolve_freecad_module is not None:
@@ -554,6 +569,7 @@ def run_execution_entrypoint(
         ReferenceTraversalRequestError,
         ReferenceTraversalExecutionError,
         ReferenceTraversalOutputWriteError,
+        ResourceInventoryError,
     ) as exc:
         _try_emit_failure_result(result_path, exc)
         if isinstance(exc, ExecutionEntrypointError):
