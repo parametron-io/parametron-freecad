@@ -27,13 +27,12 @@ class EvidenceSidecarWriteError(OSError):
     """Raised when an evidence sidecar cannot be written atomically."""
 
 
-def resolve_evidence_sidecar_path(
+def require_evidence_output_directory(
     *,
     working_copy: str | Path,
     output_directory: str | Path,
-    filename: str,
 ) -> Path:
-    """Resolve one confined evidence sidecar destination."""
+    """Resolve one existing, confined evidence output directory."""
     try:
         resolved_working_copy = require_existing_directory(working_copy)
     except ValueError as exc:
@@ -52,7 +51,7 @@ def resolve_evidence_sidecar_path(
         ) from exc
 
     try:
-        resolved_output_directory = require_child_path(
+        return require_child_path(
             resolved_working_copy,
             resolved_output_directory,
         )
@@ -60,6 +59,25 @@ def resolve_evidence_sidecar_path(
         raise EvidenceSidecarContainmentError(
             "output directory must resolve inside the working copy"
         ) from exc
+
+
+def resolve_evidence_sidecar_path(
+    *,
+    working_copy: str | Path,
+    output_directory: str | Path,
+    filename: str,
+) -> Path:
+    """Resolve one confined evidence sidecar destination."""
+    try:
+        resolved_working_copy = require_existing_directory(working_copy)
+    except ValueError as exc:
+        raise EvidenceSidecarContainmentError(
+            "working copy must be an existing directory"
+        ) from exc
+    resolved_output_directory = require_evidence_output_directory(
+        working_copy=resolved_working_copy,
+        output_directory=output_directory,
+    )
 
     target = resolve_path(resolved_output_directory / _validated_filename(filename))
     try:
@@ -194,6 +212,7 @@ __all__ = [
     "EvidenceSidecarError",
     "EvidenceSidecarWriteError",
     "remove_evidence_sidecar",
+    "require_evidence_output_directory",
     "resolve_evidence_sidecar_path",
     "write_canonical_json_sidecar_atomically",
 ]

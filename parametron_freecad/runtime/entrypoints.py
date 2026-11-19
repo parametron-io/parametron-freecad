@@ -65,6 +65,9 @@ from parametron_freecad.execution.visibility import (
     VisibilityMutationError,
     apply_visibility_mutations,
 )
+from parametron_freecad.observation.observed_contract import (
+    PARAMETRON_OBSERVED_CONTRACT,
+)
 from parametron_freecad.observation.observed_output import (
     ObservedOutputError,
     generate_observed_output,
@@ -77,13 +80,22 @@ from parametron_freecad.runtime.document_lifecycle import (
     opened_freecad_document,
     resolve_source_document_path,
 )
+from parametron_freecad.runtime.evidence_sidecar import (
+    EvidenceSidecarContainmentError,
+    EvidenceSidecarError,
+    EvidenceSidecarWriteError,
+    remove_evidence_sidecar,
+    require_evidence_output_directory,
+)
 from parametron_freecad.runtime.fact_evidence import (
+    FACT_EVIDENCE_FILENAME,
     FactObservationError,
     inspect_fact_evidence,
     prepare_fact_evidence,
     write_fact_evidence,
 )
 from parametron_freecad.runtime.fact_request import (
+    FACT_REQUEST_FILENAME,
     FactRequestError,
     discover_fact_request,
     load_fact_request,
@@ -108,6 +120,7 @@ from parametron_freecad.runtime.failure_output_contract import (
     FAILURE_STAGE_MANIFEST_LOADING,
     FAILURE_STAGE_MANIFEST_VALIDATION,
     FAILURE_STAGE_OBSERVATION,
+    FAILURE_STAGE_OBSERVATION_OUTPUT,
     FAILURE_STAGE_OCCURRENCE_EVIDENCE,
     FAILURE_STAGE_OCCURRENCE_REQUEST,
     FAILURE_STAGE_PARAMETER_ASSIGNMENT,
@@ -126,6 +139,7 @@ from parametron_freecad.runtime.failure_output_contract import (
 )
 from parametron_freecad.runtime.failure_result_writer import write_failure_result
 from parametron_freecad.runtime.integrity_observation import (
+    INTEGRITY_EVIDENCE_FILENAME,
     IntegrityBaselineError,
     IntegrityEvidenceError,
     IntegrityObservationError,
@@ -142,6 +156,7 @@ from parametron_freecad.runtime.occurrence_access import (
     OccurrenceNativeAccessError,
 )
 from parametron_freecad.runtime.occurrence_evidence import (
+    OCCURRENCE_EVIDENCE_FILENAME,
     OccurrenceObservationError,
     inspect_occurrence_evidence,
     prepare_occurrence_evidence,
@@ -152,6 +167,7 @@ from parametron_freecad.runtime.occurrence_evidence import (
     write_occurrence_evidence,
 )
 from parametron_freecad.runtime.occurrence_request import (
+    OCCURRENCE_REQUEST_FILENAME,
     OccurrenceRequestError,
     discover_occurrence_request,
     load_occurrence_request,
@@ -202,6 +218,21 @@ class _ReferenceTraversalFailedResultError(ExecutionEntrypointError):
     """Internal marker for a typed failed traversal result."""
 
 
+class EvidenceOutputDirectoryError(ExecutionEntrypointError):
+    """Raised when an enabled evidence surface has no usable output directory."""
+
+    def __init__(self, message: str, *, stage: str) -> None:
+        super().__init__(message)
+        self.stage = stage
+
+
+@dataclass(frozen=True, slots=True)
+class _EvidenceSurface:
+    label: str
+    filename: str
+    stage: str
+
+
 @dataclass(frozen=True, slots=True)
 class ValidatedExecutionManifest:
     loaded_manifest: LoadedManifest
@@ -248,7 +279,137 @@ def _normalize_failure_message(message: str) -> str:
     return normalized or "runtime failure"
 
 
+def _request_sidecar_present(working_copy: Path, filename: str) -> bool:
+    return os.path.lexists(working_copy / filename)
+
+
+def _enabled_evidence_surfaces(
+    *,
+    traversal_enabled: bool,
+    observation_enabled: bool,
+    integrity_enabled: bool,
+    occurrence_enabled: bool,
+    fact_enabled: bool,
+) -> tuple[_EvidenceSurface, ...]:
+    surfaces: list[_EvidenceSurface] = []
+    if traversal_enabled:
+        surfaces.append(
+            _EvidenceSurface(
+                label="reference traversal request",
+                filename=REFERENCE_TRAVERSAL_OUTPUT_FILENAME,
+                stage=FAILURE_STAGE_REFERENCE_TRAVERSAL_OUTPUT_CONTAINMENT,
+            )
+        )
+    if observation_enabled:
+        surfaces.append(
+            _EvidenceSurface(
+                label="observation request",
+                filename=PARAMETRON_OBSERVED_CONTRACT.filename,
+                stage=FAILURE_STAGE_OBSERVATION_OUTPUT,
+            )
+        )
+    if integrity_enabled:
+        surfaces.append(
+            _EvidenceSurface(
+                label="integrity evidence",
+                filename=INTEGRITY_EVIDENCE_FILENAME,
+                stage=FAILURE_STAGE_INTEGRITY_EVIDENCE,
+            )
+        )
+    if occurrence_enabled:
+        surfaces.append(
+            _EvidenceSurface(
+                label="occurrence evidence",
+                filename=OCCURRENCE_EVIDENCE_FILENAME,
+                stage=FAILURE_STAGE_OCCURRENCE_EVIDENCE,
+            )
+        )
+    if fact_enabled:
+        surfaces.append(
+            _EvidenceSurface(
+                label="fact evidence",
+                filename=FACT_EVIDENCE_FILENAME,
+                stage=FAILURE_STAGE_FACT_EVIDENCE,
+            )
+        )
+    return tuple(surfaces)
+
+
+def _require_enabled_evidence_output_directory(
+    *,
+    working_copy: Path,
+    output_directory: Path | None,
+    surfaces: tuple[_EvidenceSurface, ...],
+) -> None:
+    if not surfaces:
+        return
+    primary = surfaces[0]
+    if output_directory is None:
+        raise EvidenceOutputDirectoryError(
+            f"{primary.label} requires an output directory",
+            stage=primary.stage,
+        )
+    try:
+        require_evidence_output_directory(
+            working_copy=working_copy,
+            output_directory=output_directory,
+        )
+    except (EvidenceSidecarContainmentError, EvidenceSidecarError) as exc:
+        raise EvidenceOutputDirectoryError(
+            f"{primary.label} requires an existing output directory",
+            stage=primary.stage,
+        ) from exc
+
+
+def _remove_stale_evidence(
+    *,
+    working_copy: Path,
+    output_directory: Path | None,
+    surfaces: tuple[_EvidenceSurface, ...],
+) -> None:
+    if output_directory is None:
+        return
+    for surface in surfaces:
+        try:
+            remove_evidence_sidecar(
+                working_copy=working_copy,
+                output_directory=output_directory,
+                filename=surface.filename,
+            )
+        except (EvidenceSidecarError, EvidenceSidecarWriteError) as exc:
+            raise EvidenceOutputDirectoryError(
+                f"{surface.label} destination is not usable",
+                stage=surface.stage,
+            ) from exc
+
+
+def _selected_source_sha256(
+    *,
+    observation_enabled: bool,
+    integrity_observation: Any | None,
+    source_document_path: Path,
+) -> str | None:
+    if not observation_enabled:
+        return None
+    if integrity_observation is not None:
+        digest = integrity_observation.primary.baseline_sha256
+        if isinstance(digest, str) and digest:
+            return digest
+    try:
+        return hashlib.sha256(source_document_path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise ObservationRequestError(
+            "unable to hash source document for observation"
+        ) from exc
+
+
 def _failure_stage_for_exception(exc: BaseException) -> str:
+    if isinstance(exc, EvidenceOutputDirectoryError):
+        return exc.stage
+    if isinstance(exc, ExecutionEntrypointError) and isinstance(
+        exc.__cause__, EvidenceOutputDirectoryError
+    ):
+        return exc.__cause__.stage
     if isinstance(exc, FreeCADUnavailableEntrypointError):
         return FAILURE_STAGE_FREECAD_RESOLUTION
 
@@ -476,12 +637,27 @@ def run_execution_entrypoint(
         source_document = validated_manifest.loaded_manifest.data[
             EXPORT_MANIFEST_V1_CONTRACT.source_document_field
         ]
+        evidence_surfaces = _enabled_evidence_surfaces(
+            traversal_enabled=reference_traversal_request_path is not None,
+            observation_enabled=observation_request_path is not None,
+            integrity_enabled=integrity_request_path is not None,
+            occurrence_enabled=_request_sidecar_present(
+                working_copy, OCCURRENCE_REQUEST_FILENAME
+            ),
+            fact_enabled=_request_sidecar_present(working_copy, FACT_REQUEST_FILENAME),
+        )
+        _require_enabled_evidence_output_directory(
+            working_copy=working_copy,
+            output_directory=output_directory,
+            surfaces=evidence_surfaces,
+        )
+        _remove_stale_evidence(
+            working_copy=working_copy,
+            output_directory=output_directory,
+            surfaces=evidence_surfaces,
+        )
         reference_traversal_request: ReferenceTraversalRequest | None = None
         if reference_traversal_request_path is not None:
-            if output_directory is None:
-                raise ExecutionEntrypointError(
-                    "reference traversal request requires an output directory"
-                )
             try:
                 reference_traversal_request = load_reference_traversal_request(
                     reference_traversal_request_path
@@ -511,21 +687,8 @@ def run_execution_entrypoint(
                 raise
 
         observation_request = None
-        source_document_sha256 = None
         if observation_request_path is not None:
-            if output_directory is None:
-                raise ExecutionEntrypointError(
-                    "observation request requires an output directory"
-                )
             observation_request = load_observation_request(observation_request_path)
-            try:
-                source_document_sha256 = hashlib.sha256(
-                    validated_manifest.source_document_path.read_bytes()
-                ).hexdigest()
-            except OSError as exc:
-                raise ObservationRequestError(
-                    "unable to hash source document for observation"
-                ) from exc
 
         integrity_observation = None
         inventory = None
@@ -576,6 +739,12 @@ def run_execution_entrypoint(
             )
             fact_request = load_fact_request(fact_request_path)
 
+        source_document_sha256 = _selected_source_sha256(
+            observation_enabled=observation_request is not None,
+            integrity_observation=integrity_observation,
+            source_document_path=validated_manifest.source_document_path,
+        )
+
         resolved_freecad_module = freecad_module
         if resolved_freecad_module is None and resolve_freecad_module is not None:
             resolved_freecad_module = resolve_freecad_module()
@@ -604,27 +773,6 @@ def run_execution_entrypoint(
                     integrity_observation,
                     document=opened.document,
                     opened_path=opened.path,
-                )
-            if occurrence_request is not None:
-                if occurrence_resolver is None:
-                    raise OccurrenceObservationError(
-                        "occurrence resource resolver is unavailable"
-                    )
-                occurrence_observation = inspect_occurrence_evidence(
-                    opened.document,
-                    occurrence_request,
-                    source_document=source_document,
-                    resolver=occurrence_resolver,
-                    freecad_version=resolve_freecad_version(resolved_freecad_module),
-                )
-            if fact_request is not None:
-                fact_observation = inspect_fact_evidence(
-                    opened.document,
-                    fact_request,
-                    source_path=opened.path,
-                    inventory=inventory,
-                    freecad_module=resolved_freecad_module,
-                    freecad_version=resolve_freecad_version(resolved_freecad_module),
                 )
             _dependencies.export_step_artifacts(
                 opened.document,
@@ -680,18 +828,39 @@ def run_execution_entrypoint(
                     working_copy_sha256=source_document_sha256,
                     output_directory=output_directory,
                 )
-        if fact_observation is not None:
-            write_fact_evidence(
-                fact_observation,
-                working_copy=working_copy,
-                output_directory=output_directory,
-            )
-        if occurrence_observation is not None:
-            write_occurrence_evidence(
-                occurrence_observation,
-                working_copy=working_copy,
-                output_directory=output_directory,
-            )
+            if occurrence_request is not None:
+                if occurrence_resolver is None:
+                    raise OccurrenceObservationError(
+                        "occurrence resource resolver is unavailable"
+                    )
+                occurrence_observation = inspect_occurrence_evidence(
+                    opened.document,
+                    occurrence_request,
+                    source_document=source_document,
+                    resolver=occurrence_resolver,
+                    freecad_version=resolve_freecad_version(resolved_freecad_module),
+                )
+            if fact_request is not None:
+                fact_observation = inspect_fact_evidence(
+                    opened.document,
+                    fact_request,
+                    source_path=opened.path,
+                    inventory=inventory,
+                    freecad_module=resolved_freecad_module,
+                    freecad_version=resolve_freecad_version(resolved_freecad_module),
+                )
+            if occurrence_observation is not None:
+                write_occurrence_evidence(
+                    occurrence_observation,
+                    working_copy=working_copy,
+                    output_directory=output_directory,
+                )
+            if fact_observation is not None:
+                write_fact_evidence(
+                    fact_observation,
+                    working_copy=working_copy,
+                    output_directory=output_directory,
+                )
         if integrity_observation is not None:
             write_integrity_evidence(
                 integrity_observation,
@@ -806,6 +975,7 @@ def run_document_observation_entrypoint(
 
 
 __all__ = [
+    "EvidenceOutputDirectoryError",
     "ExecutionEntrypointError",
     "FreeCADUnavailableEntrypointError",
     "ObservationEntrypointError",

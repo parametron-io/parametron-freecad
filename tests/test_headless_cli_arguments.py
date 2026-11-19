@@ -244,6 +244,8 @@ class HeadlessCliArgumentTests(unittest.TestCase):
             working, _ = self._make_working_copy_with_source(tmp)
             request = working / "request.json"
             request.write_text('{"observe":{}}', encoding="utf-8")
+            output = working / "output"
+            output.mkdir()
             base = [
                 "execute", "--working-copy", str(working),
                 "--manifest", str(working / "export_manifest_v1.json"),
@@ -251,10 +253,10 @@ class HeadlessCliArgumentTests(unittest.TestCase):
             ]
             original = headless.parse_headless_arguments(base)
             output_only = headless.parse_headless_arguments(
-                [*base, "--output-dir", str(working / "output")]
+                [*base, "--output-dir", str(output)]
             )
             observed = headless.parse_headless_arguments(
-                [*base, "--output-dir", str(working / "output"),
+                [*base, "--output-dir", str(output),
                  "--observation-request", str(request)]
             )
         self.assertIsNone(original.output_dir)
