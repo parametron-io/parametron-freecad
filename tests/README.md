@@ -42,6 +42,34 @@ Generated `.FCStd` archive bytes need not match; the real fixture tests compare
 their semantic traversal output. Tracked fixtures must remain byte-for-byte
 unchanged during tests.
 
+The committed `tests/fixtures/assembly_occurrence/` and
+`tests/fixtures/fact_evidence/` bundles are real FreeCAD provenance fixtures
+tracked with Git LFS. Regenerate them only through the Nix environment and the
+FreeCAD host, writing to an absolute destination that does not yet exist:
+
+```
+nix develop --command freecadcmd scripts/generate_assembly_occurrence_fixtures.py --pass=/absolute/occurrence-fixtures
+nix develop --command freecadcmd scripts/generate_fact_evidence_fixtures.py --pass=/absolute/fact-fixtures
+```
+
+Generation is semantically reproducible; `.FCStd` archive bytes are not
+expected to be identical across runs. The real-FreeCAD evidence suites consume
+their request sidecars at the working-copy root and their integrity request
+through `PARAMETRON_RUNTIME_INTEGRITY_REQUEST`, and require an existing
+`--output-dir` inside the attempt:
+
+```
+nix develop --command env PARAMETRON_FREECAD_STRICT_SMOKE=1 \
+  python -m pytest \
+  tests/test_occurrence_real_fixtures.py \
+  tests/test_fact_real_fixtures.py \
+  tests/test_integrity_real_fixtures.py \
+  tests/test_evidence_lifecycle_real.py -q
+```
+
+`PARAMETRON_FREECAD_STRICT_SMOKE=1` makes a missing wrapper, host, or
+LFS-fetched fixture bundle a failure instead of a skip.
+
 Environment-gated real-FreeCAD rehearsals require a usable public
 `parametron-freecad` wrapper and native host. They do not fall back to direct
 Python entrypoint execution when the wrapper is unavailable:
@@ -146,3 +174,12 @@ report and is not hidden or replaced by a FreeCAD-only acceptance check.
 - Headless controlled-failure: missing working copies (`test_headless_missing_working_copies.py`)
 - Headless deterministic repeated-run behavior (`test_headless_repeated_run.py`)
 - Headless controlled-failure: unsupported artifact requests (`test_headless_unsupported_artifact_requests.py`)
+- Engineering-evidence sidecar writing and containment (`test_evidence_sidecar.py`)
+- Evidence lifecycle ordering and failure precedence (`test_evidence_lifecycle.py`)
+- Occurrence request, evidence, and runtime (`test_occurrence_request.py`, `test_occurrence_evidence.py`, `test_occurrence_runtime.py`)
+- Occurrence real-FreeCAD fixtures (`test_occurrence_real_fixtures.py`)
+- Bounded fact request, evidence, and runtime (`test_fact_request.py`, `test_fact_evidence.py`, `test_fact_runtime.py`)
+- Bounded fact real-FreeCAD fixtures (`test_fact_real_fixtures.py`)
+- Integrity observation and runtime (`test_integrity_observation.py`, `test_integrity_runtime.py`)
+- Integrity real-FreeCAD fixtures (`test_integrity_real_fixtures.py`)
+- Full real-FreeCAD engineering-evidence lifecycle (`test_evidence_lifecycle_real.py`)

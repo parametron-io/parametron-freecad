@@ -221,7 +221,7 @@ uses the rich `reference_traversal_output` serializer and one atomic writer.
 | Traversal request absence compatibility | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_runtime_invocation.py`, `tests/test_headless_cli_arguments.py`, `tests/test_step_export.py`, `tests/test_csv_export.py`, `tests/test_pdf_export.py` | Explicit regression proof preserves manifest load/validation, source resolution, document lifecycle, assignment, recompute, all export families, observation, success results, and exact Engine invocation fields/delegation when traversal is absent. |
 | Traversal request execution wiring and emission | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_headless_cli_arguments.py`, `tests/test_reference_traversal_output_writer.py` | Traversal runs after recompute and all STEP/CSV/PDF exports and before observation; `succeeded`/`partial` are atomically emitted to the canonical filename beneath the existing output directory, then continue; the exact working copy is the sole containment root; runtime/writer create no directories; failed traversal and controlled containment/write errors skip observation while completed exports remain. Stable `runtime_failure` stages cover traversal and output containment/write failures; malformed-request raw output is covered separately. |
 | Typed reference traversal callable boundary / discovery | Covered | `tests/test_reference_traversal.py` | Exact public signature; immutable four-field result; exact status vocabulary; representable partial/failed evidence; raw tuple type enforcement; chained public error; source-root and participating-object discovery; supported internal and Engine-mapped external relationships; unsupported-value-shape partial diagnostics; and FreeCAD-independent import. Serialization, writing, containment, Engine normalization, and durable storage behavior remain outside the callable. |
-| Reference traversal fixtures | Covered | `tests/test_reference_traversal_real_fixtures.py`, `scripts/generate_reference_traversal_fixtures.py`, `tests/fixtures/reference_traversal/` | One root and two referenced documents cover internal, external, shared-target, and mapped missing evidence. The Nix/FreeCAD 1.1.4 maintenance generator guarantees semantic reproducibility; the small binary bundle is stored directly in Git without LFS. |
+| Reference traversal fixtures | Covered | `tests/test_reference_traversal_real_fixtures.py`, `scripts/generate_reference_traversal_fixtures.py`, `tests/fixtures/reference_traversal/` | One root and two referenced documents cover internal, external, shared-target, and mapped missing evidence. The Nix/FreeCAD 1.1.4 maintenance generator guarantees semantic reproducibility; the repository tracks `.FCStd` fixtures, including this bundle, with Git LFS. |
 | Reference traversal ordering/deduplication/cycle guards | Covered | `tests/test_reference_traversal_output_contract.py`, `tests/test_reference_traversal.py`, `tests/test_reference_traversal_output.py`, `tests/test_runtime_entrypoints.py` | Typed canonical results collapse equal resolved/missing/unresolved nodes and edges by complete identity before deterministic ordering/sequencing, at the same aligned canonicalization boundary for both; distinct identity components, shared targets, multiple outgoing edges, byte stability, permutation independence, and controlled conflict chaining (including node-only conflicts and no partial committed output) are covered. |
 | Reference traversal writer repeated-run byte equality | Covered | `tests/test_reference_traversal_output_writer.py` | Repeated atomic writes and reordered inputs are byte-identical through the canonical rich serializer. Real traversal repeatability is covered by the native fixture tests. |
 | Reference traversal runtime-emitted file | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_reference_traversal_real_fixtures.py` | Atomic writer integration proves the exact canonical destination and trailing newline. Production-entrypoint traversal of relocated real fixtures is byte-identical across repeated, arbitrary-basename, and nested working roots, with no absolute-path leakage or fixture mutation. |
@@ -246,6 +246,15 @@ uses the rich `reference_traversal_output` serializer and one atomic writer.
 | Standalone headless `observe` rejection | Covered | negative coverage in `tests/test_headless_cli_arguments.py` | Currently rejected; observation is aligned onto `execute`. |
 | Component observation exclusion | Covered | `tests/test_engine_verification_compat.py`, `tests/test_engine_verification_expectations.py` | Not implemented; compatibility validation rejects enabled components and non-empty component expectations, while the lower-level helper omits components. |
 | Verification decision exclusion | Covered | negative coverage in `tests/test_engine_verification_compat.py`, `tests/test_observed_writer.py` | Engine-owned; FreeCAD emits raw observed facts only. |
+| Engineering-evidence sidecar transport | Covered | `tests/test_evidence_sidecar.py`, `tests/test_evidence_lifecycle.py` | Occurrence/fact requests are discovered only as plain files at the working-copy root; the integrity request is read only from `PARAMETRON_RUNTIME_INTEGRITY_REQUEST`. Every enabled surface requires an existing confined output directory. Stale enabled sidecars are removed before request loading, canonical atomic writing leaves one trailing newline, output-directory symlink escapes are rejected, and failure precedence is deterministic (output-directory preflight, baseline, occurrence request, fact request). |
+| Native occurrence evidence, focused and fake-FreeCAD | Covered | `tests/test_occurrence_request.py`, `tests/test_occurrence_evidence.py`, `tests/test_occurrence_runtime.py` | Strict request loading, 16-frame context bound, duplicate/cyclic context rejection, and confined discovery. Ten supported links remain ten distinct occurrences; shared targets stay distinguishable; duplicate native names in separate resources join separate declared identities; mixed inventories report explicit incomplete states; non-empty joint groups, nested assembly objects, `Assembly::AssemblyLink`, `App::LinkElement`, element arrays, and unsupported target types are explicit `unsupported`; missing targets are `unresolved`; ordinary property link lists are not occurrences; non-empty context is unsupported; missing/non-assembly parents are explicit; dangling, duplicate, or uncorroborated Group entries fail natively; repeated runs are byte-stable; runtime discovery writes complete evidence and fails before open on malformed requests or a missing output directory. |
+| Native occurrence evidence, real FreeCAD | Covered, real FreeCAD | `tests/test_occurrence_real_fixtures.py`, `scripts/generate_assembly_occurrence_fixtures.py`, `tests/fixtures/assembly_occurrence/` | Production `parametron-freecad execute` emits a complete ten-occurrence scope, explicit incomplete mixed states, and explicit unsupported non-empty context. Relocated and repeated runs are byte-stable, no absolute attempt path appears in evidence, the committed fixture bundle is unchanged, and the maintenance generator is semantically reproducible. The bundle is tracked with Git LFS. |
+| Bounded fact evidence, focused and fake-FreeCAD | Covered | `tests/test_fact_request.py`, `tests/test_fact_evidence.py`, `tests/test_fact_runtime.py` | Strict bounded request loading and unit/kind compatibility; typed boolean, string, number, and integer values with exact explicit units; no unit conversion; unavailable and unsupported states never substitute zero, empty, or false; required unavailable facts fail deterministically; context bindings are unsupported; declared secondary subjects are opened read-only and closed before the selected source; missing inventory, undeclared subject, and missing coordinate are explicit; shuffled equivalent requests are byte-stable; canonical-string boundaries and stale-sidecar removal are covered. |
+| Bounded fact evidence, real FreeCAD | Covered, real FreeCAD | `tests/test_fact_real_fixtures.py`, `scripts/generate_fact_evidence_fixtures.py`, `tests/fixtures/fact_evidence/` | Real bound properties emit typed evidence; a required unavailable fact fails deterministically; relocation and repeated-run evidence are byte-stable; the committed bundle is unchanged; the maintenance generator is semantically reproducible. The bundle is tracked with Git LFS. |
+| Integrity evidence, focused and fake-FreeCAD | Covered | `tests/test_integrity_observation.py`, `tests/test_integrity_runtime.py` | Primary and secondary baselines are observed; a missing secondary is `missing` and a non-regular or unreadable secondary is `unavailable` without content identity; missing, non-regular, unreadable, or mismatched primary baselines fail before open; a secondary digest mismatch also fails before mutation; post-save bytes are hashed and must agree with the declared coordinate; opened-path and native-filename mismatches, missing persisted files, and hash read failures fail at `integrity_result`; failed saves emit no success evidence; canonical atomic writes, stale removal, output escape rejection, and headless output-directory requirements are covered. |
+| Integrity evidence, real FreeCAD | Covered, real FreeCAD | `tests/test_integrity_real_fixtures.py` | Production execute reports real baseline and persisted-result digests that match independent hashing; the persisted result digest differs from the unchanged baseline when configured bytes differ; a baseline mismatch fails before mutation; a missing secondary is explicit; failure results carry `integrity_baseline` and no success evidence. |
+| Full engineering-evidence lifecycle | Covered, real FreeCAD | `tests/test_evidence_lifecycle.py`, `tests/test_evidence_lifecycle_real.py` | Focused lifecycle coverage proves occurrence and fact inspection follow observation before close, secondary documents close before the selected source, the integrity baseline digest is reused without rereading the source, and failure precedence is stable. One real `parametron-freecad execute` under an arbitrary nested working root emits all five sidecars (`prm.observed.json`, `prm.reference-traversal.json`, `prm.occurrence-evidence.json`, `prm.fact-evidence.json`, `prm.integrity-evidence.json`), a successful result, persisted-result evidence distinct from the baseline, and no absolute attempt path in the new evidence. |
+| Cross-repository evidence acceptance | Covered, opt-in real FreeCAD | `scripts/run_engine_evidence_proof.py`, `tests/test_engine_evidence_proof.py` | Engine authors the occurrence, fact, and integrity requests, invokes the production launcher on real FreeCAD 1.1.4, and validates/normalizes the returned evidence. See [Engine Evidence Acceptance Proof](#engine-evidence-acceptance-proof). |
 
 Semantic-output-exclusion validation is recorded as separate overlapping runs:
 82 focused tests passed with 644 deselected and 6 subtests; 726 complete
@@ -1550,6 +1559,56 @@ Aggregate suite status:
 nix develop --command python -m pytest
 # PASS, 3682 passed, 1609 subtests passed
 ```
+
+## Focused Engineering-Evidence Sidecar Coverage
+
+The focused suites run without a FreeCAD host:
+
+```bash
+nix develop --command python -m pytest \
+  tests/test_evidence_sidecar.py \
+  tests/test_evidence_lifecycle.py \
+  tests/test_occurrence_request.py \
+  tests/test_occurrence_evidence.py \
+  tests/test_occurrence_runtime.py \
+  tests/test_fact_request.py \
+  tests/test_fact_evidence.py \
+  tests/test_fact_runtime.py \
+  tests/test_integrity_observation.py \
+  tests/test_integrity_runtime.py -q
+```
+
+Real-FreeCAD evidence suites require the repository wrapper, a usable FreeCAD
+host, and Git LFS-fetched fixture bundles. Strict mode makes their absence a
+failure:
+
+```bash
+nix develop --command env PARAMETRON_FREECAD_STRICT_SMOKE=1 \
+  python -m pytest \
+  tests/test_occurrence_real_fixtures.py \
+  tests/test_fact_real_fixtures.py \
+  tests/test_integrity_real_fixtures.py \
+  tests/test_evidence_lifecycle_real.py -q
+```
+
+Fixture maintenance generators (writes a new bundle into an absolute path that
+does not yet exist):
+
+```bash
+nix develop --command freecadcmd \
+  scripts/generate_assembly_occurrence_fixtures.py \
+  --pass=/absolute/occurrence-fixtures
+```
+
+```bash
+nix develop --command freecadcmd \
+  scripts/generate_fact_evidence_fixtures.py \
+  --pass=/absolute/fact-fixtures
+```
+
+Generation is semantically reproducible; `.FCStd` archive bytes are not
+expected to be identical across regeneration runs. Committed fixture bundles
+must remain unchanged during tests and are tracked with Git LFS.
 
 ## Canonical Manifest Mutation Validation
 
