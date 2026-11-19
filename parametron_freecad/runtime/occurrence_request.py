@@ -174,29 +174,40 @@ def _normalize_scope(value: Any, context: str) -> OccurrenceScope:
 
     _require_exact_fields(value, _SCOPE_FIELDS, context)
 
-    parent = _normalize_entity(value["parent"], f"{context}.parent")
+    parent = normalize_entity(value["parent"], f"{context}.parent")
     mechanism = _exact_text(value["mechanism"], f"{context}.mechanism")
-
-    raw_context = value["context"]
-    if not isinstance(raw_context, list):
-        raise OccurrenceRequestError(f"{context}.context must be an array")
-    if len(raw_context) > OCCURRENCE_MAX_CONTEXT_FRAMES:
-        raise OccurrenceRequestError(
-            f"{context}.context must contain at most "
-            f"{OCCURRENCE_MAX_CONTEXT_FRAMES} frames"
-        )
-
-    frames = tuple(
-        _normalize_context_frame(frame, f"{context}.context[{index}]")
-        for index, frame in enumerate(raw_context)
+    frames = normalize_context(
+        value["context"],
+        parent,
+        f"{context}.context",
     )
-    _validate_context_uniqueness(parent, frames, context)
 
     return OccurrenceScope(
         parent=parent,
         context=frames,
         mechanism=mechanism,
     )
+
+
+def normalize_context(
+    value: Any,
+    parent: OccurrenceEntity,
+    context: str,
+) -> tuple[OccurrenceContextFrame, ...]:
+    """Validate one bounded context frame array against its parent entity."""
+    if not isinstance(value, list):
+        raise OccurrenceRequestError(f"{context} must be an array")
+    if len(value) > OCCURRENCE_MAX_CONTEXT_FRAMES:
+        raise OccurrenceRequestError(
+            f"{context} must contain at most {OCCURRENCE_MAX_CONTEXT_FRAMES} frames"
+        )
+
+    frames = tuple(
+        _normalize_context_frame(frame, f"{context}[{index}]")
+        for index, frame in enumerate(value)
+    )
+    _validate_context_uniqueness(parent, frames, context)
+    return frames
 
 
 def _normalize_context_frame(value: Any, context: str) -> OccurrenceContextFrame:
@@ -206,12 +217,13 @@ def _normalize_context_frame(value: Any, context: str) -> OccurrenceContextFrame
     _require_exact_fields(value, _CONTEXT_FRAME_FIELDS, context)
 
     return OccurrenceContextFrame(
-        parent=_normalize_entity(value["parent"], f"{context}.parent"),
+        parent=normalize_entity(value["parent"], f"{context}.parent"),
         member=_native_name(value["member"], f"{context}.member"),
     )
 
 
-def _normalize_entity(value: Any, context: str) -> OccurrenceEntity:
+def normalize_entity(value: Any, context: str) -> OccurrenceEntity:
+    """Validate one resource-qualified native object entity."""
     if not isinstance(value, dict):
         raise OccurrenceRequestError(f"{context} must be a JSON object")
 
@@ -347,4 +359,6 @@ __all__ = [
     "OccurrenceScope",
     "discover_occurrence_request",
     "load_occurrence_request",
+    "normalize_context",
+    "normalize_entity",
 ]

@@ -77,6 +77,17 @@ from parametron_freecad.runtime.document_lifecycle import (
     opened_freecad_document,
     resolve_source_document_path,
 )
+from parametron_freecad.runtime.fact_evidence import (
+    FactObservationError,
+    inspect_fact_evidence,
+    prepare_fact_evidence,
+    write_fact_evidence,
+)
+from parametron_freecad.runtime.fact_request import (
+    FactRequestError,
+    discover_fact_request,
+    load_fact_request,
+)
 from parametron_freecad.runtime.failure_output_contract import (
     FAILURE_BOUNDARY_EXECUTION_ENTRYPOINT,
     FAILURE_CATEGORY_EXECUTION,
@@ -88,6 +99,8 @@ from parametron_freecad.runtime.failure_output_contract import (
     FAILURE_STAGE_DOCUMENT_CLOSE,
     FAILURE_STAGE_DOCUMENT_OPEN,
     FAILURE_STAGE_DOCUMENT_SAVE,
+    FAILURE_STAGE_FACT_EVIDENCE,
+    FAILURE_STAGE_FACT_REQUEST,
     FAILURE_STAGE_FREECAD_RESOLUTION,
     FAILURE_STAGE_INTEGRITY_BASELINE,
     FAILURE_STAGE_INTEGRITY_EVIDENCE,
@@ -261,6 +274,10 @@ def _failure_stage_for_exception(exc: BaseException) -> str:
         return FAILURE_STAGE_OCCURRENCE_REQUEST
     if isinstance(source, (OccurrenceObservationError, OccurrenceNativeAccessError)):
         return FAILURE_STAGE_OCCURRENCE_EVIDENCE
+    if isinstance(source, FactRequestError):
+        return FAILURE_STAGE_FACT_REQUEST
+    if isinstance(source, FactObservationError):
+        return FAILURE_STAGE_FACT_EVIDENCE
     if isinstance(source, DocumentCloseError):
         return FAILURE_STAGE_DOCUMENT_CLOSE
     if isinstance(source, DocumentLifecycleError):
@@ -550,6 +567,15 @@ def run_execution_entrypoint(
                     source_path=validated_manifest.source_document_path,
                 )
 
+        fact_request = None
+        fact_request_path = discover_fact_request(working_copy)
+        if fact_request_path is not None:
+            prepare_fact_evidence(
+                working_copy=working_copy,
+                output_directory=output_directory,
+            )
+            fact_request = load_fact_request(fact_request_path)
+
         resolved_freecad_module = freecad_module
         if resolved_freecad_module is None and resolve_freecad_module is not None:
             resolved_freecad_module = resolve_freecad_module()
@@ -563,6 +589,7 @@ def run_execution_entrypoint(
             EXPORT_MANIFEST_V1_CONTRACT.outputs_field
         ]
         occurrence_observation = None
+        fact_observation = None
         with _dependencies.opened_freecad_document(
             resolved_freecad_module,
             validated_manifest.source_document_path,
@@ -588,6 +615,15 @@ def run_execution_entrypoint(
                     occurrence_request,
                     source_document=source_document,
                     resolver=occurrence_resolver,
+                    freecad_version=resolve_freecad_version(resolved_freecad_module),
+                )
+            if fact_request is not None:
+                fact_observation = inspect_fact_evidence(
+                    opened.document,
+                    fact_request,
+                    source_path=opened.path,
+                    inventory=inventory,
+                    freecad_module=resolved_freecad_module,
                     freecad_version=resolve_freecad_version(resolved_freecad_module),
                 )
             _dependencies.export_step_artifacts(
@@ -644,6 +680,12 @@ def run_execution_entrypoint(
                     working_copy_sha256=source_document_sha256,
                     output_directory=output_directory,
                 )
+        if fact_observation is not None:
+            write_fact_evidence(
+                fact_observation,
+                working_copy=working_copy,
+                output_directory=output_directory,
+            )
         if occurrence_observation is not None:
             write_occurrence_evidence(
                 occurrence_observation,
@@ -681,6 +723,8 @@ def run_execution_entrypoint(
         OccurrenceRequestError,
         OccurrenceObservationError,
         OccurrenceNativeAccessError,
+        FactRequestError,
+        FactObservationError,
     ) as exc:
         _try_emit_failure_result(result_path, exc)
         if isinstance(exc, ExecutionEntrypointError):
