@@ -324,6 +324,8 @@ class RuntimeExecutionEntrypointTests(unittest.TestCase):
             source = working / "model.FCStd"
             source.write_bytes(b"prepared working copy")
             result = working / "result.json"
+            output = working / "output"
+            output.mkdir()
             observation_request = working / "observation.json"
             observation_request.write_text("{}", encoding="utf-8")
             traversal_request = working / "traversal.json"
@@ -1405,6 +1407,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             request = working / "request.json"
             result = working / "result.json"
             output = working / "output"
+            output.mkdir()
             calls: list[str] = []
             dependencies = self._dependencies(entrypoints, calls)
             patches = self._valid_manifest_patches(
@@ -1513,6 +1516,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 request_path = working / "traversal-request.json"
                 observation_path = working / "observation-request.json"
                 output = working / "output"
+                output.mkdir()
                 result = working / "result.json"
                 calls: list[str] = []
                 normalized_request = entrypoints.ReferenceTraversalRequest(
@@ -1614,6 +1618,8 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             source = working / "model.FCStd"
             source.write_bytes(b"source")
             result = working / "result.json"
+            output = working / "output"
+            output.mkdir()
             calls: list[str] = []
 
             def run_traversal(*args, **kwargs):
@@ -1652,7 +1658,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                     working_copy=working,
                     manifest_path=manifest,
                     result_path=result,
-                    output_directory=working / "output",
+                    output_directory=output,
                     observation_request_path=working / "observation.json",
                     reference_traversal_request_path=working / "traversal.json",
                     freecad_module=object(),
@@ -1678,6 +1684,8 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             source_path = working / "model.FCStd"
             source_path.write_bytes(b"source")
             result = working / "result.json"
+            output = working / "output"
+            output.mkdir()
             calls: list[str] = []
             source = CanonicalReferenceTraversalNode(
                 kind="object", state="resolved", document_path="model.FCStd",
@@ -1732,7 +1740,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                     working_copy=working,
                     manifest_path=manifest,
                     result_path=result,
-                    output_directory=working / "output",
+                    output_directory=output,
                     reference_traversal_request_path=working / "traversal.json",
                     freecad_module=object(),
                     _dependencies=dependencies,
@@ -1759,6 +1767,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             source_path.write_bytes(b"source")
             result = working / "result.json"
             output_directory = working / "output"
+            output_directory.mkdir()
             calls: list[str] = []
             resolved = CanonicalReferenceTraversalNode(
                 kind="object", state="resolved", document_path="model.FCStd",
@@ -1826,7 +1835,9 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 ),
             )
 
-    def test_output_write_failure_is_controlled_and_skips_observation(self) -> None:
+    def test_missing_output_directory_fails_before_work_and_skips_observation(
+        self,
+    ) -> None:
         from parametron_freecad.runtime import entrypoints
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1871,18 +1882,14 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
                 )
 
             self.assertIsInstance(
-                caught.exception.__cause__,
-                entrypoints.ReferenceTraversalOutputWriteError,
+                caught.exception, entrypoints.EvidenceOutputDirectoryError
             )
-            self.assertEqual(
-                calls,
-                ["open", "assign", "recompute", "save", "step", "csv", "pdf", "traversal", "close"],
-            )
+            self.assertEqual(calls, [])
             self.assertFalse(missing_output.exists())
             self._assert_failed_result(
                 result,
                 stage="reference_traversal_output_containment",
-                substring="failed to atomically write reference traversal output file",
+                substring="requires an existing output directory",
             )
 
     def test_real_atomic_writer_emits_canonical_traversal_file(self) -> None:
@@ -2018,6 +2025,7 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
             request = working / "request.json"
             result = working / "result.json"
             output = working / "output"
+            output.mkdir()
             calls: list[str] = []
             patches = self._valid_manifest_patches(
                 entrypoints,

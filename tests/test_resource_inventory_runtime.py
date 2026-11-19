@@ -82,6 +82,8 @@ class ResourceInventoryRuntimeTests(unittest.TestCase):
     def test_invalid_inventory_fails_before_document_open(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             working, manifest, result = self._paths(tmp_dir)
+            outputs = working / "outputs"
+            outputs.mkdir()
             request = working / "prm.integrity-request.json"
             request.write_text(
                 '{"schemaVersion":"2.0","resources":[]}', encoding="utf-8"
@@ -93,6 +95,7 @@ class ResourceInventoryRuntimeTests(unittest.TestCase):
                     working_copy=working,
                     manifest_path=manifest,
                     result_path=result,
+                    output_directory=outputs,
                     integrity_request_path=request,
                     freecad_module=object(),
                     _dependencies=_ExecutionEntrypointDependencies(

@@ -15,6 +15,10 @@ from parametron_freecad.common.paths import (
     require_existing_directory,
     require_existing_file,
 )
+from parametron_freecad.execution.csv_export import (
+    CsvArtifactExportError,
+    export_csv_artifacts,
+)
 from parametron_freecad.execution.document_recompute import (
     DocumentRecomputeError,
     recompute_document,
@@ -27,21 +31,17 @@ from parametron_freecad.execution.parameter_assignment import (
     ParameterAssignmentError,
     apply_parameter_assignments,
 )
-from parametron_freecad.execution.csv_export import (
-    CsvArtifactExportError,
-    export_csv_artifacts,
-)
 from parametron_freecad.execution.pdf_export import (
     PdfArtifactExportError,
     export_pdf_artifacts,
 )
-from parametron_freecad.execution.step_export import (
-    StepArtifactExportError,
-    export_step_artifacts,
-)
 from parametron_freecad.execution.result_writer import (
     ResultWriteError,
     write_success_result,
+)
+from parametron_freecad.execution.step_export import (
+    StepArtifactExportError,
+    export_step_artifacts,
 )
 from parametron_freecad.runtime.document_lifecycle import (
     DocumentLifecycleError,
@@ -72,9 +72,7 @@ from parametron_freecad.runtime.resource_inventory import (
 # Deprecated compatibility surface for callers that imported the old boundary.
 EXECUTION_NOT_IMPLEMENTED_EXIT_CODE = 3
 
-FREECAD_UNAVAILABLE_MESSAGE = (
-    "parametron-freecad: FreeCAD module is not available"
-)
+FREECAD_UNAVAILABLE_MESSAGE = "parametron-freecad: FreeCAD module is not available"
 INVALID_ARGUMENTS_MESSAGE_PREFIX = "parametron-freecad: invalid arguments: "
 EXECUTION_FAILURE_MESSAGE_PREFIX = "parametron-freecad: execute failed: "
 EXECUTION_NOT_IMPLEMENTED_MESSAGE = (
@@ -247,8 +245,11 @@ def parse_headless_arguments(argv: list[str] | None) -> HeadlessInvocation:
         working_copy=working_copy,
     )
     if observation_request is not None and output_dir is None:
+        raise HeadlessArgumentError("--observation-request requires --output-dir")
+    if observation_request is not None and not output_dir.is_dir():
         raise HeadlessArgumentError(
-            "--observation-request requires --output-dir"
+            "--output-dir must be an existing directory when observation "
+            "output emission is requested"
         )
     reference_traversal_request = _normalize_reference_traversal_request(
         namespace.reference_traversal_request,
