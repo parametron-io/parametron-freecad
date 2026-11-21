@@ -37,6 +37,10 @@ from parametron_freecad.execution.manifest_validation import (
     ManifestValidationResult,
     validate_export_manifest_v1,
 )
+from parametron_freecad.execution.metadata_mutation import (
+    MetadataMutationError,
+    apply_metadata_mutations,
+)
 from parametron_freecad.execution.parameter_assignment import (
     ParameterAssignmentError,
     apply_parameter_assignments,
@@ -119,6 +123,7 @@ from parametron_freecad.runtime.failure_output_contract import (
     FAILURE_STAGE_INTEGRITY_RESULT,
     FAILURE_STAGE_MANIFEST_LOADING,
     FAILURE_STAGE_MANIFEST_VALIDATION,
+    FAILURE_STAGE_METADATA,
     FAILURE_STAGE_OBSERVATION,
     FAILURE_STAGE_OBSERVATION_OUTPUT,
     FAILURE_STAGE_OCCURRENCE_EVIDENCE,
@@ -244,6 +249,7 @@ class _ExecutionEntrypointDependencies:
     apply_parameter_assignments: Callable[[Any, Any], None] = (
         apply_parameter_assignments
     )
+    apply_metadata_mutations: Callable[[Any, Any], None] = apply_metadata_mutations
     apply_suppression_mutations: Callable[[Any, Any], None] = (
         apply_suppression_mutations
     )
@@ -445,6 +451,8 @@ def _failure_stage_for_exception(exc: BaseException) -> str:
         return FAILURE_STAGE_DOCUMENT_OPEN
     if isinstance(source, ParameterAssignmentError):
         return FAILURE_STAGE_PARAMETER_ASSIGNMENT
+    if isinstance(source, MetadataMutationError):
+        return FAILURE_STAGE_METADATA
     if isinstance(source, SuppressionMutationError):
         return FAILURE_STAGE_SUPPRESSION
     if isinstance(source, VisibilityMutationError):
@@ -589,6 +597,7 @@ def _apply_target_mutations_and_recompute(
 
     contract = EXPORT_MANIFEST_V1_CONTRACT
     consumers = {
+        contract.assembly_mutations.metadata_field: dependencies.apply_metadata_mutations,
         contract.assembly_mutations.suppression_field: dependencies.apply_suppression_mutations,
         contract.assembly_mutations.visibility_field: dependencies.apply_visibility_mutations,
         contract.assembly_mutations.deletion_field: dependencies.apply_deletion_mutations,
@@ -869,6 +878,7 @@ def run_execution_entrypoint(
             )
         _dependencies.write_success_result(result_path, outputs)
     except (
+        MetadataMutationError,
         SuppressionMutationError,
         VisibilityMutationError,
         DeletionMutationError,

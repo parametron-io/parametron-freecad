@@ -17,6 +17,9 @@ CORPUS = Path(__file__).parent / 'fixtures' / 'engine_generated'
 
 def mutations(prefix, families):
     values = {
+        'metadata': [
+            {'object': prefix + 'M2', 'property': 'material', 'value': 'steel', 'valueKind': 'string'},
+            {'object': prefix + 'M1', 'property': 'revision', 'value': 7, 'valueKind': 'integer'}],
         'suppression': [{'object': prefix + 'S2', 'suppressed': True}, {'object': prefix + 'S1', 'suppressed': False}],
         'visibility': [{'object': prefix + 'V2', 'visible': False}, {'object': prefix + 'V1', 'visible': True}],
         'deletion': [{'object': prefix + 'D2'}, {'object': prefix + 'D1'}],
@@ -31,26 +34,40 @@ def payload(assembly=(), part=()):
         'outputs': [], 'partMutations': mutations('P', part), 'assemblyMutations': mutations('A', assembly)}
 
 
+METADATA_PROPERTIES = ('material', 'tagged', 'mass', 'revision', 'tolerance', 'sequence')
+NATIVE_PROPERTY_TYPES = {
+    'Suppressed': 'App::PropertyBool', 'Visibility': 'App::PropertyBool',
+    'Length': 'App::PropertyFloat', 'material': 'App::PropertyString',
+    'tagged': 'App::PropertyBool', 'mass': 'App::PropertyFloat',
+    'revision': 'App::PropertyInteger', 'tolerance': 'App::PropertyFloatConstraint',
+    'sequence': 'App::PropertyIntegerConstraint'}
+
+
 class NativeObject:
-    PropertiesList = ['Suppressed', 'Visibility', 'Length']
+    PropertiesList = ['Suppressed', 'Visibility', 'Length', *METADATA_PROPERTIES]
     InList = ()
     OutList = ()
 
     def __init__(self, name, event):
         self.Name = name
         self.event = event
-        self.__dict__.update(Suppressed=False, Visibility=True, Length=1)
+        self.__dict__.update(Suppressed=False, Visibility=True, Length=1,
+                             material='PLA', tagged=False, mass=1.5, revision=1,
+                             tolerance=0.5, sequence=10)
 
     def isDerivedFrom(self, type_name):
         return self.Name == 'Health' and type_name == 'PartDesign::Body'
 
     def getTypeIdOfProperty(self, name):
-        return 'App::PropertyBool'
+        return NATIVE_PROPERTY_TYPES[name]
 
     def __setattr__(self, name, value):
-        family = {'Suppressed': 'suppression', 'Visibility': 'visibility', 'Length': 'assignment'}.get(name)
-        if family:
-            self.event(f'{family}:{self.Name}')
+        if name in METADATA_PROPERTIES:
+            self.event(f'metadata:{self.Name}:{name}')
+        else:
+            family = {'Suppressed': 'suppression', 'Visibility': 'visibility', 'Length': 'assignment'}.get(name)
+            if family:
+                self.event(f'{family}:{self.Name}')
         object.__setattr__(self, name, value)
 
 
@@ -71,7 +88,7 @@ class Harness:
         self.close_failure = close_failure
         self.closed = False
         self.data = copy.deepcopy(data)
-        names = ['Parameters', 'Health'] + [p + f + n for p in 'AP' for f in 'SVD' for n in '21']
+        names = ['Parameters', 'Health'] + [p + f + n for p in 'AP' for f in 'SVDM' for n in '21']
         self.objects = {name: NativeObject(name, self.event) for name in names}
         self.objects['Health'].Shape = SimpleNamespace(
             isNull=lambda: (self.event('validity'), False)[1],
@@ -107,9 +124,14 @@ class Harness:
         self.event(f'deletion:{name}')
         del self.objects[name]
 
+    def state(self):
+        return {name: (obj.Length, obj.Suppressed, obj.Visibility, *(
+            getattr(obj, property_name) for property_name in METADATA_PROPERTIES))
+            for name, obj in self.objects.items()}
+
     def save(self):
         self.event('save')
-        self.saved = {name: (obj.Length, obj.Suppressed, obj.Visibility) for name, obj in self.objects.items()}
+        self.saved = self.state()
 
     def close(self, name):
         assert name == 'Doc'
@@ -133,7 +155,7 @@ class Harness:
 
     def observe(self, document, request, **kwargs):
         assert document is self.document
-        assert self.saved == {name: (obj.Length, obj.Suppressed, obj.Visibility) for name, obj in self.objects.items()}
+        assert self.saved == self.state()
         assert not (self.root / 'prm.result.json').exists()
         try:
             self.event('observation')
@@ -163,6 +185,9 @@ class Harness:
 # two deletions. No expected event list is derived from the runtime helper.
 CASES = [
     ((), (), ['recompute']),
+    ((), ('metadata',), ['metadata:PM2:material', 'metadata:PM1:revision', 'recompute', 'validity']),
+    (('metadata',), ('metadata',), ['metadata:AM2:material', 'metadata:AM1:revision',
+        'metadata:PM2:material', 'metadata:PM1:revision', 'recompute', 'validity']),
     ((), ('suppression',), ['suppression:PS2', 'suppression:PS1', 'recompute', 'validity']),
     ((), ('visibility',), ['visibility:PV2', 'visibility:PV1', 'recompute', 'validity']),
     ((), ('deletion',), ['deletion:PD2', 'recompute', 'validity', 'deletion:PD1', 'recompute', 'validity']),
@@ -176,6 +201,13 @@ CASES = [
     (('suppression', 'visibility', 'deletion'), ('suppression', 'visibility', 'deletion'),
         ['suppression:AS2', 'suppression:AS1', 'visibility:AV2', 'visibility:AV1',
          'deletion:AD2', 'recompute', 'validity', 'deletion:AD1', 'recompute', 'validity',
+         'suppression:PS2', 'suppression:PS1', 'visibility:PV2', 'visibility:PV1',
+         'deletion:PD2', 'recompute', 'validity', 'deletion:PD1', 'recompute', 'validity']),
+    (('metadata', 'suppression', 'visibility', 'deletion'), ('metadata', 'suppression', 'visibility', 'deletion'),
+        ['metadata:AM2:material', 'metadata:AM1:revision',
+         'suppression:AS2', 'suppression:AS1', 'visibility:AV2', 'visibility:AV1',
+         'deletion:AD2', 'recompute', 'validity', 'deletion:AD1', 'recompute', 'validity',
+         'metadata:PM2:material', 'metadata:PM1:revision',
          'suppression:PS2', 'suppression:PS1', 'visibility:PV2', 'visibility:PV1',
          'deletion:PD2', 'recompute', 'validity', 'deletion:PD1', 'recompute', 'validity']),
 ]
@@ -302,3 +334,56 @@ def test_unsafe_deletion_rejects_surviving_dependents_before_removal(tmp_path):
     assert harness.events == ['open', 'assignment:Parameters', 'close']
     assert harness.document.getObject('PD2') is not None
     assert harness.document.getObject('PD1') is not None
+
+
+def test_metadata_mutation_runs_on_prepared_working_copy_and_persists(tmp_path):
+    harness = Harness(tmp_path / 'run', payload(part=('metadata',)))
+    harness.run()
+    assert harness.events[:3] == ['open', 'assignment:Parameters', 'metadata:PM2:material']
+    assert harness.events.index('metadata:PM1:revision') < harness.events.index('recompute')
+    assert harness.events.index('recompute') < harness.events.index('validity') < harness.events.index('save')
+    assert harness.objects['PM2'].material == 'steel'
+    assert harness.objects['PM1'].revision == 7
+    assert harness.saved['PM2'][3] == 'steel'
+    assert harness.saved['PM1'][6] == 7
+    assert (harness.root / 'model.FCStd').read_bytes() == b'pristine source'
+    assert harness.result() == {'schemaVersion': '1.0', 'status': 'succeeded', 'artifacts': []}
+
+
+def test_metadata_failure_is_classified_and_stops_later_stages(tmp_path):
+    harness = Harness(tmp_path / 'run', payload(part=('metadata', 'suppression', 'visibility')),
+                      fail='metadata:PM2:material')
+    with pytest.raises(harness.ep.ExecutionEntrypointError) as caught:
+        harness.run()
+    assert caught.value.__cause__.__cause__ is harness.original
+    assert harness.events == ['open', 'assignment:Parameters', 'metadata:PM2:material', 'close']
+    assert 'save' not in harness.events and 'success' not in harness.events
+    result = harness.result()
+    assert result['failure']['stage'] == 'metadata'
+    assert result['failure']['boundary'] == 'execution_entrypoint'
+    assert result['failure']['code'] == 'runtime_failure'
+    assert (harness.root / 'model.FCStd').read_bytes() == b'pristine source'
+
+
+def test_metadata_only_request_triggers_validity_before_persistence(tmp_path):
+    harness = Harness(tmp_path / 'run', payload(part=('metadata',)))
+    harness.objects['Health'].Shape.isValid = lambda: False
+    with pytest.raises(harness.ep.ExecutionEntrypointError):
+        harness.run()
+    assert harness.result()['failure']['stage'] == 'post_mutation_validity'
+    assert harness.events[-2:] == ['validity', 'close']
+    assert 'save' not in harness.events and 'success' not in harness.events
+    assert (harness.root / 'model.FCStd').read_bytes() == b'pristine source'
+
+
+def test_metadata_write_precedes_deletion_of_same_object(tmp_path):
+    data = payload(part=('metadata', 'deletion'))
+    data['partMutations']['metadata'] = [
+        {'object': 'PD1', 'property': 'material', 'value': 'steel', 'valueKind': 'string'}]
+    data['partMutations']['deletion'] = [{'object': 'PD1'}]
+    harness = Harness(tmp_path / 'run', data)
+    harness.run()
+    assert harness.events == ['open', 'assignment:Parameters', 'metadata:PD1:material',
+        'deletion:PD1', 'recompute', 'validity', 'save', 'step', 'csv', 'pdf',
+        'traversal', 'observation', 'close', 'success']
+    assert harness.document.getObject('PD1') is None

@@ -121,6 +121,8 @@ class FailureOutputContractTests(unittest.TestCase):
             self.contract.FAILURE_STAGE_PARAMETER_ASSIGNMENT,
             "parameter_assignment",
         )
+        self.assertEqual(self.contract.FAILURE_STAGE_METADATA, "metadata")
+        self.assertIn("FAILURE_STAGE_METADATA", self.contract.__all__)
         self.assertEqual(
             self.contract.FAILURE_STAGE_DOCUMENT_SAVE,
             "document_save",
