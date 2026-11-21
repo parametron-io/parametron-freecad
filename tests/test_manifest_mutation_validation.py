@@ -37,11 +37,27 @@ FULL_CANONICAL_POSITIVE = {
     "sourceDocument": "model.FCStd",
     "parameterAssignments": [],
     "assemblyMutations": {
+        "metadata": [
+            {
+                "object": "AsmD",
+                "property": "material",
+                "value": "steel",
+                "valueKind": "string",
+            }
+        ],
         "suppression": [{"object": "AsmA", "suppressed": True}],
         "visibility": [{"object": "AsmB", "visible": False}],
         "deletion": [{"object": "AsmC"}],
     },
     "partMutations": {
+        "metadata": [
+            {
+                "object": "Body",
+                "property": "revision",
+                "value": 7,
+                "valueKind": "integer",
+            }
+        ],
         "suppression": [{"object": "Pad", "suppressed": False}],
         "visibility": [{"object": "Body", "visible": True}],
         "deletion": [{"object": "Chamfer"}],
@@ -150,6 +166,21 @@ class TestSparseMutationSections(unittest.TestCase):
 
     def test_sparse_deletion_only_is_valid(self):
         data = _canonical(partMutations={"deletion": []})
+        self.assertTrue(mv.validate_export_manifest_v1(data).is_valid)
+
+    def test_sparse_metadata_only_is_valid(self):
+        data = _canonical(
+            partMutations={
+                "metadata": [
+                    {
+                        "object": "Body",
+                        "property": "material",
+                        "value": "steel",
+                        "valueKind": "string",
+                    }
+                ]
+            }
+        )
         self.assertTrue(mv.validate_export_manifest_v1(data).is_valid)
 
     def test_neither_mutation_section_present_is_valid(self):
@@ -263,8 +294,18 @@ class TestCollectionTypeValidation(unittest.TestCase):
                     [(mv.DIAGNOSTIC_INVALID_MUTATION_COLLECTION_TYPE, "partMutations.deletion")],
                 )
 
+    def test_metadata_rejects_non_array_values(self):
+        for bad in self.INVALID_COLLECTION_VALUES:
+            with self.subTest(bad=bad):
+                data = _canonical(partMutations={"metadata": bad})
+                result = mv.validate_export_manifest_v1(data)
+                self.assertEqual(
+                    [(d.code, d.path) for d in result.diagnostics],
+                    [(mv.DIAGNOSTIC_INVALID_MUTATION_COLLECTION_TYPE, "partMutations.metadata")],
+                )
+
     def test_empty_array_remains_valid_for_each_collection(self):
-        for name in ("suppression", "visibility", "deletion"):
+        for name in ("metadata", "suppression", "visibility", "deletion"):
             with self.subTest(name=name):
                 data = _canonical(assemblyMutations={name: []})
                 self.assertTrue(mv.validate_export_manifest_v1(data).is_valid)
@@ -492,6 +533,471 @@ class TestDeletionEntryValidation(unittest.TestCase):
                 )
 
 
+class TestMetadataEntryValidation(unittest.TestCase):
+    def _entries(self, entries):
+        return _canonical(partMutations={"metadata": entries})
+
+    def _result(self, entries):
+        return mv.validate_export_manifest_v1(self._entries(entries))
+
+    def test_valid_all_value_kinds(self):
+        data = self._entries(
+            [
+                {
+                    "object": "Body",
+                    "property": "material",
+                    "value": "steel",
+                    "valueKind": "string",
+                },
+                {
+                    "object": "Body",
+                    "property": "tagged",
+                    "value": True,
+                    "valueKind": "boolean",
+                },
+                {
+                    "object": "Body",
+                    "property": "mass",
+                    "value": 1.5,
+                    "valueKind": "number",
+                },
+                {
+                    "object": "Body",
+                    "property": "revision",
+                    "value": 7,
+                    "valueKind": "integer",
+                },
+            ]
+        )
+        self.assertTrue(mv.validate_export_manifest_v1(data).is_valid)
+
+    def test_same_object_different_properties_allowed(self):
+        data = self._entries(
+            [
+                {
+                    "object": "Body",
+                    "property": "material",
+                    "value": "steel",
+                    "valueKind": "string",
+                },
+                {
+                    "object": "Body",
+                    "property": "revision",
+                    "value": 7,
+                    "valueKind": "integer",
+                },
+            ]
+        )
+        self.assertTrue(mv.validate_export_manifest_v1(data).is_valid)
+
+    def test_non_object_entry_rejected(self):
+        for bad in (None, 1, True, "entry", []):
+            with self.subTest(bad=bad):
+                result = self._result([bad])
+                self.assertEqual(
+                    [(d.code, d.path) for d in result.diagnostics],
+                    [
+                        (
+                            mv.DIAGNOSTIC_INVALID_MUTATION_ENTRY_TYPE,
+                            "partMutations.metadata[0]",
+                        )
+                    ],
+                )
+
+    def test_missing_each_field_rejected(self):
+        full = {
+            "object": "Body",
+            "property": "material",
+            "value": "steel",
+            "valueKind": "string",
+        }
+        for field_name in ("object", "property", "value", "valueKind"):
+            entry = dict(full)
+            del entry[field_name]
+            with self.subTest(field=field_name):
+                result = self._result([entry])
+                self.assertIn(
+                    (
+                        mv.DIAGNOSTIC_MISSING_MUTATION_ENTRY_FIELD,
+                        "partMutations.metadata[0]",
+                    ),
+                    [(d.code, d.path) for d in result.diagnostics],
+                )
+
+    def test_unknown_field_rejected(self):
+        for field_name in (
+            "semanticId",
+            "semanticID",
+            "displayName",
+            "target",
+            "targetKind",
+            "type",
+            "unit",
+            "force",
+            "cascade",
+            "action",
+        ):
+            entry = {
+                "object": "Body",
+                "property": "material",
+                "value": "steel",
+                "valueKind": "string",
+                field_name: True,
+            }
+            with self.subTest(field=field_name):
+                result = self._result([entry])
+                self.assertIn(
+                    (
+                        mv.DIAGNOSTIC_UNKNOWN_MUTATION_ENTRY_FIELD,
+                        f"partMutations.metadata[0].{field_name}",
+                    ),
+                    [(d.code, d.path) for d in result.diagnostics],
+                )
+
+    def test_object_and_property_must_be_exact_non_empty_strings(self):
+        for field_name in ("object", "property"):
+            for bad in (
+                None,
+                1,
+                True,
+                "",
+                " Body",
+                "Body ",
+                "   ",
+                "Bo\x00dy",
+                [],
+                {},
+            ):
+                entry = {
+                    "object": "Body",
+                    "property": "material",
+                    "value": "steel",
+                    "valueKind": "string",
+                }
+                entry[field_name] = bad
+                with self.subTest(field=field_name, bad=bad):
+                    result = self._result([entry])
+                    self.assertIn(
+                        (
+                            mv.DIAGNOSTIC_INVALID_METADATA_ENTRY_FIELD_TYPE,
+                            f"partMutations.metadata[0].{field_name}",
+                        ),
+                        [(d.code, d.path) for d in result.diagnostics],
+                    )
+
+    def test_value_kind_must_be_string(self):
+        for bad in (None, 1, True, [], {}):
+            entry = {
+                "object": "Body",
+                "property": "material",
+                "value": "steel",
+                "valueKind": bad,
+            }
+            with self.subTest(bad=bad):
+                result = self._result([entry])
+                self.assertEqual(
+                    [(d.code, d.path) for d in result.diagnostics],
+                    [
+                        (
+                            mv.DIAGNOSTIC_INVALID_METADATA_ENTRY_FIELD_TYPE,
+                            "partMutations.metadata[0].valueKind",
+                        )
+                    ],
+                )
+
+    def test_unsupported_value_kind_rejected(self):
+        for bad in ("date", "", "Float", "int"):
+            entry = {
+                "object": "Body",
+                "property": "material",
+                "value": "steel",
+                "valueKind": bad,
+            }
+            with self.subTest(bad=bad):
+                result = self._result([entry])
+                self.assertEqual(
+                    [(d.code, d.path) for d in result.diagnostics],
+                    [
+                        (
+                            mv.DIAGNOSTIC_UNSUPPORTED_METADATA_VALUE_KIND,
+                            "partMutations.metadata[0].valueKind",
+                        )
+                    ],
+                )
+
+    def test_string_value_kind_rejects_non_strings(self):
+        for bad in (1, True, None, [], {}):
+            entry = {
+                "object": "Body",
+                "property": "material",
+                "value": bad,
+                "valueKind": "string",
+            }
+            with self.subTest(bad=bad):
+                result = self._result([entry])
+                self.assertEqual(
+                    [(d.code, d.path) for d in result.diagnostics],
+                    [
+                        (
+                            mv.DIAGNOSTIC_INVALID_METADATA_VALUE,
+                            "partMutations.metadata[0].value",
+                        )
+                    ],
+                )
+
+    def test_boolean_value_kind_requires_strict_json_boolean(self):
+        for bad in (0, 1, "true", "false", None, [], {}):
+            entry = {
+                "object": "Body",
+                "property": "tagged",
+                "value": bad,
+                "valueKind": "boolean",
+            }
+            with self.subTest(bad=bad):
+                result = self._result([entry])
+                self.assertEqual(
+                    [(d.code, d.path) for d in result.diagnostics],
+                    [
+                        (
+                            mv.DIAGNOSTIC_INVALID_METADATA_VALUE,
+                            "partMutations.metadata[0].value",
+                        )
+                    ],
+                )
+
+    def test_number_value_kind_accepts_int_and_finite_float(self):
+        for value in (7, -3, 0, 7.5, -0.5):
+            entry = {
+                "object": "Body",
+                "property": "mass",
+                "value": value,
+                "valueKind": "number",
+            }
+            with self.subTest(value=value):
+                self.assertTrue(
+                    mv.validate_export_manifest_v1(self._entries([entry])).is_valid
+                )
+
+    def test_number_value_kind_rejects_bool_string_none_and_non_finite(self):
+        for bad in (
+            True,
+            "7",
+            None,
+            [],
+            {},
+            float("inf"),
+            float("-inf"),
+            float("nan"),
+        ):
+            entry = {
+                "object": "Body",
+                "property": "mass",
+                "value": bad,
+                "valueKind": "number",
+            }
+            with self.subTest(bad=bad):
+                result = self._result([entry])
+                self.assertEqual(
+                    [(d.code, d.path) for d in result.diagnostics],
+                    [
+                        (
+                            mv.DIAGNOSTIC_INVALID_METADATA_VALUE,
+                            "partMutations.metadata[0].value",
+                        )
+                    ],
+                )
+
+    def test_integer_value_kind_accepts_int_and_integral_float(self):
+        for value in (7, -3, 0, 7.0, -3.0):
+            entry = {
+                "object": "Body",
+                "property": "revision",
+                "value": value,
+                "valueKind": "integer",
+            }
+            with self.subTest(value=value):
+                self.assertTrue(
+                    mv.validate_export_manifest_v1(self._entries([entry])).is_valid
+                )
+
+    def test_integer_value_kind_rejects_fractional_float(self):
+        for value in (1.5, -0.5):
+            entry = {
+                "object": "Body",
+                "property": "revision",
+                "value": value,
+                "valueKind": "integer",
+            }
+            with self.subTest(value=value):
+                result = self._result([entry])
+                diagnostics = [(d.code, d.path, d.message) for d in result.diagnostics]
+                self.assertEqual(
+                    [(code, path) for code, path, _ in diagnostics],
+                    [
+                        (
+                            mv.DIAGNOSTIC_INVALID_METADATA_VALUE,
+                            "partMutations.metadata[0].value",
+                        )
+                    ],
+                )
+                self.assertIn("exact integral", diagnostics[0][2])
+
+    def test_integer_value_kind_rejects_non_number_and_bool(self):
+        for bad in (True, "7", None, [], {}):
+            entry = {
+                "object": "Body",
+                "property": "revision",
+                "value": bad,
+                "valueKind": "integer",
+            }
+            with self.subTest(bad=bad):
+                result = self._result([entry])
+                self.assertEqual(
+                    [(d.code, d.path) for d in result.diagnostics],
+                    [
+                        (
+                            mv.DIAGNOSTIC_INVALID_METADATA_VALUE,
+                            "partMutations.metadata[0].value",
+                        )
+                    ],
+                )
+
+    def test_duplicate_object_property_pair_rejected(self):
+        entry = {
+            "object": "Body",
+            "property": "material",
+            "value": "steel",
+            "valueKind": "string",
+        }
+        result = self._result([entry, dict(entry)])
+        diagnostics = [(d.code, d.path, d.message) for d in result.diagnostics]
+        self.assertEqual(
+            [(code, path) for code, path, _ in diagnostics],
+            [
+                (
+                    mv.DIAGNOSTIC_DUPLICATE_METADATA_PROPERTY,
+                    "partMutations.metadata[1]",
+                )
+            ],
+        )
+        self.assertIn(
+            "first occurrence at partMutations.metadata[0]",
+            diagnostics[0][2],
+        )
+
+    def test_duplicate_check_uses_object_and_property_pair(self):
+        data = self._entries(
+            [
+                {
+                    "object": "Body",
+                    "property": "material",
+                    "value": "steel",
+                    "valueKind": "string",
+                },
+                {
+                    "object": "Body",
+                    "property": "revision",
+                    "value": 7,
+                    "valueKind": "integer",
+                },
+                {
+                    "object": "Other",
+                    "property": "material",
+                    "value": "brass",
+                    "valueKind": "string",
+                },
+            ]
+        )
+        self.assertTrue(mv.validate_export_manifest_v1(data).is_valid)
+
+    def test_metadata_coexists_with_suppression_and_visibility(self):
+        data = _canonical(
+            partMutations={
+                "metadata": [
+                    {
+                        "object": "Body",
+                        "property": "material",
+                        "value": "steel",
+                        "valueKind": "string",
+                    }
+                ],
+                "suppression": [{"object": "Body", "suppressed": True}],
+                "visibility": [{"object": "Body", "visible": False}],
+            }
+        )
+        self.assertTrue(mv.validate_export_manifest_v1(data).is_valid)
+
+    def test_metadata_does_not_conflict_with_deletion(self):
+        data = _canonical(
+            partMutations={
+                "metadata": [
+                    {
+                        "object": "Body",
+                        "property": "material",
+                        "value": "steel",
+                        "valueKind": "string",
+                    }
+                ],
+                "deletion": [{"object": "Body"}],
+            }
+        )
+        self.assertTrue(mv.validate_export_manifest_v1(data).is_valid)
+
+    def test_diagnostic_order_within_one_metadata_entry(self):
+        entry = {
+            "object": "",
+            "property": "",
+            "value": 1.5,
+            "valueKind": "integer",
+            "extra": True,
+        }
+        result = self._result([entry])
+        self.assertEqual(
+            [(d.code, d.path) for d in result.diagnostics],
+            [
+                (
+                    mv.DIAGNOSTIC_UNKNOWN_MUTATION_ENTRY_FIELD,
+                    "partMutations.metadata[0].extra",
+                ),
+                (
+                    mv.DIAGNOSTIC_INVALID_METADATA_ENTRY_FIELD_TYPE,
+                    "partMutations.metadata[0].object",
+                ),
+                (
+                    mv.DIAGNOSTIC_INVALID_METADATA_ENTRY_FIELD_TYPE,
+                    "partMutations.metadata[0].property",
+                ),
+                (
+                    mv.DIAGNOSTIC_INVALID_METADATA_VALUE,
+                    "partMutations.metadata[0].value",
+                ),
+            ],
+        )
+
+    def test_entries_validated_in_input_array_order(self):
+        entries = [
+            {
+                "object": "",
+                "property": "material",
+                "value": "steel",
+                "valueKind": "string",
+            },
+            {
+                "object": "Body",
+                "property": "",
+                "value": "steel",
+                "valueKind": "string",
+            },
+        ]
+        result = self._result(entries)
+        self.assertEqual(
+            [d.path for d in result.diagnostics],
+            [
+                "partMutations.metadata[0].object",
+                "partMutations.metadata[1].property",
+            ],
+        )
+
 class TestDuplicateMutationObjects(unittest.TestCase):
     def test_duplicate_suppression_object_rejected(self):
         data = _canonical(
@@ -679,6 +1185,40 @@ class TestCrossScopeConflicts(unittest.TestCase):
                     ],
                 )
 
+    def test_cross_scope_metadata_conflict(self):
+        data = _canonical(
+            assemblyMutations={
+                "metadata": [
+                    {
+                        "object": "X",
+                        "property": "material",
+                        "value": "steel",
+                        "valueKind": "string",
+                    }
+                ]
+            },
+            partMutations={
+                "metadata": [
+                    {
+                        "object": "X",
+                        "property": "revision",
+                        "value": 7,
+                        "valueKind": "integer",
+                    }
+                ]
+            },
+        )
+        result = mv.validate_export_manifest_v1(data)
+        self.assertEqual(
+            [(d.code, d.path) for d in result.diagnostics],
+            [
+                (
+                    mv.DIAGNOSTIC_CROSS_SCOPE_MUTATION_OBJECT_CONFLICT,
+                    "partMutations.metadata[0].object",
+                )
+            ],
+        )
+
     def test_object_in_multiple_families_both_scopes_reports_once(self):
         data = _canonical(
             assemblyMutations={
@@ -737,18 +1277,27 @@ class TestDiagnosticOrdering(unittest.TestCase):
             ],
         )
 
-    def test_family_order_within_scope_is_suppression_visibility_deletion(self):
+    def test_family_order_within_scope_is_metadata_suppression_visibility_deletion(self):
         data = _canonical(
             assemblyMutations={
                 "deletion": [{"object": "", }],
                 "suppression": [{"object": "", "suppressed": True}],
                 "visibility": [{"object": "", "visible": True}],
+                "metadata": [
+                    {
+                        "object": "",
+                        "property": "material",
+                        "value": "steel",
+                        "valueKind": "string",
+                    }
+                ],
             }
         )
         result = mv.validate_export_manifest_v1(data)
         self.assertEqual(
             [d.path for d in result.diagnostics],
             [
+                "assemblyMutations.metadata[0].object",
                 "assemblyMutations.suppression[0].object",
                 "assemblyMutations.visibility[0].object",
                 "assemblyMutations.deletion[0].object",
@@ -818,6 +1367,31 @@ class TestInputImmutability(unittest.TestCase):
 
     def test_valid_full_canonical_not_mutated(self):
         self._assert_unchanged(copy.deepcopy(FULL_CANONICAL_POSITIVE))
+
+    def test_valid_metadata_not_mutated(self):
+        data = _canonical(
+            partMutations={
+                "metadata": [
+                    {
+                        "object": "Body",
+                        "property": "material",
+                        "value": "steel",
+                        "valueKind": "string",
+                    }
+                ]
+            }
+        )
+        self._assert_unchanged(copy.deepcopy(data))
+
+    def test_duplicate_metadata_not_mutated(self):
+        entry = {
+            "object": "Body",
+            "property": "material",
+            "value": "steel",
+            "valueKind": "string",
+        }
+        data = _canonical(partMutations={"metadata": [entry, dict(entry)]})
+        self._assert_unchanged(copy.deepcopy(data))
 
     def test_duplicate_family_failure_not_mutated(self):
         data = _canonical(

@@ -28,20 +28,31 @@ OPTIONAL_TOP_LEVEL_FIELDS = (
 )
 TOP_LEVEL_FIELDS = REQUIRED_TOP_LEVEL_FIELDS + OPTIONAL_TOP_LEVEL_FIELDS
 
+MUTATION_COLLECTION_METADATA = "metadata"
 MUTATION_COLLECTION_SUPPRESSION = "suppression"
 MUTATION_COLLECTION_VISIBILITY = "visibility"
 MUTATION_COLLECTION_DELETION = "deletion"
 
 TARGET_MUTATION_SECTION_FIELDS = (
+    MUTATION_COLLECTION_METADATA,
     MUTATION_COLLECTION_SUPPRESSION,
     MUTATION_COLLECTION_VISIBILITY,
     MUTATION_COLLECTION_DELETION,
 )
 
 MUTATION_ENTRY_FIELD_OBJECT = "object"
+METADATA_ENTRY_FIELD_PROPERTY = "property"
+METADATA_ENTRY_FIELD_VALUE = "value"
+METADATA_ENTRY_FIELD_VALUE_KIND = "valueKind"
 SUPPRESSION_ENTRY_FIELD_SUPPRESSED = "suppressed"
 VISIBILITY_ENTRY_FIELD_VISIBLE = "visible"
 
+METADATA_ENTRY_FIELDS = (
+    MUTATION_ENTRY_FIELD_OBJECT,
+    METADATA_ENTRY_FIELD_PROPERTY,
+    METADATA_ENTRY_FIELD_VALUE,
+    METADATA_ENTRY_FIELD_VALUE_KIND,
+)
 SUPPRESSION_ENTRY_FIELDS = (
     MUTATION_ENTRY_FIELD_OBJECT,
     SUPPRESSION_ENTRY_FIELD_SUPPRESSED,
@@ -51,6 +62,18 @@ VISIBILITY_ENTRY_FIELDS = (
     VISIBILITY_ENTRY_FIELD_VISIBLE,
 )
 DELETION_ENTRY_FIELDS = (MUTATION_ENTRY_FIELD_OBJECT,)
+
+METADATA_VALUE_KIND_STRING = "string"
+METADATA_VALUE_KIND_BOOLEAN = "boolean"
+METADATA_VALUE_KIND_NUMBER = "number"
+METADATA_VALUE_KIND_INTEGER = "integer"
+
+SUPPORTED_METADATA_VALUE_KINDS = (
+    METADATA_VALUE_KIND_STRING,
+    METADATA_VALUE_KIND_BOOLEAN,
+    METADATA_VALUE_KIND_NUMBER,
+    METADATA_VALUE_KIND_INTEGER,
+)
 
 PARAMETER_ASSIGNMENT_FIELD_TARGET = "target"
 PARAMETER_ASSIGNMENT_FIELD_VALUE = "value"
@@ -126,6 +149,18 @@ class ManifestContract:
 
 
 @dataclass(frozen=True, slots=True)
+class MetadataEntryContract:
+    """Field names and value kinds for one metadata mutation entry."""
+
+    fields: tuple[str, ...]
+    object_field: str
+    property_field: str
+    value_field: str
+    value_kind_field: str
+    supported_value_kinds: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class SuppressionEntryContract:
     """Field names for one suppression mutation entry."""
 
@@ -156,9 +191,11 @@ class TargetMutationSectionContract:
     """Shared field and entry contracts for target mutations."""
 
     fields: tuple[str, ...]
+    metadata_field: str
     suppression_field: str
     visibility_field: str
     deletion_field: str
+    metadata_entry: MetadataEntryContract
     suppression_entry: SuppressionEntryContract
     visibility_entry: VisibilityEntryContract
     deletion_entry: DeletionEntryContract
@@ -177,6 +214,15 @@ OUTPUT_CONTRACT = OutputContract(
     format_field=OUTPUT_FIELD_FORMAT,
     path_field=OUTPUT_FIELD_PATH,
     supported_formats=SUPPORTED_OUTPUT_FORMATS,
+)
+
+METADATA_ENTRY_CONTRACT = MetadataEntryContract(
+    fields=METADATA_ENTRY_FIELDS,
+    object_field=MUTATION_ENTRY_FIELD_OBJECT,
+    property_field=METADATA_ENTRY_FIELD_PROPERTY,
+    value_field=METADATA_ENTRY_FIELD_VALUE,
+    value_kind_field=METADATA_ENTRY_FIELD_VALUE_KIND,
+    supported_value_kinds=SUPPORTED_METADATA_VALUE_KINDS,
 )
 
 SUPPRESSION_ENTRY_CONTRACT = SuppressionEntryContract(
@@ -198,9 +244,11 @@ DELETION_ENTRY_CONTRACT = DeletionEntryContract(
 
 TARGET_MUTATION_SECTION_CONTRACT = TargetMutationSectionContract(
     fields=TARGET_MUTATION_SECTION_FIELDS,
+    metadata_field=MUTATION_COLLECTION_METADATA,
     suppression_field=MUTATION_COLLECTION_SUPPRESSION,
     visibility_field=MUTATION_COLLECTION_VISIBILITY,
     deletion_field=MUTATION_COLLECTION_DELETION,
+    metadata_entry=METADATA_ENTRY_CONTRACT,
     suppression_entry=SUPPRESSION_ENTRY_CONTRACT,
     visibility_entry=VISIBILITY_ENTRY_CONTRACT,
     deletion_entry=DELETION_ENTRY_CONTRACT,
@@ -223,6 +271,7 @@ EXPORT_MANIFEST_V1_CONTRACT = ManifestContract(
     assembly_mutations=TARGET_MUTATION_SECTION_CONTRACT,
     part_mutations=TARGET_MUTATION_SECTION_CONTRACT,
 )
+
 
 def supported_output_formats() -> tuple[str, ...]:
     """Return the supported Phase 1 output formats in deterministic order."""
@@ -247,10 +296,22 @@ __all__ = [
     "FIELD_SCHEMA_VERSION",
     "FIELD_SOURCE_DOCUMENT",
     "ManifestContract",
+    "METADATA_ENTRY_CONTRACT",
+    "METADATA_ENTRY_FIELDS",
+    "METADATA_ENTRY_FIELD_PROPERTY",
+    "METADATA_ENTRY_FIELD_VALUE",
+    "METADATA_ENTRY_FIELD_VALUE_KIND",
+    "METADATA_VALUE_KIND_BOOLEAN",
+    "METADATA_VALUE_KIND_INTEGER",
+    "METADATA_VALUE_KIND_NUMBER",
+    "METADATA_VALUE_KIND_STRING",
+    "MetadataEntryContract",
     "MUTATION_COLLECTION_DELETION",
+    "MUTATION_COLLECTION_METADATA",
     "MUTATION_COLLECTION_SUPPRESSION",
     "MUTATION_COLLECTION_VISIBILITY",
     "MUTATION_ENTRY_FIELD_OBJECT",
+    "SUPPORTED_METADATA_VALUE_KINDS",
     "OUTPUT_CONTRACT",
     "OUTPUT_FIELDS",
     "OUTPUT_FIELD_FORMAT",
