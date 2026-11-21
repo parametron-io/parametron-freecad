@@ -94,6 +94,28 @@ def open_freecad_document(freecad_module: Any, path: Path) -> OpenedDocument:
     )
 
 
+def synchronize_native_object_inventory(document: Any, path: Path) -> None:
+    """Force FreeCAD to materialize the native object inventory after open."""
+
+    try:
+        objects = document.Objects
+    except AttributeError:
+        return
+    except Exception as exc:
+        raise DocumentOpenError(
+            f"FreeCAD failed to restore document object inventory: {path}"
+        ) from exc
+
+    try:
+        tuple(objects)
+    except TypeError:
+        return
+    except Exception as exc:
+        raise DocumentOpenError(
+            f"FreeCAD failed to restore document object inventory: {path}"
+        ) from exc
+
+
 def close_freecad_document(freecad_module: Any, opened: OpenedDocument) -> None:
     """Close an opened FreeCAD document by its stable document name."""
 
@@ -130,6 +152,7 @@ def opened_freecad_document(
 
 
 __all__ = [
+    "synchronize_native_object_inventory",
     "DocumentCloseError",
     "DocumentLifecycleError",
     "DocumentOpenError",
