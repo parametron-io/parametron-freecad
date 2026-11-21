@@ -19,6 +19,10 @@ orchestration and durable product storage/indexing are outside this repository.
   not added to the result's artifact list.
 - Declared STEP, CSV, and PDF exports. STEP selects exactly one object through
   `document.getObject(outputs[].id)`, with no Label or whole-document fallback.
+- Native mutation of existing metadata properties through exact
+  `<ObjectName>.<PropertyName>` entries, a post-write read-back check, and raw
+  post-mutation observation of the actual native state. Metadata is never
+  created; a missing property fails deterministically.
 - Optional observation of requested parameters, metadata, reference existence,
   and canonical request-scoped target-state suppression, visibility, and
   existence on the same live document, without evaluating verification checks.
@@ -39,17 +43,38 @@ orchestration and durable product storage/indexing are outside this repository.
   containment against the exact supplied working-copy root.
 
 Normal `execute` consumes canonical Engine-produced schema 1.0 manifests
-directly. Optional `assemblyMutations` and `partMutations` support suppression,
-visibility, and conservative deletion. Assembly precedes Part; within each
-section, suppression precedes visibility and deletion. Focused native tests
-also cover each capability independently. Standalone validation and normal
-`execute` accept the canonical schema 1.0 manifest and reject schema 2.0.
+directly. Optional `assemblyMutations` and `partMutations` support mutation of
+existing native metadata properties, suppression, visibility, and conservative
+deletion. Mutation ordering is deterministic: parameter assignments first,
+then Assembly before Part; within each section `metadata`, `suppression`,
+`visibility`, and `deletion` run in that order, so a metadata write precedes a
+deletion of the same object. Focused native tests also cover each capability
+independently. Standalone validation and normal `execute` accept the canonical
+schema 1.0 manifest and reject schema 2.0.
+
+Metadata mutation supports exactly these `valueKind` and native property type
+pairs:
+
+- `string` -> `App::PropertyString`
+- `boolean` -> `App::PropertyBool`
+- `number` -> `App::PropertyFloat`, `App::PropertyFloatConstraint`
+- `integer` -> `App::PropertyInteger`, `App::PropertyIntegerConstraint`
+
+`App::PropertyLength`, `App::PropertyDistance`, `App::PropertyAngle`, and
+`App::PropertyQuantity` are not native metadata mutation types. A missing,
+unsupported, or read-only property, a `valueKind`/native-type mismatch, and a
+post-write mismatch each produce a typed, deterministic metadata failure. A
+metadata failure is reported at failure stage `metadata`, stops later
+mutation stages, and leaves earlier successful writes applied.
+
 Traversal requests require `schemaVersion: "1.0"` and `externalTargets` (an
 empty array is valid). Raw traversal evidence retains object type, source
 property, reference mechanism, endpoint identity, and resolution state under
 schema 1.0.
-Requested target-state observation reads live native state after successful
-mutation and persistence and emits raw evidence. Engine owns expected-versus-
+Requested metadata and target-state observation reads live native state after
+successful mutation and persistence and emits raw evidence, including the
+actual native values and value kinds. Observation ordering is deterministic,
+and the working-copy digest expectation is first. Engine owns expected-versus-
 observed verification and normalized records. Mutation and lifecycle failures
 use the existing structured failure boundary; cleanup is attempted and a
 required-stage failure prevents a success result.
@@ -79,6 +104,15 @@ and persisted document before close.
   algebra, unit conversion, or computed physical mass.
 - A baseline mismatch fails before mutation. The runtime never reads, enforces,
   or rewrites `prm.project-lock.json`.
+- Metadata must already exist in the source document. FreeCAD does not create
+  missing metadata, property groups, aliases, or fallback properties, and
+  metadata authoring policy remains Engine-owned. There is no template, BOM,
+  metadata-deletion, or GUI authoring capability.
+- Read-only native properties fail at the metadata stage. Unsupported
+  Quantity-family native types (`App::PropertyLength`, `App::PropertyDistance`,
+  `App::PropertyAngle`, `App::PropertyQuantity`) also fail deterministically.
+- Parameter observation supports scalar boolean, integer, finite float, and
+  string values. Native `Quantity` values are not observed.
 - Verification decisions and normalized engineering records remain
   Engine-owned.
 

@@ -65,6 +65,34 @@ python -m pytest tests/test_observation_request.py
 python -m pytest -q tests/test_verification_contract.py tests/test_observed_contract.py tests/test_target_state_observation.py tests/test_target_state_real_fixtures.py
 ```
 
+Focused native metadata mutation and observation checks:
+
+```bash
+python -m pytest tests/test_metadata_mutation.py
+python -m pytest tests/test_metadata_observation.py
+python -m pytest tests/test_runtime_entrypoints.py -k metadata
+python -m pytest tests/test_canonical_runtime_lifecycle.py -k metadata
+```
+
+Metadata fixture prerequisites and the real-FreeCAD metadata mutation and
+observation proof (requires an available FreeCAD host; strict mode makes host
+unavailability a failure):
+
+```bash
+env PARAMETRON_FREECAD_STRICT_SMOKE=1 \
+  python -m pytest tests/test_metadata_mutation_fixtures.py \
+  tests/test_metadata_coexistence_fixture.py \
+  tests/test_metadata_mutation_real_lifecycle.py
+```
+
+Opt-in Engine acceptance proof for raw metadata evidence (requires a sibling
+`parametron-engine` checkout and `nix`):
+
+```bash
+env PARAMETRON_RUN_METADATA_ENGINE_ACCEPTANCE_PROOF=1 \
+  python -m pytest tests/test_metadata_engine_acceptance_proof.py
+```
+
 Focused native suppression, visibility, and deletion checks:
 
 ```bash
@@ -157,8 +185,14 @@ uses the rich `reference_traversal_output` serializer and one atomic writer.
 | `sourceDocument` containment | Covered | `tests/test_document_lifecycle.py`, `tests/test_headless_missing_working_copies.py`, `tests/test_headless_cli_arguments.py` | Traversal and symlink escapes rejected against the supplied root. |
 | FreeCAD-native manifest contract | Covered | `tests/test_manifest_contract.py` | Filename is `prm.export-manifest.json`. |
 | Canonical manifest mutation metadata and strict validation | Covered | `tests/test_manifest_mutation_contract.py`, `tests/test_manifest_mutation_validation.py` | Canonical schema-1 metadata and strict validation cover mutation section shapes, version rejection, booleans, duplicates, conflicts, and deterministic diagnostics. Normal execute accepts canonical schema 1.0 with mutations and rejects schema 2.0 before document operations. |
-| Canonical schema 1.0 mutation validation | Covered | `tests/test_canonical_manifest_validation.py`, `tests/test_canonical_lifecycle.py` | Four required core fields and optional `assemblyMutations`/`partMutations`; each section is closed to suppression, visibility, deletion. Strict booleans and entry shapes; duplicate, deletion, and cross-scope conflict rejection; suppression plus visibility coexistence; deterministic diagnostics without input mutation. Canonical Engine-generated manifest loads directly, and normal execute rejects schema 2.0. |
-| Canonical runtime lifecycle and failure handling | Covered | `tests/test_canonical_runtime_lifecycle.py` | Parameter assignment → Assembly suppression, visibility, deletion → Part suppression, visibility, deletion → required final recompute/validity when applicable → save → STEP/CSV/PDF exports → traversal → observation → close → success. Each deletion includes internal recompute and supported Body validity inspection; a final pass follows later mutation state without redundant checking after final deletion. Mutation-free execution retains one recompute and no new target-mutation validity requirement. Structured stages cover suppression, visibility, deletion, recompute, post_mutation_validity, document_save, observation, and document_close; failures stop later work, attempt cleanup, preserve native causes and the primary execution failure even when cleanup/result emission fails, and prevent false success. Earlier completed mutations are not generally rolled back. |
+| Canonical schema 1.0 mutation validation | Covered | `tests/test_canonical_manifest_validation.py`, `tests/test_canonical_lifecycle.py` | Four required core fields and optional `assemblyMutations`/`partMutations`; each section is closed to metadata, suppression, visibility, deletion. Strict booleans and entry shapes; duplicate, deletion, and cross-scope conflict rejection; suppression plus visibility coexistence; deterministic diagnostics without input mutation. Canonical Engine-generated manifest loads directly, and normal execute rejects schema 2.0. |
+| Native metadata mutation consumer | Covered | `tests/test_metadata_mutation.py` | Exact native object and property resolution through `document.getObject` and `PropertiesList`; only `string`/`boolean`/`number`/`integer` value kinds and exactly `App::PropertyString`, `App::PropertyBool`, `App::PropertyFloat`, `App::PropertyFloatConstraint`, `App::PropertyInteger`, and `App::PropertyIntegerConstraint`; no property creation; typed failures for missing object/property, unsupported Quantity-family types, value-kind mismatch, read-only writes, other native write failures, and post-write mismatch; caller order, fail-fast, earlier writes retained, no input mutation. |
+| Metadata lifecycle integration and failure stage | Covered | `tests/test_runtime_entrypoints.py`, `tests/test_canonical_runtime_lifecycle.py`, `tests/test_failure_output_contract.py` | Parameter assignments first, then Assembly and Part, each with `metadata` → `suppression` → `visibility` → `deletion`; metadata writes precede deletion of the same object; recompute and supported validity follow metadata-only mutation; `MetadataMutationError` maps to deterministic failure stage `metadata`; failure stops later stages, attempts cleanup, and prevents false success. |
+| Exact-native metadata observation | Covered | `tests/test_metadata_observation.py`, `tests/test_unavailable_requested_observations.py`, `tests/test_observed_contract.py` | Requested `{ownerId, key}` pairs resolve exact native `PropertiesList` membership and require a supported native type; the runtime reports the actual native value and value kind and rejects an observed value kind that disagrees with the native type; request order is preserved, the working-copy digest expectation remains first, and no unrequested or synthetic metadata is emitted. |
+| Metadata mutation fixture prerequisites | Covered, real FreeCAD | `tests/test_metadata_mutation_fixtures.py`, `tests/test_metadata_coexistence_fixture.py`, `scripts/generate_metadata_coexistence_fixture.py`, `tests/fixtures/metadata_mutation/` | Locked SHA-256 for the source and coexistence fixtures, non-LFS presence, native metadata inventory and types, read-only and Quantity-family properties, generator reproducibility and path guards, source fixture unchanged, and committed fixtures unchanged after real-FreeCAD inspection. |
+| Real-FreeCAD metadata mutation and observation proof | Covered, real FreeCAD | `tests/test_metadata_mutation_real_lifecycle.py`, `tests/freecad_metadata_mutation_lifecycle_runner.py` (test-only host), `tests/fixtures/metadata_mutation/` | Engine-authored `prm.export-manifest.json` and `prm.verification.json` enter production execute on the committed coexistence fixture. Real FreeCAD proves parameter assignment, six metadata writes across four value kinds, suppression, visibility, deletion, recompute/validity, save and independent reopen, raw post-mutation metadata observation, and deterministic failures for missing, unsupported, read-only, and value-kind-mismatch entries without property creation. Repeated runs agree on normalized evidence and the committed fixture remains unchanged. |
+| Opt-in Engine metadata acceptance proof | Covered, opt-in real FreeCAD | `tests/test_metadata_engine_acceptance_proof.py`, `scripts/run_metadata_engine_acceptance_proof.py` | Engine's normal CLI runs the production `parametron-freecad` launcher against the committed metadata fixture and accepts the raw FreeCAD metadata evidence through Engine-owned verification and normalized records. Gated by `PARAMETRON_RUN_METADATA_ENGINE_ACCEPTANCE_PROOF=1`; skipped otherwise. |
+| Canonical runtime lifecycle and failure handling | Covered | `tests/test_canonical_runtime_lifecycle.py` | Parameter assignment → Assembly metadata, suppression, visibility, deletion → Part metadata, suppression, visibility, deletion → required final recompute/validity when applicable → save → STEP/CSV/PDF exports → traversal → observation → close → success. Each deletion includes internal recompute and supported Body validity inspection; a final pass follows later mutation state without redundant checking after final deletion. Mutation-free execution retains one recompute and no new target-mutation validity requirement. Structured stages cover metadata, suppression, visibility, deletion, recompute, post_mutation_validity, document_save, observation, and document_close; failures stop later work, attempt cleanup, preserve native causes and the primary execution failure even when cleanup/result emission fails, and prevent false success. Earlier completed mutations are not generally rolled back. |
 | Canonical native lifecycle | Covered, real FreeCAD | `tests/test_canonical_lifecycle.py`, `tests/freecad_canonical_lifecycle_runner.py`, `tests/fixtures/canonical_lifecycle/` | Real normal execute persists large-variant parameters, suppression/unsuppression, hide/unhide, and conservative `Body002` deletion. No-delete regression proves `Body002` survives when deletion is omitted. Reopening proves persisted state equals live post-mutation observation; result/traversal emission, source-fixture integrity, and repeated-run semantic determinism are covered. |
 | Production-execute target-mutation native proof | Covered, real FreeCAD | `tests/test_mutation_execute_real_fixtures.py`, `tests/freecad_mutation_execute_runner.py` (test-only host, not a production entrypoint), `tests/fixtures/partdesign_mutations/` | Canonical schema 1.0 `prm.export-manifest.json` and `prm.verification.json` enter production execute. Real FreeCAD proves suppress/unsuppress, hide/unhide, conservative safe deletion, post-mutation recompute and validity, working-copy save and independent reopen, and requested raw suppression/visibility/existence observation in `prm.observed.json`. Unsafe deletion and native validity failures yield failed `prm.result.json`, no observation or false success, and predictable document closure. Equivalent runs agree on native state, validity, result, target-state observation, and output names; the committed fixture hash stays unchanged. This does not prove arbitrary-object deletion, `.FCStd` archive byte identity, or the separate real Engine-to-FreeCAD rehearsal. |
 | Ordinary production execute and native parameter persistence | Covered, real FreeCAD | `tests/test_execute_real_rehearsal.py`, `tests/freecad_canonical_parameter_inspection_runner.py` (test-only inspector), `tests/fixtures/canonical_lifecycle/input/cube.FCStd` | Two independent public `parametron-freecad execute` runs consume equivalent minimal schema 1.0 manifests with five `VarSet` assignments and `outputs: []` from fresh fixture copies under flat and nested arbitrary working roots. Real FreeCAD assigns parameters, recomputes, and saves the native working document before each process completes. Each run emits successful, byte-identical canonical `prm.result.json` with `artifacts: []`; results contain no fixture or temporary-root paths. After execution, separate real-FreeCAD processes reopen each saved `.FCStd` and find equivalent persisted parameter values. The committed fixture hash remains unchanged. Native persistence is not a derived output; generated `.FCStd` archive bytes are not compared. |
@@ -1560,6 +1594,107 @@ nix develop --command python -m pytest
 # PASS, 3682 passed, 1609 subtests passed
 ```
 
+## Focused FreeCAD-Native Metadata Mutation and Observation Coverage
+
+Production and test assets:
+
+```text
+parametron_freecad/execution/metadata_mutation.py
+parametron_freecad/runtime/metadata_access.py
+tests/test_metadata_mutation.py
+tests/test_metadata_observation.py
+tests/test_metadata_mutation_fixtures.py
+tests/test_metadata_coexistence_fixture.py
+tests/test_metadata_mutation_real_lifecycle.py
+tests/freecad_metadata_mutation_fixture_runner.py
+tests/freecad_metadata_coexistence_fixture_runner.py
+tests/freecad_metadata_mutation_lifecycle_runner.py
+scripts/generate_metadata_coexistence_fixture.py
+tests/fixtures/metadata_mutation/
+```
+
+The three FreeCAD runner scripts are test-only command-host support; they are
+not production entrypoints.
+
+### Consumer contract matrix
+
+| Tested Surface | Expected Behavior |
+| --- | --- |
+| Exact native addressing | Passes the authored object name unchanged to `document.getObject` and requires exact `PropertiesList` membership for the property; no Label, alias, case-normalized, or whitespace-normalized fallback |
+| Supported value kinds and native types | Exactly `string`/`App::PropertyString`, `boolean`/`App::PropertyBool`, `number`/`App::PropertyFloat` and `App::PropertyFloatConstraint`, and `integer`/`App::PropertyInteger` and `App::PropertyIntegerConstraint` |
+| No metadata creation | Missing objects and properties fail without creating properties, groups, aliases, or fallback properties; successful writes leave `PropertiesList` unchanged |
+| Unsupported native types | `App::PropertyLength`, `App::PropertyDistance`, `App::PropertyAngle`, and `App::PropertyQuantity` fail deterministically as unsupported native metadata mutation types |
+| Value-kind and value validation | A requested kind incompatible with the native type fails before writing; values must match the declared kind, numbers must be finite, and integers must be integral and inside the signed 64-bit range |
+| Read-only and native write failures | Read-only native properties fail as not writable; other native write exceptions fail as native write errors; underlying native causes are preserved where applicable |
+| Post-write verification | Each successful write is read back and must report the requested native value kind and value; native clamping, overflow wrap, or boolean coercion fails deterministically |
+| Ordering and fail-fast | Applies entries in caller-provided order, stops at the first failure, retains earlier successful writes without rollback, and does not apply later entries |
+| Observation exactness | Requested metadata resolves the exact `{ownerId, key}` pair, requires a supported native type, reports the actual native value and value kind, and rejects an observed value kind that disagrees with the native type |
+| Observation ordering | Observation output is deterministic; requested metadata preserves request order, the working-copy digest expectation remains first, and no unrequested or synthetic metadata is emitted |
+| Import safety | The consumer and observation modules import without FreeCAD modules present |
+
+### Fixture prerequisites
+
+The committed `tests/fixtures/metadata_mutation/` bundle contains an
+Engine-authored `prm.export-manifest.json`, `prm.verification.json`, project,
+CAD, semantic-map, and DSL inputs, `input/metadata-source.FCStd`, and the
+derived coexistence document `input/metadata-coexistence.FCStd`. Fixture tests
+lock the source and coexistence SHA-256 values, require fetched Git LFS
+content, inspect the native metadata inventory and types (including a read-only
+property and Quantity-family properties), prove generator success-path
+semantics and two-run semantic reproducibility, and verify that committed
+fixtures and the source fixture stay unchanged after real-FreeCAD inspection.
+
+### Real-FreeCAD evidence
+
+| Tested Surface | Established Fixture/Test Fact |
+| --- | --- |
+| Production execute lifecycle | The committed Engine-authored manifest and verification request run through normal `execute` against a temporary coexistence fixture copy: parameter assignment, six metadata writes across all four value kinds, suppression, visibility, conservative deletion, recompute/validity, persistence, and observation all complete |
+| Persisted native state | Independent reopen reports the requested metadata values and kinds, the suppressed `Pad`, the hidden `MetadataBody`, the assigned parameter, and the deleted `DeletionMarker`; the metadata `PropertiesList` is unchanged |
+| Raw observation | `prm.observed.json` reports the actual native metadata values and value kinds, the working-copy digest first, the parameter, the target-state facts, and the working-copy path reference; FreeCAD does not evaluate the Engine-authored checks |
+| Deterministic native failures | Missing property, unsupported `App::PropertyLength`, read-only `_ExternalGeoVersion`, and value-kind mismatch each produce a failed result at stage `metadata` with the typed cause, no observation, and unchanged baseline native state |
+| No metadata creation under failure | The missing-property failure does not add the property; the unsupported and mismatch failures leave the existing native value unchanged |
+| Repeatability | Two independent executions produce equivalent normalized result, metadata, parameter, target-state, working-copy digest, and native evidence; the committed fixture remains unchanged |
+| Opt-in Engine acceptance | With `PARAMETRON_RUN_METADATA_ENGINE_ACCEPTANCE_PROOF=1`, Engine's normal CLI invokes the production launcher against the committed fixture and accepts the raw FreeCAD metadata evidence through Engine-owned verification and normalized records; without the variable the test is skipped |
+
+This coverage proves the implemented native metadata mutation and raw
+observation capability. It does not prove metadata creation, property groups,
+templates, BOM semantics, metadata deletion, GUI authoring, arbitrary native
+property types, or Engine-owned policy. Engine remains responsible for
+expected state, verification, and normalized records; FreeCAD remains
+responsible for native execution, persistence, and raw evidence.
+
+### Validation results
+
+Focused consumer and observation suites:
+
+```bash
+nix develop --command python -m pytest tests/test_metadata_mutation.py tests/test_metadata_observation.py -q
+# PASS, 141 passed, 96 subtests passed
+```
+
+```bash
+nix develop --command python -m pytest tests/test_runtime_entrypoints.py tests/test_canonical_runtime_lifecycle.py -k metadata -q
+# PASS, 9 passed, 103 deselected
+```
+
+Real-FreeCAD metadata fixture and lifecycle suites:
+
+```bash
+nix develop --command env PARAMETRON_FREECAD_STRICT_SMOKE=1 \
+  python -m pytest tests/test_metadata_mutation_fixtures.py \
+  tests/test_metadata_coexistence_fixture.py \
+  tests/test_metadata_mutation_real_lifecycle.py -q
+# PASS, 31 passed, 2 subtests passed
+```
+
+Opt-in Engine acceptance proof:
+
+```bash
+nix develop --command env PARAMETRON_RUN_METADATA_ENGINE_ACCEPTANCE_PROOF=1 \
+  python -m pytest tests/test_metadata_engine_acceptance_proof.py -q
+# PASS, 1 passed
+```
+
 ## Focused Engineering-Evidence Sidecar Coverage
 
 The focused suites run without a FreeCAD host:
@@ -1614,11 +1749,13 @@ must remain unchanged during tests and are tracked with Git LFS.
 
 `tests/test_manifest_mutation_contract.py` checks canonical schema-1 contract
 metadata. `tests/test_manifest_mutation_validation.py` checks standalone
-schema-1 validation of sparse and combined suppression, visibility, and
-deletion mutations. It covers exact field shapes, strict booleans, duplicate
-and cross-scope conflict rejection, deterministic diagnostic order, and input
-immutability. Schema 2.0 is rejected by both standalone validation and normal
-execution before FreeCAD document operations.
+schema-1 validation of sparse and combined metadata, suppression, visibility,
+and deletion mutations. It covers exact field shapes, strict booleans, metadata
+selectors and value kinds, finite and integral numbers, duplicate and
+cross-scope conflict rejection, deterministic diagnostic order (`metadata` →
+`suppression` → `visibility` → `deletion`), and input immutability. Schema 2.0
+is rejected by both standalone validation and normal execution before FreeCAD
+document operations.
 
 ```bash
 python -m pytest tests/test_manifest_mutation_contract.py tests/test_manifest_mutation_validation.py tests/test_canonical_manifest_validation.py
