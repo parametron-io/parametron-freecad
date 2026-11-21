@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from parametron_freecad.execution.manifest_contract import (
     EXPORT_MANIFEST_V1_CONTRACT,
+    METADATA_VALUE_KIND_BOOLEAN,
+    METADATA_VALUE_KIND_INTEGER,
+    METADATA_VALUE_KIND_NUMBER,
+    METADATA_VALUE_KIND_STRING,
 )
 
 ROOT_PATH = "$"
@@ -38,14 +43,14 @@ DIAGNOSTIC_INVALID_MUTATION_COLLECTION_TYPE = "invalid_mutation_collection_type"
 DIAGNOSTIC_INVALID_MUTATION_ENTRY_TYPE = "invalid_mutation_entry_type"
 DIAGNOSTIC_MISSING_MUTATION_ENTRY_FIELD = "missing_mutation_entry_field"
 DIAGNOSTIC_UNKNOWN_MUTATION_ENTRY_FIELD = "unknown_mutation_entry_field"
-DIAGNOSTIC_INVALID_MUTATION_ENTRY_FIELD_TYPE = (
-    "invalid_mutation_entry_field_type"
-)
+DIAGNOSTIC_INVALID_MUTATION_ENTRY_FIELD_TYPE = "invalid_mutation_entry_field_type"
 DIAGNOSTIC_DUPLICATE_MUTATION_OBJECT = "duplicate_mutation_object"
 DIAGNOSTIC_MUTATION_FAMILY_CONFLICT = "mutation_family_conflict"
-DIAGNOSTIC_CROSS_SCOPE_MUTATION_OBJECT_CONFLICT = (
-    "cross_scope_mutation_object_conflict"
-)
+DIAGNOSTIC_CROSS_SCOPE_MUTATION_OBJECT_CONFLICT = "cross_scope_mutation_object_conflict"
+DIAGNOSTIC_INVALID_METADATA_ENTRY_FIELD_TYPE = "invalid_metadata_entry_field_type"
+DIAGNOSTIC_UNSUPPORTED_METADATA_VALUE_KIND = "unsupported_metadata_value_kind"
+DIAGNOSTIC_INVALID_METADATA_VALUE = "invalid_metadata_value"
+DIAGNOSTIC_DUPLICATE_METADATA_PROPERTY = "duplicate_metadata_property"
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,6 +220,7 @@ def _validate_mutation_section(
         )
 
     entry_contracts = {
+        contract.metadata_field: contract.metadata_entry,
         contract.suppression_field: contract.suppression_entry,
         contract.visibility_field: contract.visibility_entry,
         contract.deletion_field: contract.deletion_entry,
@@ -231,6 +237,15 @@ def _validate_mutation_section(
                     path=collection_path,
                     message=f"field '{collection_field}' must be a list",
                 )
+            )
+            continue
+        if collection_field == contract.metadata_field:
+            _validate_metadata_collection(
+                collection,
+                collection_path,
+                entry_contracts[collection_field],
+                occurrences[collection_field],
+                diagnostics,
             )
             continue
         _validate_mutation_collection(
@@ -315,6 +330,190 @@ def _validate_mutation_collection(
         occurrences.append((object_value, object_path))
 
 
+def _validate_metadata_collection(
+    collection: list[Any],
+    collection_path: str,
+    contract: Any,
+    occurrences: list[tuple[str, str]],
+    diagnostics: list[ManifestDiagnostic],
+) -> None:
+    first_paths: dict[tuple[str, str], str] = {}
+    for index, item in enumerate(collection):
+        item_path = f"{collection_path}[{index}]"
+        if not isinstance(item, Mapping):
+            diagnostics.append(
+                ManifestDiagnostic(
+                    code=DIAGNOSTIC_INVALID_MUTATION_ENTRY_TYPE,
+                    path=item_path,
+                    message="mutation entry must be an object",
+                )
+            )
+            continue
+
+        for field_name in contract.fields:
+            if field_name not in item:
+                diagnostics.append(
+                    ManifestDiagnostic(
+                        code=DIAGNOSTIC_MISSING_MUTATION_ENTRY_FIELD,
+                        path=item_path,
+                        message=f"missing required field '{field_name}'",
+                    )
+                )
+        for field_name in sorted(key for key in item if key not in contract.fields):
+            diagnostics.append(
+                ManifestDiagnostic(
+                    code=DIAGNOSTIC_UNKNOWN_MUTATION_ENTRY_FIELD,
+                    path=f"{item_path}.{field_name}",
+                    message=f"unknown field '{field_name}'",
+                )
+            )
+
+        object_field = contract.object_field
+        object_value = item.get(object_field)
+        object_valid = _is_exact_native_selector(object_value)
+        if object_field in item and not object_valid:
+            diagnostics.append(
+                ManifestDiagnostic(
+                    code=DIAGNOSTIC_INVALID_METADATA_ENTRY_FIELD_TYPE,
+                    path=f"{item_path}.{object_field}",
+                    message=(
+                        f"field '{object_field}' must be an exact non-empty "
+                        "string without surrounding whitespace or NUL"
+                    ),
+                )
+            )
+
+        property_field = contract.property_field
+        property_value = item.get(property_field)
+        property_valid = _is_exact_native_selector(property_value)
+        if property_field in item and not property_valid:
+            diagnostics.append(
+                ManifestDiagnostic(
+                    code=DIAGNOSTIC_INVALID_METADATA_ENTRY_FIELD_TYPE,
+                    path=f"{item_path}.{property_field}",
+                    message=(
+                        f"field '{property_field}' must be an exact non-empty "
+                        "string without surrounding whitespace or NUL"
+                    ),
+                )
+            )
+
+        value_kind_field = contract.value_kind_field
+        value_kind = item.get(value_kind_field)
+        value_kind_valid = False
+        if value_kind_field in item:
+            if not isinstance(value_kind, str):
+                diagnostics.append(
+                    ManifestDiagnostic(
+                        code=DIAGNOSTIC_INVALID_METADATA_ENTRY_FIELD_TYPE,
+                        path=f"{item_path}.{value_kind_field}",
+                        message=f"field '{value_kind_field}' must be a string",
+                    )
+                )
+            elif value_kind not in contract.supported_value_kinds:
+                supported = ", ".join(contract.supported_value_kinds)
+                diagnostics.append(
+                    ManifestDiagnostic(
+                        code=DIAGNOSTIC_UNSUPPORTED_METADATA_VALUE_KIND,
+                        path=f"{item_path}.{value_kind_field}",
+                        message=(
+                            f"unsupported metadata valueKind '{value_kind}'; "
+                            f"supported: {supported}"
+                        ),
+                    )
+                )
+            else:
+                value_kind_valid = True
+
+        value_field = contract.value_field
+        if value_field in item and value_kind_valid:
+            _validate_metadata_value(
+                item[value_field],
+                value_kind,
+                item_path,
+                contract,
+                diagnostics,
+            )
+
+        if object_valid and property_valid:
+            native_key = (object_value, property_value)
+            first_path = first_paths.get(native_key)
+            if first_path is not None:
+                diagnostics.append(
+                    ManifestDiagnostic(
+                        code=DIAGNOSTIC_DUPLICATE_METADATA_PROPERTY,
+                        path=item_path,
+                        message=(
+                            f"duplicate metadata property "
+                            f"'{object_value}.{property_value}'; "
+                            f"first occurrence at {first_path}"
+                        ),
+                    )
+                )
+                continue
+            first_paths[native_key] = item_path
+            occurrences.append((object_value, f"{item_path}.{object_field}"))
+
+
+def _validate_metadata_value(
+    value: Any,
+    value_kind: str,
+    item_path: str,
+    contract: Any,
+    diagnostics: list[ManifestDiagnostic],
+) -> None:
+    field_name = contract.value_field
+    detail: str | None = None
+    if value_kind == METADATA_VALUE_KIND_STRING:
+        if isinstance(value, str):
+            return
+        detail = f"field '{field_name}' must be a string for valueKind 'string'"
+    elif value_kind == METADATA_VALUE_KIND_BOOLEAN:
+        if type(value) is bool:
+            return
+        detail = f"field '{field_name}' must be a boolean for valueKind 'boolean'"
+    elif value_kind in (METADATA_VALUE_KIND_NUMBER, METADATA_VALUE_KIND_INTEGER):
+        if type(value) is bool or not isinstance(value, (int, float)):
+            detail = (
+                f"field '{field_name}' must be a number for valueKind '{value_kind}'"
+            )
+        elif isinstance(value, float) and not math.isfinite(value):
+            detail = (
+                f"field '{field_name}' must be a finite number "
+                f"for valueKind '{value_kind}'"
+            )
+        elif (
+            value_kind == METADATA_VALUE_KIND_INTEGER
+            and isinstance(value, float)
+            and not value.is_integer()
+        ):
+            detail = (
+                f"field '{field_name}' must be an exact integral number "
+                "for valueKind 'integer'"
+            )
+        else:
+            return
+    else:
+        return
+
+    diagnostics.append(
+        ManifestDiagnostic(
+            code=DIAGNOSTIC_INVALID_METADATA_VALUE,
+            path=f"{item_path}.{field_name}",
+            message=detail,
+        )
+    )
+
+
+def _is_exact_native_selector(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and value != ""
+        and value == value.strip()
+        and "\x00" not in value
+    )
+
+
 def _validate_mutation_boolean_field(
     item: Mapping[str, Any],
     item_path: str,
@@ -370,9 +569,7 @@ def _validate_cross_scope_mutation_conflicts(
 ) -> None:
     contract = EXPORT_MANIFEST_V1_CONTRACT.assembly_mutations
     assembly_names = {
-        name
-        for family in contract.fields
-        for name, _ in assembly_occurrences[family]
+        name for family in contract.fields for name, _ in assembly_occurrences[family]
     }
     reported: set[str] = set()
     for family in contract.fields:
@@ -676,8 +873,11 @@ def _is_supported_json_scalar(value: Any) -> bool:
 
 __all__ = [
     "DIAGNOSTIC_CROSS_SCOPE_MUTATION_OBJECT_CONFLICT",
+    "DIAGNOSTIC_DUPLICATE_METADATA_PROPERTY",
     "DIAGNOSTIC_DUPLICATE_MUTATION_OBJECT",
     "DIAGNOSTIC_INVALID_FIELD_TYPE",
+    "DIAGNOSTIC_INVALID_METADATA_ENTRY_FIELD_TYPE",
+    "DIAGNOSTIC_INVALID_METADATA_VALUE",
     "DIAGNOSTIC_INVALID_MUTATION_COLLECTION_TYPE",
     "DIAGNOSTIC_INVALID_MUTATION_ENTRY_FIELD_TYPE",
     "DIAGNOSTIC_INVALID_MUTATION_ENTRY_TYPE",
@@ -699,6 +899,7 @@ __all__ = [
     "DIAGNOSTIC_UNKNOWN_MUTATION_ENTRY_FIELD",
     "DIAGNOSTIC_UNKNOWN_OUTPUT_FIELD",
     "DIAGNOSTIC_UNKNOWN_PARAMETER_ASSIGNMENT_FIELD",
+    "DIAGNOSTIC_UNSUPPORTED_METADATA_VALUE_KIND",
     "DIAGNOSTIC_UNSUPPORTED_OUTPUT_FORMAT",
     "ManifestDiagnostic",
     "ManifestValidationResult",

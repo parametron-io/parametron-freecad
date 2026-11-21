@@ -347,6 +347,76 @@ class TestDeletionMetadata(unittest.TestCase):
         self.assertTrue(forbidden.isdisjoint(set(self.mc.DELETION_ENTRY_FIELDS)))
 
 
+class TestMetadataMutationMetadata(unittest.TestCase):
+    """Exact metadata collection name, entry shape, and value kinds."""
+
+    def setUp(self):
+        import parametron_freecad.execution.manifest_contract as mc
+
+        self.mc = mc
+
+    def test_collection_name_constant(self):
+        self.assertEqual(self.mc.MUTATION_COLLECTION_METADATA, "metadata")
+
+    def test_entry_fields_exact_tuple(self):
+        self.assertEqual(
+            self.mc.METADATA_ENTRY_FIELDS,
+            ("object", "property", "value", "valueKind"),
+        )
+
+    def test_entry_fields_is_tuple(self):
+        self.assertIsInstance(self.mc.METADATA_ENTRY_FIELDS, tuple)
+
+    def test_entry_field_constants(self):
+        self.assertEqual(self.mc.MUTATION_ENTRY_FIELD_OBJECT, "object")
+        self.assertEqual(self.mc.METADATA_ENTRY_FIELD_PROPERTY, "property")
+        self.assertEqual(self.mc.METADATA_ENTRY_FIELD_VALUE, "value")
+        self.assertEqual(self.mc.METADATA_ENTRY_FIELD_VALUE_KIND, "valueKind")
+
+    def test_value_kind_constants(self):
+        self.assertEqual(self.mc.METADATA_VALUE_KIND_STRING, "string")
+        self.assertEqual(self.mc.METADATA_VALUE_KIND_BOOLEAN, "boolean")
+        self.assertEqual(self.mc.METADATA_VALUE_KIND_NUMBER, "number")
+        self.assertEqual(self.mc.METADATA_VALUE_KIND_INTEGER, "integer")
+
+    def test_supported_value_kinds_exact_and_ordered(self):
+        self.assertEqual(
+            self.mc.SUPPORTED_METADATA_VALUE_KINDS,
+            ("string", "boolean", "number", "integer"),
+        )
+        self.assertIsInstance(self.mc.SUPPORTED_METADATA_VALUE_KINDS, tuple)
+
+    def test_contract_object_matches_constants(self):
+        contract = self.mc.METADATA_ENTRY_CONTRACT
+        self.assertEqual(contract.fields, self.mc.METADATA_ENTRY_FIELDS)
+        self.assertEqual(contract.object_field, "object")
+        self.assertEqual(contract.property_field, "property")
+        self.assertEqual(contract.value_field, "value")
+        self.assertEqual(contract.value_kind_field, "valueKind")
+        self.assertEqual(
+            contract.supported_value_kinds,
+            self.mc.SUPPORTED_METADATA_VALUE_KINDS,
+        )
+
+    def test_forbidden_fields_absent_from_entry(self):
+        forbidden = {
+            "semanticId",
+            "semanticID",
+            "displayName",
+            "target",
+            "targetKind",
+            "type",
+            "unit",
+            "force",
+            "cascade",
+            "action",
+        }
+        self.assertTrue(forbidden.isdisjoint(set(self.mc.METADATA_ENTRY_FIELDS)))
+
+    def test_entry_field_count_is_exactly_four(self):
+        self.assertEqual(len(self.mc.METADATA_ENTRY_FIELDS), 4)
+
+
 class TestSharedMutationSectionMetadata(unittest.TestCase):
     """Exact section collection names, ordering, and part/assembly sharing."""
 
@@ -358,7 +428,7 @@ class TestSharedMutationSectionMetadata(unittest.TestCase):
     def test_section_fields_exact_order(self):
         self.assertEqual(
             self.mc.TARGET_MUTATION_SECTION_FIELDS,
-            ("suppression", "visibility", "deletion"),
+            ("metadata", "suppression", "visibility", "deletion"),
         )
 
     def test_section_fields_is_tuple(self):
@@ -370,12 +440,14 @@ class TestSharedMutationSectionMetadata(unittest.TestCase):
 
     def test_section_contract_field_name_attributes(self):
         contract = self.mc.TARGET_MUTATION_SECTION_CONTRACT
+        self.assertEqual(contract.metadata_field, "metadata")
         self.assertEqual(contract.suppression_field, "suppression")
         self.assertEqual(contract.visibility_field, "visibility")
         self.assertEqual(contract.deletion_field, "deletion")
 
     def test_section_contract_entry_contracts_are_the_singleton_objects(self):
         contract = self.mc.TARGET_MUTATION_SECTION_CONTRACT
+        self.assertIs(contract.metadata_entry, self.mc.METADATA_ENTRY_CONTRACT)
         self.assertIs(contract.suppression_entry, self.mc.SUPPRESSION_ENTRY_CONTRACT)
         self.assertIs(contract.visibility_entry, self.mc.VISIBILITY_ENTRY_CONTRACT)
         self.assertIs(contract.deletion_entry, self.mc.DELETION_ENTRY_CONTRACT)
@@ -389,8 +461,8 @@ class TestSharedMutationSectionMetadata(unittest.TestCase):
         self.assertIs(canonical.assembly_mutations, self.mc.TARGET_MUTATION_SECTION_CONTRACT)
         self.assertIs(canonical.part_mutations, self.mc.TARGET_MUTATION_SECTION_CONTRACT)
 
-    def test_no_extra_mutation_collections_beyond_the_three(self):
-        allowed = {"suppression", "visibility", "deletion"}
+    def test_no_extra_mutation_collections_beyond_the_four(self):
+        allowed = {"metadata", "suppression", "visibility", "deletion"}
         self.assertEqual(set(self.mc.TARGET_MUTATION_SECTION_FIELDS), allowed)
 
 
@@ -444,7 +516,7 @@ class TestParameterOutputContractReuse(unittest.TestCase):
 
 
 class TestForbiddenMutationCollections(unittest.TestCase):
-    """No mutation family beyond suppression/visibility/deletion exists."""
+    """No mutation family beyond metadata/suppression/visibility/deletion exists."""
 
     def setUp(self):
         import parametron_freecad.execution.manifest_contract as mc
@@ -459,7 +531,8 @@ class TestForbiddenMutationCollections(unittest.TestCase):
 
     def test_no_keep_representation_in_any_entry_fields(self):
         all_entry_fields = (
-            self.mc.SUPPRESSION_ENTRY_FIELDS
+            self.mc.METADATA_ENTRY_FIELDS
+            + self.mc.SUPPRESSION_ENTRY_FIELDS
             + self.mc.VISIBILITY_ENTRY_FIELDS
             + self.mc.DELETION_ENTRY_FIELDS
         )
@@ -469,10 +542,10 @@ class TestForbiddenMutationCollections(unittest.TestCase):
         self.assertNotIn("keep", self.mc.TOP_LEVEL_FIELDS)
         self.assertNotIn("keep", self.mc.TARGET_MUTATION_SECTION_FIELDS)
 
-    def test_section_fields_contain_only_the_three_known_families(self):
+    def test_section_fields_contain_only_the_four_known_families(self):
         self.assertEqual(
             set(self.mc.TARGET_MUTATION_SECTION_FIELDS),
-            {"suppression", "visibility", "deletion"},
+            {"metadata", "suppression", "visibility", "deletion"},
         )
 
 
@@ -500,6 +573,7 @@ class TestForbiddenTargetFields(unittest.TestCase):
 
         self.mc = mc
         self.all_entry_field_tuples = {
+            "metadata": self.mc.METADATA_ENTRY_FIELDS,
             "suppression": self.mc.SUPPRESSION_ENTRY_FIELDS,
             "visibility": self.mc.VISIBILITY_ENTRY_FIELDS,
             "deletion": self.mc.DELETION_ENTRY_FIELDS,
@@ -519,6 +593,12 @@ class TestForbiddenTargetFields(unittest.TestCase):
 
     def test_suppression_entry_contract_has_no_forbidden_attribute(self):
         contract = self.mc.SUPPRESSION_ENTRY_CONTRACT
+        for forbidden in self.FORBIDDEN_FIELDS:
+            with self.subTest(forbidden=forbidden):
+                self.assertFalse(hasattr(contract, forbidden))
+
+    def test_metadata_entry_contract_has_no_forbidden_attribute(self):
+        contract = self.mc.METADATA_ENTRY_CONTRACT
         for forbidden in self.FORBIDDEN_FIELDS:
             with self.subTest(forbidden=forbidden):
                 self.assertFalse(hasattr(contract, forbidden))
@@ -556,6 +636,10 @@ class TestImmutability(unittest.TestCase):
         with self.assertRaises((TypeError, AttributeError, FrozenInstanceError)):
             self.mc.SUPPRESSION_ENTRY_CONTRACT.object_field = "mutated"
 
+    def test_metadata_entry_contract_rejects_field_mutation(self):
+        with self.assertRaises((TypeError, AttributeError, FrozenInstanceError)):
+            self.mc.METADATA_ENTRY_CONTRACT.object_field = "mutated"
+
     def test_visibility_entry_contract_rejects_field_mutation(self):
         with self.assertRaises((TypeError, AttributeError, FrozenInstanceError)):
             self.mc.VISIBILITY_ENTRY_CONTRACT.object_field = "mutated"
@@ -584,6 +668,10 @@ class TestImmutability(unittest.TestCase):
         with self.assertRaises((TypeError, AttributeError)):
             self.mc.SUPPRESSION_ENTRY_FIELDS[0] = "other"
 
+    def test_metadata_entry_fields_is_immutable_tuple(self):
+        with self.assertRaises((TypeError, AttributeError)):
+            self.mc.METADATA_ENTRY_FIELDS[0] = "other"
+
     def test_visibility_entry_fields_is_immutable_tuple(self):
         with self.assertRaises((TypeError, AttributeError)):
             self.mc.VISIBILITY_ENTRY_FIELDS[0] = "other"
@@ -598,6 +686,7 @@ class TestImmutability(unittest.TestCase):
             "OPTIONAL_TOP_LEVEL_FIELDS",
             "TOP_LEVEL_FIELDS",
             "TARGET_MUTATION_SECTION_FIELDS",
+            "METADATA_ENTRY_FIELDS",
             "SUPPRESSION_ENTRY_FIELDS",
             "VISIBILITY_ENTRY_FIELDS",
             "DELETION_ENTRY_FIELDS",

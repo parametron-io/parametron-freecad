@@ -13,9 +13,12 @@ def manifest(**sections):
 
 @pytest.mark.parametrize('scope', ['assemblyMutations', 'partMutations'])
 @pytest.mark.parametrize('section', [{}, {'suppression': []}, {'visibility': []}, {'deletion': []},
+    {'metadata': []},
+    {'metadata': [{'object': 'Body', 'property': 'material', 'value': 'steel', 'valueKind': 'string'}]},
     {'suppression': [{'object': 'Z', 'suppressed': True}, {'object': 'A', 'suppressed': False}],
      'visibility': [{'object': 'Z', 'visible': False}, {'object': 'A', 'visible': True}],
-     'deletion': [{'object': 'Other'}]}])
+     'deletion': [{'object': 'Other'}],
+     'metadata': [{'object': 'M', 'property': 'revision', 'value': 7, 'valueKind': 'integer'}]}])
 def test_optional_empty_sparse_and_combined_sections(scope, section):
     payload = manifest(**{scope: section})
     original = copy.deepcopy(payload)
@@ -32,7 +35,7 @@ def test_absent_and_coexisting_sections():
 
 @pytest.mark.parametrize('scope', ['assemblyMutations', 'partMutations'])
 @pytest.mark.parametrize('family', ['parameters', 'properties', 'actions', 'keep', 'force'])
-def test_only_three_mutation_families(scope, family):
+def test_only_known_mutation_families(scope, family):
     result = validate_export_manifest_v1(manifest(**{scope: {family: []}}))
     assert [(d.code, d.path) for d in result.diagnostics] == [
         ('unknown_mutation_collection', f'{scope}.{family}')]
