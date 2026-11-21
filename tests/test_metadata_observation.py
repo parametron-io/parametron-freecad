@@ -35,21 +35,64 @@ def _request(meta_id="m.title", key="Title", owner_id="Part001"):
     return {"id": meta_id, "key": key, "ownerId": owner_id}
 
 
+def _native_type_for_value(value):
+    if type(value) is bool:
+        return "App::PropertyBool"
+    if type(value) is int:
+        return "App::PropertyInteger"
+    if type(value) is float:
+        return "App::PropertyFloat"
+    return "App::PropertyString"
+
+
 class FakeOwner:
-    def __init__(self, **properties):
+    def __init__(self, *, native_types=None, **properties):
         object.__setattr__(self, "read_names", [])
+        object.__setattr__(self, "_values", dict(properties))
+        object.__setattr__(self, "_native_types", dict(native_types or {}))
         for name, value in properties.items():
             object.__setattr__(self, name, value)
 
+    @property
+    def PropertiesList(self):
+        return tuple(object.__getattribute__(self, "_values"))
+
+    def getTypeIdOfProperty(self, name):
+        native_types = object.__getattribute__(self, "_native_types")
+        if name in native_types:
+            return native_types[name]
+        value = object.__getattribute__(self, "_values").get(name)
+        return _native_type_for_value(value)
+
     def __getattribute__(self, name):
-        if not name.startswith("_") and name != "read_names":
+        if (
+            not name.startswith("_")
+            and name not in ("read_names", "PropertiesList", "getTypeIdOfProperty")
+        ):
             object.__getattribute__(self, "read_names").append(name)
         return object.__getattribute__(self, name)
 
 
 class RaisingOwner:
+    PropertiesList = ("Title",)
+
+    def getTypeIdOfProperty(self, name):
+        return "App::PropertyString"
+
     def __getattr__(self, name):
         raise RuntimeError(f"cannot read {name}")
+
+
+class NonPropertyOwner:
+    PropertiesList = ()
+
+    def getTypeIdOfProperty(self, name):
+        raise AssertionError("non-property attributes must not be type-inspected")
+
+    def __getattr__(self, name):
+        if name == "Name":
+            return "Body"
+        raise AttributeError(name)
 
 
 class FakeDocument:
@@ -127,14 +170,18 @@ class TestImportSafety(unittest.TestCase):
             MetadataObservationError,
             MetadataObservationOwnerNotFoundError,
             MetadataObservationPropertyError,
+            MetadataObservationPropertyNotFoundError,
             MetadataObservationRequestError,
+            MetadataObservationUnsupportedPropertyTypeError,
             MetadataObservationValueError,
         )
         for cls in (
             MetadataObservationDocumentError,
             MetadataObservationOwnerNotFoundError,
             MetadataObservationPropertyError,
+            MetadataObservationPropertyNotFoundError,
             MetadataObservationRequestError,
+            MetadataObservationUnsupportedPropertyTypeError,
             MetadataObservationValueError,
         ):
             self.assertTrue(issubclass(cls, MetadataObservationError), cls.__name__)
@@ -149,14 +196,18 @@ class TestImportSafety(unittest.TestCase):
             MetadataObservationError,
             MetadataObservationOwnerNotFoundError,
             MetadataObservationPropertyError,
+            MetadataObservationPropertyNotFoundError,
             MetadataObservationRequestError,
+            MetadataObservationUnsupportedPropertyTypeError,
             MetadataObservationValueError,
         )
         subclasses = (
             MetadataObservationDocumentError,
             MetadataObservationOwnerNotFoundError,
             MetadataObservationPropertyError,
+            MetadataObservationPropertyNotFoundError,
             MetadataObservationRequestError,
+            MetadataObservationUnsupportedPropertyTypeError,
             MetadataObservationValueError,
         )
         for cls in subclasses:
@@ -322,6 +373,17 @@ class TestSuccessfulObservation(_MetadataObservationTestCase):
 
         self.assertEqual(result[0]["value"], "Bracket")
 
+    def test_observed_value_is_actual_owner_value_not_expected_payload(self):
+        owner = FakeOwner(Title="actual")
+        document = FakeDocument({"Part001": owner})
+        data = _verification([_request("m.title", "Title", "Part001")])
+        data["expected"]["metadata"][0]["value"] = "expected-only"
+        data["expected"]["metadata"][0]["valueKind"] = "string"
+
+        result = self.observe(document, data)
+
+        self.assertEqual(result[0]["value"], "actual")
+
     def test_value_kind_derived_from_observed_runtime_value(self):
         owner = FakeOwner(Name="beam", Count=3, Weight=1.5, Active=True)
         document = FakeDocument({"Obj": owner})
@@ -407,6 +469,29 @@ class TestValueKindMapping(_MetadataObservationTestCase):
         kind = self._observe_single_kind(False)
         self.assertEqual(kind, "boolean")
         self.assertNotEqual(kind, "integer")
+
+    def test_supported_native_types_map_to_expected_value_kinds(self):
+        cases = (
+            ("App::PropertyString", "text", "string"),
+            ("App::PropertyBool", True, "boolean"),
+            ("App::PropertyFloat", 1.5, "number"),
+            ("App::PropertyFloatConstraint", 1.5, "number"),
+            ("App::PropertyInteger", 7, "integer"),
+            ("App::PropertyIntegerConstraint", 7, "integer"),
+        )
+
+        for native_type, value, expected_kind in cases:
+            with self.subTest(native_type=native_type):
+                owner = FakeOwner(
+                    Val=value,
+                    native_types={"Val": native_type},
+                )
+                document = FakeDocument({"Obj": owner})
+                result = self.observe(
+                    document,
+                    _verification([_request("m.v", "Val", "Obj")]),
+                )
+                self.assertEqual(result[0]["valueKind"], expected_kind)
 
 
 # ---------------------------------------------------------------------------
@@ -629,6 +714,67 @@ class TestPropertyReadFailures(_MetadataObservationTestCase):
         data = _verification([_request("m.mat", "Material", "Obj")])
         result = self.observe(document, data)
         self.assertEqual(result[0]["value"], "steel")
+
+    def test_missing_native_property_raises_not_found_error(self):
+        document = FakeDocument({"Obj": FakeOwner(Other=1)})
+
+        with self.assertRaises(self.mo.MetadataObservationPropertyNotFoundError):
+            self.observe(
+                document,
+                _verification([_request("m.x", "Missing", "Obj")]),
+            )
+
+    def test_non_property_attribute_is_rejected(self):
+        document = FakeDocument({"Obj": NonPropertyOwner()})
+
+        with self.assertRaises(self.mo.MetadataObservationPropertyNotFoundError):
+            self.observe(
+                document,
+                _verification([_request("m.name", "Name", "Obj")]),
+            )
+
+    def test_unsupported_native_property_type_is_rejected(self):
+        owner = FakeOwner(
+            Val="12.5 mm",
+            native_types={"Val": "App::PropertyLength"},
+        )
+        document = FakeDocument({"Obj": owner})
+
+        with self.assertRaises(
+            self.mo.MetadataObservationUnsupportedPropertyTypeError
+        ):
+            self.observe(
+                document,
+                _verification([_request("m.v", "Val", "Obj")]),
+            )
+
+    def test_native_type_value_kind_mismatch_is_rejected(self):
+        owner = FakeOwner(
+            Val=1.5,
+            native_types={"Val": "App::PropertyInteger"},
+        )
+        document = FakeDocument({"Obj": owner})
+
+        with self.assertRaises(self.mo.MetadataObservationValueError):
+            self.observe(
+                document,
+                _verification([_request("m.v", "Val", "Obj")]),
+            )
+
+    def test_unsupported_native_type_wins_over_unsupported_python_value(self):
+        owner = FakeOwner(
+            Val=object(),
+            native_types={"Val": "App::PropertyLength"},
+        )
+        document = FakeDocument({"Obj": owner})
+
+        with self.assertRaises(
+            self.mo.MetadataObservationUnsupportedPropertyTypeError
+        ):
+            self.observe(
+                document,
+                _verification([_request("m.v", "Val", "Obj")]),
+            )
 
 
 # ---------------------------------------------------------------------------

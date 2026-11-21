@@ -35,12 +35,30 @@ def _import_module():
 # ---------------------------------------------------------------------------
 
 
+def _native_type_for_value(value):
+    if type(value) is bool:
+        return "App::PropertyBool"
+    if type(value) is int:
+        return "App::PropertyInteger"
+    if type(value) is float:
+        return "App::PropertyFloat"
+    return "App::PropertyString"
+
+
 class FakeObject:
-    """Minimal fake document object exposing arbitrary properties."""
+    """Minimal fake document object exposing arbitrary native properties."""
 
     def __init__(self, **properties):
+        self._values = dict(properties)
         for name, value in properties.items():
             setattr(self, name, value)
+
+    @property
+    def PropertiesList(self):
+        return tuple(self._values)
+
+    def getTypeIdOfProperty(self, name):
+        return _native_type_for_value(self._values.get(name))
 
 
 class FakeDocument:

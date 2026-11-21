@@ -28,8 +28,11 @@ from parametron_freecad.observation.observed_contract import (
 from parametron_freecad.runtime.metadata_access import (
     MetadataAccessDocumentError,
     MetadataAccessOwnerNotFoundError,
+    MetadataAccessPropertyInspectionError,
+    MetadataAccessPropertyNotFoundError,
     MetadataAccessPropertyReadError,
-    read_metadata_value,
+    UnsupportedMetadataPropertyTypeError,
+    read_metadata_property,
     resolve_metadata_owner,
 )
 
@@ -56,6 +59,16 @@ class MetadataObservationOwnerNotFoundError(MetadataObservationError):
 
 class MetadataObservationPropertyError(MetadataObservationError):
     """Raised when a requested metadata property cannot be read."""
+
+
+class MetadataObservationPropertyNotFoundError(MetadataObservationPropertyError):
+    """Raised when a requested metadata property does not exist."""
+
+
+class MetadataObservationUnsupportedPropertyTypeError(
+    MetadataObservationPropertyError
+):
+    """Raised when a requested metadata property has an unsupported native type."""
 
 
 class MetadataObservationValueError(MetadataObservationError):
@@ -150,9 +163,24 @@ def _resolve_owner(document: Any, owner_id: str) -> Any:
         ) from None
 
 
-def _read_metadata_value(owner: Any, owner_id: str, key: str) -> Any:
+def _read_metadata_property(owner: Any, owner_id: str, key: str) -> Any:
     try:
-        return read_metadata_value(owner, key, owner_id=owner_id)
+        return read_metadata_property(owner, key, owner_id=owner_id)
+    except MetadataAccessPropertyNotFoundError:
+        raise MetadataObservationPropertyNotFoundError(
+            f"owner {owner_id!r} metadata key {key!r} is not an existing "
+            "native property"
+        ) from None
+    except MetadataAccessPropertyInspectionError as exc:
+        cause = exc.__cause__ if exc.__cause__ is not None else exc
+        raise MetadataObservationPropertyError(
+            f"owner {owner_id!r} metadata key {key!r} could not be inspected: "
+            f"{cause}"
+        ) from cause
+    except UnsupportedMetadataPropertyTypeError as exc:
+        raise MetadataObservationUnsupportedPropertyTypeError(
+            f"owner {owner_id!r} metadata key {key!r} has {exc}"
+        ) from exc
     except MetadataAccessPropertyReadError as exc:
         cause = exc.__cause__
         raise MetadataObservationPropertyError(
@@ -206,8 +234,16 @@ def observe_requested_metadata(
             index, metadata_request
         )
         owner = _resolve_owner(document, owner_id)
-        raw_value = _read_metadata_value(owner, owner_id, key)
+        resolved = _read_metadata_property(owner, owner_id, key)
+        raw_value = resolved.value
         value_kind = _derive_value_kind(raw_value, owner_id, key)
+        if value_kind != resolved.value_kind:
+            raise MetadataObservationValueError(
+                f"owner {owner_id!r} metadata key {key!r} has native type "
+                f"{resolved.native_type_id!r} requiring value kind "
+                f"{resolved.value_kind!r}, but the observed value kind is "
+                f"{value_kind!r}"
+            )
         results.append(
             {
                 OBSERVED_METADATA_FIELD_ID: metadata_id,
@@ -226,7 +262,9 @@ __all__ = [
     "MetadataObservationError",
     "MetadataObservationOwnerNotFoundError",
     "MetadataObservationPropertyError",
+    "MetadataObservationPropertyNotFoundError",
     "MetadataObservationRequestError",
+    "MetadataObservationUnsupportedPropertyTypeError",
     "MetadataObservationValueError",
     "observe_requested_metadata",
 ]
