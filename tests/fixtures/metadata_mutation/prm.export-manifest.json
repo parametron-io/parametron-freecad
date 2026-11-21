@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0",
+  "sourceDocument": "source/metadata-coexistence.FCStd",
+  "parameterAssignments": [
+    {
+      "target": "Parameters.pilotValue",
+      "value": 12.5,
+      "valueKind": "float"
+    }
+  ],
+  "partMutations": {
+    "metadata": [
+      {
+        "object": "MetadataBody",
+        "property": "mass",
+        "value": 12.5,
+        "valueKind": "number"
+      },
+      {
+        "object": "MetadataBody",
+        "property": "material",
+        "value": "S235JR",
+        "valueKind": "string"
+      },
+      {
+        "object": "MetadataBody",
+        "property": "revision",
+        "value": 7,
+        "valueKind": "integer"
+      },
+      {
+        "object": "MetadataBody",
+        "property": "sequence",
+        "value": 20,
+        "valueKind": "integer"
+      },
+      {
+        "object": "MetadataBody",
+        "property": "tagged",
+        "value": true,
+        "valueKind": "boolean"
+      },
+      {
+        "object": "MetadataBody",
+        "property": "tolerance",
+        "value": 0.75,
+        "valueKind": "number"
+      }
+    ],
+    "suppression": [
+      {
+        "object": "Pad",
+        "suppressed": true
+      }
+    ],
+    "visibility": [
+      {
+        "object": "MetadataBody",
+        "visible": false
+      }
+    ],
+    "deletion": [
+      {
+        "object": "DeletionMarker"
+      }
+    ]
+  },
+  "outputs": []
+}

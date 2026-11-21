@@ -1,0 +1,328 @@
+{
+  "schemaVersion": "1.0",
+  "captureId": "cap.freecad.metadata-mutation.coexistence.v1",
+  "adapter": {
+    "name": "freecad",
+    "version": ""
+  },
+  "cadSystem": {
+    "name": "FreeCAD",
+    "version": "1.1.4"
+  },
+  "sourceDocument": {
+    "logicalId": "metadata_coexistence_model",
+    "path": "input/metadata-coexistence.FCStd",
+    "fingerprint": "sha256:b6a09b7f7092db0efb594026e8e6dc3eb5fff49fa78582851e2961e0e15910c0"
+  },
+  "rootProduct": {
+    "id": "cmp.root"
+  },
+  "annotations": {
+    "description": "Real FreeCAD metadata mutation and observation coexistence capture.",
+    "comment": "Native identities, target properties, parameter writability, metadata types, and the safe deletion marker were validated through read-only headless FreeCAD probing against the committed metadata-coexistence.FCStd fixture.",
+    "purpose": "Provide native-evidence-backed capture truth for the metadata mutation and observation end-to-end proof."
+  },
+  "entities": {
+    "components": [
+      {
+        "id": "cmp.root",
+        "kind": "assembly",
+        "name": "metadata_coexistence",
+        "displayName": "Metadata Coexistence",
+        "cadType": "App::Document",
+        "quantity": 1,
+        "material": "",
+        "identitySource": {
+          "kind": "parent_scoped_path",
+          "path": "cmp.root",
+          "nativeRef": "metadata_coexistence"
+        },
+        "stabilityClass": "stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "The fixture has no native App::Part container; the FreeCAD document itself is captured as the required root assembly-kind component.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "cmp.enclosure",
+        "kind": "part",
+        "name": "Enclosure",
+        "displayName": "Enclosure",
+        "cadType": "PartDesign::Body",
+        "quantity": 1,
+        "material": "",
+        "identitySource": {
+          "kind": "parent_scoped_path",
+          "path": "cmp.root/MetadataBody",
+          "nativeRef": "MetadataBody"
+        },
+        "stabilityClass": "stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": true,
+          "unhide": true,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Semantic target Enclosure intentionally differs from the native MetadataBody owner. Native Visibility is real and settable; the Body has no native Suppressed property. Body.Tip=Pad and Body.Shape is valid.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "cmp.sacrificialMarker",
+        "kind": "part",
+        "name": "SacrificialMarker",
+        "displayName": "Sacrificial Marker",
+        "cadType": "Part::Box",
+        "quantity": 1,
+        "material": "",
+        "identitySource": {
+          "kind": "parent_scoped_path",
+          "path": "cmp.root/DeletionMarker",
+          "nativeRef": "DeletionMarker"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": false,
+          "unsuppress": false,
+          "hide": false,
+          "unhide": false,
+          "delete": true
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Semantic target SacrificialMarker intentionally differs from the native DeletionMarker object. The standalone Part::Box has no native dependents and does not participate in the PartDesign Body shape. It is captured as a part component so deletion stays in the part mutation section after metadata writes.",
+          "purpose": ""
+        }
+      }
+    ],
+    "features": [
+      {
+        "id": "fea.enclosure.pad",
+        "componentId": "cmp.enclosure",
+        "name": "Pad",
+        "displayName": "Pad",
+        "cadType": "PartDesign::Pad",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Pad",
+          "nativeRef": "Pad"
+        },
+        "stabilityClass": "conditionally_stable",
+        "targetability": {
+          "suppress": true,
+          "unsuppress": true,
+          "hide": false,
+          "unhide": false,
+          "delete": false
+        },
+        "annotations": {
+          "description": "",
+          "comment": "Native writable Suppressed feature and the PartDesign Body tip.",
+          "purpose": ""
+        }
+      }
+    ],
+    "relationships": [],
+    "parameterGroups": [
+      {
+        "id": "grp.root.varset",
+        "ownerComponentId": "cmp.root",
+        "name": "Parameters",
+        "displayName": "Parameters",
+        "groupKind": "varset",
+        "cadType": "App::VarSet",
+        "observable": true,
+        "writable": true,
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "Parameters",
+          "nativeRef": "Parameters"
+        },
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "Native App::VarSet object Name and semantic group name are Parameters so the runtime parameter target uses the exact native identity.",
+          "purpose": ""
+        }
+      }
+    ],
+    "parameters": [
+      {
+        "id": "par.root.varset.pilotValue",
+        "ownerKind": "group",
+        "ownerId": "grp.root.varset",
+        "componentId": "cmp.root",
+        "name": "pilotValue",
+        "displayName": "Pilot Value",
+        "cadType": "App::PropertyFloat",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 10.0,
+        "unit": "mm",
+        "identitySource": {
+          "kind": "owner_scoped_key",
+          "ownerScopedKey": "pilotValue",
+          "groupScopedKey": "pilotValue",
+          "nativeRef": "Parameters.pilotValue"
+        },
+        "stabilityClass": "conditionally_stable",
+        "annotations": {
+          "description": "",
+          "comment": "Native App::VarSet scalar parameter used by the coexistence parameter assignment.",
+          "purpose": ""
+        }
+      }
+    ],
+    "metadata": [
+      {
+        "id": "meta.enclosure.material",
+        "ownerKind": "component",
+        "ownerId": "cmp.enclosure",
+        "componentId": "cmp.enclosure",
+        "key": "material",
+        "displayName": "Material",
+        "cadType": "App::PropertyString",
+        "valueType": "string",
+        "observable": true,
+        "writable": true,
+        "currentValue": "PLA",
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "meta.enclosure.tagged",
+        "ownerKind": "component",
+        "ownerId": "cmp.enclosure",
+        "componentId": "cmp.enclosure",
+        "key": "tagged",
+        "displayName": "Tagged",
+        "cadType": "App::PropertyBool",
+        "valueType": "boolean",
+        "observable": true,
+        "writable": true,
+        "currentValue": false,
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "meta.enclosure.mass",
+        "ownerKind": "component",
+        "ownerId": "cmp.enclosure",
+        "componentId": "cmp.enclosure",
+        "key": "mass",
+        "displayName": "Mass",
+        "cadType": "App::PropertyFloat",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 1.5,
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "meta.enclosure.revision",
+        "ownerKind": "component",
+        "ownerId": "cmp.enclosure",
+        "componentId": "cmp.enclosure",
+        "key": "revision",
+        "displayName": "Revision",
+        "cadType": "App::PropertyInteger",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 1,
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "Captured valueType remains broad; the semantic map resolves integer valueKind from App::PropertyInteger.",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "meta.enclosure.tolerance",
+        "ownerKind": "component",
+        "ownerId": "cmp.enclosure",
+        "componentId": "cmp.enclosure",
+        "key": "tolerance",
+        "displayName": "Tolerance",
+        "cadType": "App::PropertyFloatConstraint",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 0.5,
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "",
+          "purpose": ""
+        }
+      },
+      {
+        "id": "meta.enclosure.sequence",
+        "ownerKind": "component",
+        "ownerId": "cmp.enclosure",
+        "componentId": "cmp.enclosure",
+        "key": "sequence",
+        "displayName": "Sequence",
+        "cadType": "App::PropertyIntegerConstraint",
+        "valueType": "number",
+        "observable": true,
+        "writable": true,
+        "currentValue": 10,
+        "stabilityClass": "stable",
+        "annotations": {
+          "description": "",
+          "comment": "Captured valueType remains broad; the semantic map resolves integer valueKind from App::PropertyIntegerConstraint.",
+          "purpose": ""
+        }
+      }
+    ]
+  },
+  "structure": {
+    "rootComponentId": "cmp.root",
+    "nodes": [
+      {
+        "componentId": "cmp.root",
+        "parentComponentId": "",
+        "children": [
+          "cmp.enclosure",
+          "cmp.sacrificialMarker"
+        ]
+      },
+      {
+        "componentId": "cmp.enclosure",
+        "parentComponentId": "cmp.root",
+        "children": []
+      },
+      {
+        "componentId": "cmp.sacrificialMarker",
+        "parentComponentId": "cmp.root",
+        "children": []
+      }
+    ]
+  }
+}

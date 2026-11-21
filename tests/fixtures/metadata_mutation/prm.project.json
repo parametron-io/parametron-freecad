@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "projectId": "metadata-mutation-coexistence",
+  "dsl": "metadata.project.dsl",
+  "resources": {
+    "models": {
+      "metadata_coexistence_model": "input/metadata-coexistence.FCStd"
+    }
+  }
+}

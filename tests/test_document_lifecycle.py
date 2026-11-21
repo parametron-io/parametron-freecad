@@ -476,6 +476,97 @@ class OpenFreeCADDocumentTests(unittest.TestCase):
         self.assertTrue(issubclass(DocumentOpenError, DocumentLifecycleError))
 
 
+class OpenFreeCADDocumentInventoryTests(unittest.TestCase):
+    """Proves the execute-path native object inventory synchronization contract."""
+
+    def _make_path(self, tmp_dir: str) -> Path:
+        path = Path(tmp_dir) / "model.FCStd"
+        path.write_text("fake", encoding="utf-8")
+        return path
+
+    def test_native_object_inventory_is_iterated(self) -> None:
+        from parametron_freecad.runtime.document_lifecycle import (
+            synchronize_native_object_inventory,
+        )
+
+        class RecordingObjects:
+            def __init__(self) -> None:
+                self.iterations = 0
+
+            def __iter__(self):
+                self.iterations += 1
+                return iter([object()])
+
+        class Document:
+            Name = "Doc"
+            Objects = RecordingObjects()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            synchronize_native_object_inventory(
+                Document(),
+                self._make_path(tmp_dir),
+            )
+
+        self.assertGreaterEqual(Document.Objects.iterations, 1)
+
+    def test_document_without_objects_attribute_is_tolerated(self) -> None:
+        from parametron_freecad.runtime.document_lifecycle import (
+            synchronize_native_object_inventory,
+        )
+
+        class Document:
+            Name = "Doc"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            synchronize_native_object_inventory(
+                Document(),
+                self._make_path(tmp_dir),
+            )
+
+    def test_non_iterable_objects_attribute_is_tolerated(self) -> None:
+        from parametron_freecad.runtime.document_lifecycle import (
+            synchronize_native_object_inventory,
+        )
+
+        class Document:
+            Name = "Doc"
+            Objects = object()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            synchronize_native_object_inventory(
+                Document(),
+                self._make_path(tmp_dir),
+            )
+
+    def test_inventory_iteration_failure_raises_document_open_error_with_cause(
+        self,
+    ) -> None:
+        from parametron_freecad.runtime.document_lifecycle import (
+            DocumentOpenError,
+            synchronize_native_object_inventory,
+        )
+
+        original = RuntimeError("inventory failure")
+
+        class FailingObjects:
+            def __iter__(self):
+                raise original
+
+        class Document:
+            Name = "Doc"
+            Objects = FailingObjects()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with self.assertRaises(DocumentOpenError) as caught:
+                synchronize_native_object_inventory(
+                    Document(),
+                    self._make_path(tmp_dir),
+                )
+
+        self.assertIs(caught.exception.__cause__, original)
+        self.assertIn("object inventory", str(caught.exception))
+
+
 class CloseFreeCADDocumentTests(unittest.TestCase):
     def _make_opened(self, name: str = "TestDoc") -> object:
         from parametron_freecad.runtime.document_lifecycle import OpenedDocument

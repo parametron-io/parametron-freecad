@@ -83,6 +83,7 @@ from parametron_freecad.runtime.document_lifecycle import (
     SourceDocumentPathError,
     opened_freecad_document,
     resolve_source_document_path,
+    synchronize_native_object_inventory,
 )
 from parametron_freecad.runtime.evidence_sidecar import (
     EvidenceSidecarContainmentError,
@@ -407,6 +408,15 @@ def _selected_source_sha256(
         raise ObservationRequestError(
             "unable to hash source document for observation"
         ) from exc
+
+
+def _is_real_freecad_module(freecad_module: Any) -> bool:
+    """Return whether the injected object is the real FreeCAD application module."""
+
+    return (
+        getattr(freecad_module, "__name__", None) == "FreeCAD"
+        and callable(getattr(freecad_module, "openDocument", None))
+    )
 
 
 def _failure_stage_for_exception(exc: BaseException) -> str:
@@ -772,6 +782,8 @@ def run_execution_entrypoint(
             resolved_freecad_module,
             validated_manifest.source_document_path,
         ) as opened:
+            if _is_real_freecad_module(resolved_freecad_module):
+                synchronize_native_object_inventory(opened.document, opened.path)
             _dependencies.apply_parameter_assignments(opened.document, assignments)
             _apply_target_mutations_and_recompute(
                 opened.document, validated_manifest.loaded_manifest.data, _dependencies
