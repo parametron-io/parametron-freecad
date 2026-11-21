@@ -45,6 +45,7 @@ FAILURE_STAGE_FACT_EVIDENCE = "fact_evidence"
 FAILURE_STAGE_DOCUMENT_OPEN = "document_open"
 FAILURE_STAGE_DOCUMENT_CLOSE = "document_close"
 FAILURE_STAGE_PARAMETER_ASSIGNMENT = "parameter_assignment"
+FAILURE_STAGE_METADATA = "metadata"
 FAILURE_STAGE_SUPPRESSION = "suppression"
 FAILURE_STAGE_VISIBILITY = "visibility"
 FAILURE_STAGE_DELETION = "deletion"
@@ -123,6 +124,7 @@ def build_failure_output_payload(failure: StructuredFailure) -> dict[str, Any]:
 
 __all__ = [
     "FAILURE_STAGE_DOCUMENT_CLOSE",
+    "FAILURE_STAGE_METADATA",
     "FAILURE_STAGE_SUPPRESSION",
     "FAILURE_STAGE_VISIBILITY",
     "FAILURE_STAGE_DELETION",

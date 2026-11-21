@@ -3433,5 +3433,154 @@ class ExecuteObservationContractTests(unittest.TestCase):
                 self.assertFalse((output / "prm.observed.json").exists())
 
 
+class MetadataMutationLifecycleCompositionTests(unittest.TestCase):
+    def _dependencies(self, events):
+        from parametron_freecad.runtime import entrypoints
+
+        return entrypoints._ExecutionEntrypointDependencies(
+            apply_metadata_mutations=lambda document, mutations: events.append(
+                ("metadata", mutations)
+            ),
+            apply_suppression_mutations=lambda document, mutations: events.append(
+                ("suppression", mutations)
+            ),
+            apply_visibility_mutations=lambda document, mutations: events.append(
+                ("visibility", mutations)
+            ),
+            apply_deletion_mutations=lambda document, mutations: events.append(
+                ("deletion", mutations)
+            ),
+            recompute_document=lambda document: events.append(("recompute",)),
+            inspect_document_post_mutation_validity=lambda document: events.append(
+                ("validity",)
+            ),
+        )
+
+    def test_metadata_only_mutation_triggers_recompute_and_validity(self) -> None:
+        from parametron_freecad.runtime import entrypoints
+
+        events = []
+        manifest = {
+            "partMutations": {
+                "metadata": [
+                    {
+                        "object": "Body",
+                        "property": "material",
+                        "value": "steel",
+                        "valueKind": "string",
+                    }
+                ]
+            }
+        }
+
+        entrypoints._apply_target_mutations_and_recompute(
+            object(), manifest, self._dependencies(events)
+        )
+
+        self.assertEqual(
+            [event[0] for event in events],
+            ["metadata", "recompute", "validity"],
+        )
+
+    def test_contract_order_is_metadata_suppression_visibility_deletion(self) -> None:
+        from parametron_freecad.runtime import entrypoints
+
+        events = []
+        manifest = {
+            "partMutations": {
+                "deletion": [{"object": "D"}],
+                "visibility": [{"object": "V", "visible": False}],
+                "suppression": [{"object": "S", "suppressed": True}],
+                "metadata": [
+                    {
+                        "object": "M",
+                        "property": "p",
+                        "value": "x",
+                        "valueKind": "string",
+                    }
+                ],
+            }
+        }
+
+        entrypoints._apply_target_mutations_and_recompute(
+            object(), manifest, self._dependencies(events)
+        )
+
+        self.assertEqual(
+            [event[0] for event in events],
+            ["metadata", "suppression", "visibility", "deletion"],
+        )
+
+    def test_assembly_section_precedes_part_section(self) -> None:
+        from parametron_freecad.runtime import entrypoints
+
+        events = []
+        manifest = {
+            "assemblyMutations": {
+                "metadata": [
+                    {
+                        "object": "AM",
+                        "property": "p",
+                        "value": "x",
+                        "valueKind": "string",
+                    }
+                ]
+            },
+            "partMutations": {
+                "metadata": [
+                    {
+                        "object": "PM",
+                        "property": "p",
+                        "value": "x",
+                        "valueKind": "string",
+                    }
+                ]
+            },
+        }
+
+        entrypoints._apply_target_mutations_and_recompute(
+            object(), manifest, self._dependencies(events)
+        )
+
+        self.assertEqual(
+            [event[0] for event in events],
+            ["metadata", "metadata", "recompute", "validity"],
+        )
+        self.assertEqual(events[0][1][0]["object"], "AM")
+        self.assertEqual(events[1][1][0]["object"], "PM")
+
+    def test_metadata_error_maps_to_metadata_failure_stage(self) -> None:
+        from parametron_freecad.execution.metadata_mutation import (
+            MetadataMutationVerificationError,
+        )
+        from parametron_freecad.runtime import entrypoints
+
+        error = MetadataMutationVerificationError("metadata failed")
+        self.assertEqual(
+            entrypoints._failure_stage_for_exception(error),
+            "metadata",
+        )
+
+        wrapped = entrypoints.ExecutionEntrypointError("wrapped")
+        wrapped.__cause__ = error
+        self.assertEqual(
+            entrypoints._failure_stage_for_exception(wrapped),
+            "metadata",
+        )
+
+    def test_default_dependency_uses_production_metadata_consumer(self) -> None:
+        from parametron_freecad.execution.metadata_mutation import (
+            apply_metadata_mutations,
+        )
+        from parametron_freecad.runtime import entrypoints
+
+        dependencies = entrypoints._ExecutionEntrypointDependencies()
+
+        self.assertIs(
+            dependencies.apply_metadata_mutations,
+            apply_metadata_mutations,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
