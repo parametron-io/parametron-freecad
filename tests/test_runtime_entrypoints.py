@@ -2333,8 +2333,23 @@ class ReferenceTraversalRequestEntrypointTests(unittest.TestCase):
 class RuntimeObservationEntrypointTests(unittest.TestCase):
     class FakeObject:
         def __init__(self, **properties):
+            self._values = dict(properties)
             for name, value in properties.items():
                 setattr(self, name, value)
+
+        @property
+        def PropertiesList(self):
+            return tuple(self._values)
+
+        def getTypeIdOfProperty(self, name):
+            value = self._values.get(name)
+            if type(value) is bool:
+                return "App::PropertyBool"
+            if type(value) is int:
+                return "App::PropertyInteger"
+            if type(value) is float:
+                return "App::PropertyFloat"
+            return "App::PropertyString"
 
     class FakeDocument:
         Name = "FakeDoc"
