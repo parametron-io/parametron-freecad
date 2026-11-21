@@ -52,6 +52,16 @@ nix develop --command freecadcmd scripts/generate_assembly_occurrence_fixtures.p
 nix develop --command freecadcmd scripts/generate_fact_evidence_fixtures.py --pass=/absolute/fact-fixtures
 ```
 
+The committed `tests/fixtures/metadata_mutation/` bundle is a real FreeCAD
+metadata fixture tracked with Git LFS. Regenerate it only through:
+
+```
+nix develop --command freecadcmd scripts/generate_metadata_mutation_fixtures.py --pass=/absolute/metadata-fixtures
+```
+
+The generated `metadata-source.FCStd` is committed under
+`tests/fixtures/metadata_mutation/input/` after review.
+
 Generation is semantically reproducible; `.FCStd` archive bytes are not
 expected to be identical across runs. The real-FreeCAD evidence suites consume
 their request sidecars at the working-copy root and their integrity request
@@ -180,6 +190,7 @@ report and is not hidden or replaced by a FreeCAD-only acceptance check.
 - Occurrence real-FreeCAD fixtures (`test_occurrence_real_fixtures.py`)
 - Bounded fact request, evidence, and runtime (`test_fact_request.py`, `test_fact_evidence.py`, `test_fact_runtime.py`)
 - Bounded fact real-FreeCAD fixtures (`test_fact_real_fixtures.py`)
+- Metadata mutation fixture prerequisites and generator (`test_metadata_mutation_fixtures.py`)
 - Integrity observation and runtime (`test_integrity_observation.py`, `test_integrity_runtime.py`)
 - Integrity real-FreeCAD fixtures (`test_integrity_real_fixtures.py`)
 - Full real-FreeCAD engineering-evidence lifecycle (`test_evidence_lifecycle_real.py`)
