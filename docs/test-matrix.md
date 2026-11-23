@@ -26,7 +26,7 @@ satisfying the documented runtime and verification requirements may be used.
 Syntax/import check:
 
 ```bash
-python -m compileall parametron_freecad scripts tests
+python -m compileall parametron_freecad scripts tests workbench
 ```
 
 Full suite (including real-FreeCAD tests when their environment is available):
