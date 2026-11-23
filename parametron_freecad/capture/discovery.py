@@ -57,6 +57,12 @@ from parametron_freecad.capture.native_probe import (
     require_document_name,
     require_native_objects,
 )
+from parametron_freecad.capture.native_types import (
+    METADATA_NATIVE_TYPES,
+    NATIVE_VALUE_KIND_BY_TYPE,
+    PARAMETER_NATIVE_TYPES,
+    QUANTITY_NATIVE_KINDS,
+)
 
 # ---------------------------------------------------------------------------
 # Native type and property capability tables
@@ -76,31 +82,6 @@ _PARTDESIGN_DATUM_TYPES = frozenset(
 )
 _APP_DATUM_TYPES = frozenset({"App::Origin", "App::Line", "App::Plane", "App::Point"})
 
-_NATIVE_VALUE_KIND_BY_TYPE = {
-    "App::PropertyString": "string",
-    "App::PropertyBool": "boolean",
-    "App::PropertyFloat": "float",
-    "App::PropertyFloatConstraint": "float",
-    "App::PropertyInteger": "integer",
-    "App::PropertyIntegerConstraint": "integer",
-    "App::PropertyLength": "length",
-    "App::PropertyDistance": "distance",
-    "App::PropertyAngle": "angle",
-    "App::PropertyQuantity": "quantity",
-}
-
-_PARAMETER_NATIVE_TYPES = frozenset(_NATIVE_VALUE_KIND_BY_TYPE)
-_METADATA_NATIVE_TYPES = frozenset(
-    {
-        "App::PropertyString",
-        "App::PropertyBool",
-        "App::PropertyFloat",
-        "App::PropertyFloatConstraint",
-        "App::PropertyInteger",
-        "App::PropertyIntegerConstraint",
-    }
-)
-_QUANTITY_NATIVE_KINDS = frozenset({"length", "distance", "angle", "quantity"})
 _VALUE_TYPE_BY_NATIVE_KIND = {
     "string": "string",
     "boolean": "boolean",
@@ -1207,7 +1188,7 @@ def _property_evidence(
     status, status_available = property_status(value, key)
     native_value = read_native_value(value, key)
     native_kind = (
-        _NATIVE_VALUE_KIND_BY_TYPE.get(native_type) if native_type is not None else None
+        NATIVE_VALUE_KIND_BY_TYPE.get(native_type) if native_type is not None else None
     )
 
     if native_type is None:
@@ -1228,7 +1209,7 @@ def _property_evidence(
         )
 
     supported_types = (
-        _PARAMETER_NATIVE_TYPES if capability == "parameter" else _METADATA_NATIVE_TYPES
+        PARAMETER_NATIVE_TYPES if capability == "parameter" else METADATA_NATIVE_TYPES
     )
     if native_type not in supported_types:
         return PropertyEvidence(
@@ -1304,7 +1285,7 @@ def _property_evidence(
 
     unit = (
         native_value.unit
-        if capability == "parameter" and native_kind in _QUANTITY_NATIVE_KINDS
+        if capability == "parameter" and native_kind in QUANTITY_NATIVE_KINDS
         else None
     )
     return PropertyEvidence(
@@ -1330,7 +1311,7 @@ def _native_value_matches_kind(
 ) -> bool:
     if native_kind is None:
         return False
-    if native_kind in _QUANTITY_NATIVE_KINDS:
+    if native_kind in QUANTITY_NATIVE_KINDS:
         return python_kind == "quantity"
     return python_kind == native_kind
 
