@@ -20,6 +20,13 @@ from parametron_freecad.capture import (
     CaptureIdPolicyError,
     CaptureNamePolicyError,
     CaptureWriteError,
+    SemanticMapConfirmationRequiredError,
+    SemanticMapContractError,
+    SemanticMapDecodeError,
+    SemanticMapError,
+    SemanticMapIdentityError,
+    SemanticMapSelectionError,
+    SemanticMapWriteError,
 )
 
 _GUARDED_ROOTS = {"FreeCAD", "FreeCADGui", "Part", "freecad"}
@@ -84,6 +91,19 @@ class CaptureImportSafetyTests(unittest.TestCase):
         )
         self.assertFalse(issubclass(CaptureWriteError, CaptureError))
         self.assertTrue(issubclass(CaptureWriteError, OSError))
+        self.assertTrue(issubclass(SemanticMapError, ValueError))
+        self.assertTrue(issubclass(SemanticMapContractError, SemanticMapError))
+        self.assertTrue(issubclass(SemanticMapSelectionError, SemanticMapError))
+        self.assertTrue(issubclass(SemanticMapDecodeError, SemanticMapError))
+        self.assertTrue(issubclass(SemanticMapIdentityError, SemanticMapError))
+        self.assertTrue(
+            issubclass(
+                SemanticMapConfirmationRequiredError,
+                SemanticMapError,
+            )
+        )
+        self.assertFalse(issubclass(SemanticMapWriteError, SemanticMapError))
+        self.assertTrue(issubclass(SemanticMapWriteError, OSError))
 
     def test_public_surface_is_available(self) -> None:
         for name in (
@@ -105,10 +125,27 @@ class CaptureImportSafetyTests(unittest.TestCase):
             "ParameterCandidate",
             "ParameterGroupCandidate",
             "PropertyEvidence",
+            "SEMANTIC_MAP_FILENAME",
+            "SEMANTIC_MAP_SCHEMA_VERSION",
+            "SemanticMapConfirmationRequiredError",
+            "SemanticMapContractError",
+            "SemanticMapDecodeError",
+            "SemanticMapDiffEntry",
+            "SemanticMapError",
+            "SemanticMapIdentityError",
+            "SemanticMapSelectionError",
+            "SemanticMapUpdatePlan",
+            "SemanticMapWriteError",
+            "SemanticMapWriteResult",
+            "SemanticParameterTypeSelection",
             "TargetabilityEvidence",
+            "build_semantic_map",
             "canonical_capture_bytes",
             "canonical_capture_text",
+            "canonical_semantic_map_bytes",
+            "canonical_semantic_map_text",
             "discover_capture_candidates",
+            "freecad_semantic_map_template",
             "generate_component_id",
             "generate_feature_id",
             "generate_group_owned_parameter_id",
@@ -116,8 +153,12 @@ class CaptureImportSafetyTests(unittest.TestCase):
             "generate_parameter_group_id",
             "generate_parameter_id",
             "generate_relationship_id",
+            "plan_semantic_map_update",
+            "update_semantic_map",
             "validate_capture_document",
+            "validate_semantic_map",
             "write_capture_document",
+            "write_semantic_map",
         ):
             with self.subTest(name=name):
                 self.assertTrue(hasattr(capture, name), f"missing public name: {name}")
