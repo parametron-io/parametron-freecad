@@ -5,7 +5,7 @@
 Syntax and import check (from the repository root):
 
 ```
-python -m compileall parametron_freecad scripts tests
+python -m compileall parametron_freecad scripts tests workbench
 ```
 
 Full test suite:
@@ -90,6 +90,12 @@ Python entrypoint execution when the wrapper is unavailable:
   native rehearsal. A skip supplies no evidence that native behavior passed.
 - `PARAMETRON_FREECAD_STRICT_SMOKE=1` requires usable native prerequisites;
   their absence or failure makes validation unsuccessful rather than skipped.
+- `PARAMETRON_FREECAD_GUI=1` enables the opt-in workbench GUI smoke; without a
+  real FreeCAD GUI session the smoke is skipped.
+- `PARAMETRON_ENGINE_ACCEPTANCE=1` enables the opt-in capture-to-Engine
+  acceptance proof. It also honors `PARAMETRON_ENGINE_REPO` (a sibling
+  `parametron-engine` checkout by default) and `PARAMETRON_ENGINE_BIN` (a
+  prebuilt Engine CLI, otherwise built with `go build`).
 
 The Nix development environment supplies the intended wrapper and host for
 strict native validation. The ordinary Python and fake-FreeCAD tests do not
@@ -162,10 +168,30 @@ targets relative to the source document while the normal executor materializes
 the source at `source/<basename>`. The blocker is part of the Engine proof
 report and is not hidden or replaced by a FreeCAD-only acceptance check.
 
+## Capture authoring tests
+
+Capture authoring is covered by GUI-free contract, discovery, semantic-map, and
+orchestration tests plus real-FreeCAD fixture tests. The workbench four-tab
+state is GUI-free and covered by ordinary tests; `workbench/` add-on metadata and
+import boundaries are validated statically. The opt-in capture-to-Engine
+acceptance proof regenerates representative captures and asks the Engine CLI to
+validate them:
+
+```bash
+nix develop --command env PARAMETRON_ENGINE_ACCEPTANCE=1 \
+  PARAMETRON_ENGINE_REPO=../parametron-engine \
+  python -m pytest tests/test_capture_engine_acceptance.py -q
+```
+
+See [docs/test-matrix.md](../docs/test-matrix.md) for the recorded commands,
+fixture digests, and accepted Engine outcome.
+
 ## Test coverage areas
 
 - Canonical JSON helpers (`test_canonical_json.py`)
 - Path and working-copy boundary helpers (`test_paths.py`)
+- Capture contract core, discovery, semantic maps, orchestration, and workbench
+  state (`test_capture_*.py`, `test_workbench_*.py`)
 - Headless invocation and optional FreeCAD smoke (`test_headless_invocation.py`)
 - Headless CLI argument surface and execute-mode integration (`test_headless_cli_arguments.py`)
 - Process exit code taxonomy (`test_exit_codes.py`)
