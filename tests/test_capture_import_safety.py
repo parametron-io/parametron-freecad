@@ -13,6 +13,9 @@ from unittest import mock
 import parametron_freecad.capture as capture
 from parametron_freecad.capture import (
     CaptureContractError,
+    CaptureDiscoveryDocumentError,
+    CaptureDiscoveryError,
+    CaptureDiscoveryInspectionError,
     CaptureError,
     CaptureIdPolicyError,
     CaptureNamePolicyError,
@@ -72,19 +75,40 @@ class CaptureImportSafetyTests(unittest.TestCase):
         self.assertTrue(issubclass(CaptureContractError, CaptureError))
         self.assertTrue(issubclass(CaptureNamePolicyError, CaptureError))
         self.assertTrue(issubclass(CaptureIdPolicyError, CaptureError))
+        self.assertTrue(issubclass(CaptureDiscoveryError, ValueError))
+        self.assertTrue(
+            issubclass(CaptureDiscoveryDocumentError, CaptureDiscoveryError)
+        )
+        self.assertTrue(
+            issubclass(CaptureDiscoveryInspectionError, CaptureDiscoveryError)
+        )
         self.assertFalse(issubclass(CaptureWriteError, CaptureError))
         self.assertTrue(issubclass(CaptureWriteError, OSError))
 
     def test_public_surface_is_available(self) -> None:
         for name in (
             "CaptureContractError",
+            "CaptureDiscovery",
+            "CaptureDiscoveryDocumentError",
+            "CaptureDiscoveryError",
+            "CaptureDiscoveryInspectionError",
             "CaptureDocument",
             "CaptureError",
             "CaptureIdPolicyError",
             "CaptureNamePolicyError",
             "CaptureWriteError",
+            "ComponentCandidate",
+            "DiscoveryDiagnostic",
+            "DocumentEvidence",
+            "FeatureCandidate",
+            "MetadataCandidate",
+            "ParameterCandidate",
+            "ParameterGroupCandidate",
+            "PropertyEvidence",
+            "TargetabilityEvidence",
             "canonical_capture_bytes",
             "canonical_capture_text",
+            "discover_capture_candidates",
             "generate_component_id",
             "generate_feature_id",
             "generate_group_owned_parameter_id",
