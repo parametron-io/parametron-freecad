@@ -92,6 +92,77 @@ document is opened, the persisted configured result is hashed immediately after
 save, and occurrence/fact inspection runs on the same open, mutated, recomputed,
 and persisted document before close.
 
+## Capture authoring
+
+Capture is a separate GUI-free authoring path that turns an already-open, saved
+FreeCAD project source into Engine-consumable project files. Capture does not
+run Engine and does not execute engineering work.
+
+The implemented capture surface lives in two places:
+
+- `parametron_freecad/capture/` — the GUI-free capture core: the schema 1.0
+  `prm.cad.json` record model, semantic-name and stable-ID policy, canonical
+  serialization, an atomic writer, read-only native discovery, the versioned
+  `prm.semantic-map.json` template/generator/validator/merge writer, project
+  context loading, source fingerprinting, drift detection, deterministic
+  previews, and project-root orchestration.
+- `workbench/` — the FreeCAD add-on shell with a four-tab capture panel:
+  Part/Assembly, Features, Parameters, and Metadata. The Qt panel is a frontend
+  to the GUI-free core; importing the capture package and workbench state stays
+  safe under headless FreeCAD and plain Python.
+
+Capture behavior:
+
+- Capture requires an existing `prm.project.json` and an explicitly selected
+  declared model logical ID. It never invents project identity, creates a
+  project mapping, or bootstraps a project.
+- The active document must be the declared saved source. Capture verifies the
+  saved file path, rejects unsaved documents, and records a deterministic
+  `sha256:<hex>` fingerprint of the saved source bytes.
+- Discovery is top-down and read-only. Components come from supported
+  assembly/part containers, features from PartDesign features and sketches,
+  parameter groups from `App::VarSet`, parameters from supported native scalar
+  properties, and metadata from existing supported native properties. Links,
+  joints, object groups, spreadsheets, technical drawings, and unknown native
+  types produce diagnostics rather than invented capture entities.
+- Semantic names are user-authored and validated as DSL identifiers. They are
+  never derived from native object names, labels, CAD types, geometry, or
+  `nativeRef`.
+- Stable IDs are generated deterministically from semantic names and structural
+  scope, or supplied as explicit exact overrides. Generated or explicit ID
+  collisions are hard failures with no automatic suffixing.
+- Capture is top-down: the root part/assembly must be captured and named before
+  the Features, Parameters, and Metadata tabs become available, and each
+  captured entity requires its captured owner. Uncaptured native objects are
+  simply absent from the capture.
+- Parameters are limited to supported native properties, not Sketcher
+  constraints. Semantic parameter types and units come from the project
+  semantic map, or a conservative default when none exists; the Parameters tab
+  shows observable/writable state and lets the user choose among declared
+  semantic types.
+- Metadata must already exist. Capture selects existing `String`, `Bool`,
+  `Float`, `FloatConstraint`, `Integer`, and `IntegerConstraint` metadata and
+  never creates metadata.
+- Feature target actions come from captured native capability and may be
+  narrowed, never extended. Authorizing an uncaptured action fails.
+- `prm.cad.json` and `prm.semantic-map.json` are written to the directory
+  containing `prm.project.json`. Each file is written atomically, and existing
+  differing files are never silently replaced: the caller must review the
+  deterministic diff and pass an explicit confirmation decision.
+- Drift fails closed before writing: a missing native selector, changed native
+  type, changed ownership/hierarchy, or a semantic-name change that alters a
+  generated ID requires rebind or review.
+- Capture only reads native state. It does not save, recompute, or mutate the
+  source document, and it does not modify `prm.project.json`.
+
+Engine remains the semantic and schema authority. FreeCAD validates capture
+invariants and produces contract-shaped raw files; Engine performs semantic
+validation, planning, verification, and normalized-record generation, and may
+run an optional Engine CLI validation preflight. An opt-in real-FreeCAD proof
+regenerates a representative capture and proves the Engine CLI accepts it
+through normal project-mode validation without structural repair; see
+[docs/test-matrix.md](docs/test-matrix.md).
+
 ## Current limitations
 
 - Supported occurrence scope is the direct `Assembly::AssemblyObject.Group`
@@ -106,8 +177,12 @@ and persisted document before close.
   or rewrites `prm.project-lock.json`.
 - Metadata must already exist in the source document. FreeCAD does not create
   missing metadata, property groups, aliases, or fallback properties, and
-  metadata authoring policy remains Engine-owned. There is no template, BOM,
-  metadata-deletion, or GUI authoring capability.
+  metadata authoring policy remains Engine-owned. There is no template, BOM, or
+  metadata-deletion capability.
+- Capture authoring is v0-limited: it does not implement technical drawings,
+  relationships/mates, external linked documents, a GUI execution trigger,
+  project bootstrap, or the `parametron/` folder layout. Capture never creates
+  metadata and never derives semantic names.
 - Read-only native properties fail at the metadata stage. Unsupported
   Quantity-family native types (`App::PropertyLength`, `App::PropertyDistance`,
   `App::PropertyAngle`, `App::PropertyQuantity`) also fail deterministically.
@@ -176,6 +251,9 @@ for exact schema semantics.
 - `parametron_freecad/runtime/`: launcher, CLI, lifecycle, invocation, traversal,
   occurrence/fact/integrity evidence sidecars, and error boundaries
 - `parametron_freecad/observation/`: requested CAD facts and observed output
+- `parametron_freecad/capture/`: GUI-free capture contract core, native
+  discovery, semantic-map generation, project context, drift, and orchestration
+- `workbench/`: FreeCAD add-on shell and four-tab capture UI
 - `scripts/`: development entrypoint and fixture maintenance generators
 - `tests/`: ordinary Python, fake-FreeCAD, and real-FreeCAD coverage
 
@@ -186,14 +264,14 @@ ordinary validation commands are:
 
 ```bash
 parametron-freecad smoke
-python -m compileall parametron_freecad scripts tests
+python -m compileall parametron_freecad scripts tests workbench
 python -m pytest
 ```
 
 See [tests/README.md](tests/README.md) for FreeCAD dependency notes and
 environment variables (`PARAMETRON_FREECAD_BIN`,
-`PARAMETRON_FREECAD_STRICT_SMOKE`), and [docs/test-matrix.md](docs/test-matrix.md)
-for current validation coverage.
+`PARAMETRON_FREECAD_STRICT_SMOKE`, `PARAMETRON_ENGINE_ACCEPTANCE`), and
+[docs/test-matrix.md](docs/test-matrix.md) for current validation coverage.
 
 This repository includes a Nix flake that provides the reproducible
 development environment used by maintainers and CI:
@@ -214,6 +292,7 @@ documentation is maintained in `parametron-docs`:
 
 - [FreeCAD adapter architecture](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/architecture.md)
 - [FreeCAD runtime](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/runtime.md)
+- [FreeCAD capture authoring](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/authoring-capture.md)
 - [FreeCAD contracts](https://github.com/parametron-io/parametron-docs/tree/main/docs/engine/adapters/freecad/contracts)
 - [Occurrence evidence](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/occurrence-evidence.md)
 - [Bounded fact evidence](https://github.com/parametron-io/parametron-docs/blob/main/docs/engine/adapters/freecad/contracts/fact-evidence.md)
