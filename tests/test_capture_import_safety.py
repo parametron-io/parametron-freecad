@@ -12,13 +12,22 @@ from unittest import mock
 
 import parametron_freecad.capture as capture
 from parametron_freecad.capture import (
+    CaptureConfirmationRequiredError,
     CaptureContractError,
+    CaptureDecisionError,
     CaptureDiscoveryDocumentError,
     CaptureDiscoveryError,
     CaptureDiscoveryInspectionError,
+    CaptureDriftError,
     CaptureError,
+    CaptureFingerprintError,
     CaptureIdPolicyError,
     CaptureNamePolicyError,
+    CaptureOrchestrationError,
+    CapturePreflightError,
+    CaptureProjectError,
+    CaptureSourceError,
+    CaptureUnsavedDocumentError,
     CaptureWriteError,
     SemanticMapConfirmationRequiredError,
     SemanticMapContractError,
@@ -91,6 +100,21 @@ class CaptureImportSafetyTests(unittest.TestCase):
         )
         self.assertFalse(issubclass(CaptureWriteError, CaptureError))
         self.assertTrue(issubclass(CaptureWriteError, OSError))
+        self.assertTrue(issubclass(CaptureOrchestrationError, ValueError))
+        self.assertTrue(issubclass(CaptureProjectError, CaptureOrchestrationError))
+        self.assertTrue(issubclass(CaptureSourceError, CaptureOrchestrationError))
+        self.assertTrue(issubclass(CaptureUnsavedDocumentError, CaptureSourceError))
+        self.assertTrue(issubclass(CaptureDecisionError, CaptureOrchestrationError))
+        self.assertTrue(issubclass(CaptureDriftError, CaptureOrchestrationError))
+        self.assertTrue(
+            issubclass(
+                CaptureConfirmationRequiredError,
+                CaptureOrchestrationError,
+            )
+        )
+        self.assertTrue(issubclass(CapturePreflightError, CaptureOrchestrationError))
+        self.assertFalse(issubclass(CaptureFingerprintError, CaptureOrchestrationError))
+        self.assertTrue(issubclass(CaptureFingerprintError, OSError))
         self.assertTrue(issubclass(SemanticMapError, ValueError))
         self.assertTrue(issubclass(SemanticMapContractError, SemanticMapError))
         self.assertTrue(issubclass(SemanticMapSelectionError, SemanticMapError))
@@ -108,22 +132,49 @@ class CaptureImportSafetyTests(unittest.TestCase):
     def test_public_surface_is_available(self) -> None:
         for name in (
             "CaptureContractError",
+            "CaptureConfirmationRequiredError",
+            "CaptureDecisionError",
+            "CaptureDecisions",
             "CaptureDiscovery",
             "CaptureDiscoveryDocumentError",
             "CaptureDiscoveryError",
             "CaptureDiscoveryInspectionError",
             "CaptureDocument",
+            "CaptureDriftEntry",
+            "CaptureDriftError",
             "CaptureError",
+            "CaptureFingerprintError",
             "CaptureIdPolicyError",
             "CaptureNamePolicyError",
+            "CaptureOrchestrationError",
+            "CaptureOutputPlan",
+            "CapturePreflightError",
+            "CaptureProjectContext",
+            "CaptureProjectError",
+            "CaptureSourceError",
+            "CaptureUnsavedDocumentError",
             "CaptureWriteError",
+            "CaptureWriteSummary",
             "ComponentCandidate",
+            "ComponentDecision",
             "DiscoveryDiagnostic",
             "DocumentEvidence",
+            "ENGINE_BIN_ENVIRONMENT",
+            "EnginePreflightResult",
+            "EnginePreflightRunner",
+            "FINGERPRINT_PREFIX",
             "FeatureCandidate",
+            "FeatureDecision",
+            "MappingDiffEntry",
             "MetadataCandidate",
+            "MetadataDecision",
+            "PROJECT_MAPPING_FILENAME",
+            "PROJECT_MAPPING_VERSION",
             "ParameterCandidate",
+            "ParameterDecision",
             "ParameterGroupCandidate",
+            "ParameterGroupDecision",
+            "ProjectModel",
             "PropertyEvidence",
             "SEMANTIC_MAP_FILENAME",
             "SEMANTIC_MAP_SCHEMA_VERSION",
@@ -139,12 +190,17 @@ class CaptureImportSafetyTests(unittest.TestCase):
             "SemanticMapWriteResult",
             "SemanticParameterTypeSelection",
             "TargetabilityEvidence",
+            "build_capture_document",
             "build_semantic_map",
             "canonical_capture_bytes",
             "canonical_capture_text",
             "canonical_semantic_map_bytes",
             "canonical_semantic_map_text",
+            "derive_capture_id",
+            "detect_capture_drift",
+            "diff_mappings",
             "discover_capture_candidates",
+            "document_fingerprint",
             "freecad_semantic_map_template",
             "generate_component_id",
             "generate_feature_id",
@@ -153,11 +209,18 @@ class CaptureImportSafetyTests(unittest.TestCase):
             "generate_parameter_group_id",
             "generate_parameter_id",
             "generate_relationship_id",
+            "load_project_context",
+            "plan_capture_outputs",
             "plan_semantic_map_update",
+            "resolve_model_by_path",
+            "resolve_model_source_path",
+            "resolve_selected_model",
             "update_semantic_map",
             "validate_capture_document",
             "validate_semantic_map",
+            "verify_active_source",
             "write_capture_document",
+            "write_capture_outputs",
             "write_semantic_map",
         ):
             with self.subTest(name=name):

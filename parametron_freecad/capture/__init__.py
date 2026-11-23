@@ -7,13 +7,13 @@ This package implements the FreeCAD-free capture authoring core:
 * canonical serialization;
 * an atomic writer with an explicit overwrite decision.
 
-It also implements FreeCAD-native capture discovery and the versioned
-``prm.semantic-map.json`` template, generator, validator, and merge writer.
+It also implements FreeCAD-native capture discovery, the versioned
+``prm.semantic-map.json`` template, generator, validator, and merge writer, and
+project-root capture orchestration with drift detection, previews, and atomic
+confirmed writes.
 
-It does not import ``FreeCAD``, ``FreeCADGui``, or ``Part``. Project-root
-discovery, project mapping, source fingerprinting, drift handling, GUI
-surfaces, capture orchestration, and Engine preflight belong to other bounded
-capture issues.
+It does not import ``FreeCAD``, ``FreeCADGui``, or ``Part``. Workbench GUI
+surfaces and Engine planning belong to other bounded capture issues.
 """
 
 from __future__ import annotations
@@ -21,6 +21,15 @@ from __future__ import annotations
 from parametron_freecad.capture.canonical import (
     canonical_capture_bytes,
     canonical_capture_text,
+)
+from parametron_freecad.capture.decisions import (
+    CaptureDecisions,
+    ComponentDecision,
+    FeatureDecision,
+    MetadataDecision,
+    ParameterDecision,
+    ParameterGroupDecision,
+    derive_capture_id,
 )
 from parametron_freecad.capture.discovery import (
     CaptureDiscovery,
@@ -40,12 +49,22 @@ from parametron_freecad.capture.discovery_errors import (
     CaptureDiscoveryError,
     CaptureDiscoveryInspectionError,
 )
+from parametron_freecad.capture.engine_preflight import (
+    ENGINE_BIN_ENVIRONMENT,
+    EnginePreflightResult,
+    EnginePreflightRunner,
+)
 from parametron_freecad.capture.errors import (
     CaptureContractError,
     CaptureError,
     CaptureIdPolicyError,
     CaptureNamePolicyError,
     CaptureWriteError,
+)
+from parametron_freecad.capture.fingerprint import (
+    FINGERPRINT_PREFIX,
+    CaptureFingerprintError,
+    document_fingerprint,
 )
 from parametron_freecad.capture.model import (
     Annotations,
@@ -78,6 +97,41 @@ from parametron_freecad.capture.naming import (
     semantic_name_slug,
     validate_explicit_id,
     validate_semantic_name,
+)
+from parametron_freecad.capture.native_session import (
+    ActiveSourceEvidence,
+    verify_active_source,
+)
+from parametron_freecad.capture.orchestration import (
+    CaptureOutputPlan,
+    CaptureWriteSummary,
+    MappingDiffEntry,
+    build_capture_document,
+    detect_capture_drift,
+    diff_mappings,
+    plan_capture_outputs,
+    write_capture_outputs,
+)
+from parametron_freecad.capture.orchestration_errors import (
+    CaptureConfirmationRequiredError,
+    CaptureDecisionError,
+    CaptureDriftEntry,
+    CaptureDriftError,
+    CaptureOrchestrationError,
+    CapturePreflightError,
+    CaptureProjectError,
+    CaptureSourceError,
+    CaptureUnsavedDocumentError,
+)
+from parametron_freecad.capture.project import (
+    PROJECT_MAPPING_FILENAME,
+    PROJECT_MAPPING_VERSION,
+    CaptureProjectContext,
+    ProjectModel,
+    load_project_context,
+    resolve_model_by_path,
+    resolve_model_source_path,
+    resolve_selected_model,
 )
 from parametron_freecad.capture.semantic_map import (
     FREECAD_CAD_SYSTEM_MIN_VERSION,
@@ -116,36 +170,64 @@ from parametron_freecad.capture.writer import (
 
 __all__ = [
     "Annotations",
+    "ActiveSourceEvidence",
     "CAPTURE_CONTRACT_FILENAME",
     "CAPTURE_SCHEMA_VERSION",
+    "CaptureConfirmationRequiredError",
     "CaptureContractError",
+    "CaptureDecisionError",
+    "CaptureDecisions",
     "CaptureDiscovery",
     "CaptureDiscoveryDocumentError",
     "CaptureDiscoveryError",
     "CaptureDiscoveryInspectionError",
     "CaptureDocument",
+    "CaptureDriftEntry",
+    "CaptureDriftError",
     "CaptureError",
+    "CaptureFingerprintError",
     "CaptureIdPolicyError",
     "CaptureNamePolicyError",
+    "CaptureOrchestrationError",
+    "CaptureOutputPlan",
+    "CapturePreflightError",
+    "CaptureProjectContext",
+    "CaptureProjectError",
+    "CaptureSourceError",
+    "CaptureUnsavedDocumentError",
     "CaptureWriteError",
+    "CaptureWriteSummary",
     "Component",
     "ComponentCandidate",
+    "ComponentDecision",
     "DiscoveryDiagnostic",
     "DocumentEvidence",
+    "ENGINE_BIN_ENVIRONMENT",
     "Entities",
+    "EnginePreflightResult",
+    "EnginePreflightRunner",
+    "FINGERPRINT_PREFIX",
     "FREECAD_CAD_SYSTEM_MIN_VERSION",
     "FREECAD_SEMANTIC_MAP_TEMPLATE_VERSION",
     "Feature",
     "FeatureCandidate",
+    "FeatureDecision",
     "FreeCADSemanticMapSelection",
     "IdentitySource",
+    "MappingDiffEntry",
     "Metadata",
     "MetadataCandidate",
+    "MetadataDecision",
     "NamedVersion",
+    "PROJECT_MAPPING_FILENAME",
+    "PROJECT_MAPPING_VERSION",
     "Parameter",
     "ParameterCandidate",
+    "ParameterDecision",
     "ParameterGroup",
     "ParameterGroupCandidate",
+    "ParameterGroupDecision",
+    "ProjectModel",
     "PropertyEvidence",
     "Relationship",
     "RootProduct",
@@ -168,12 +250,17 @@ __all__ = [
     "StructureNode",
     "Targetability",
     "TargetabilityEvidence",
+    "build_capture_document",
     "build_semantic_map",
     "canonical_capture_bytes",
     "canonical_capture_text",
     "canonical_semantic_map_bytes",
     "canonical_semantic_map_text",
+    "derive_capture_id",
+    "detect_capture_drift",
+    "diff_mappings",
     "discover_capture_candidates",
+    "document_fingerprint",
     "freecad_semantic_map_template",
     "generate_component_id",
     "generate_feature_id",
@@ -182,14 +269,21 @@ __all__ = [
     "generate_parameter_group_id",
     "generate_parameter_id",
     "generate_relationship_id",
+    "load_project_context",
     "native_key_slug",
+    "plan_capture_outputs",
     "plan_semantic_map_update",
+    "resolve_model_by_path",
+    "resolve_model_source_path",
+    "resolve_selected_model",
     "semantic_name_slug",
     "update_semantic_map",
     "validate_capture_document",
     "validate_explicit_id",
     "validate_semantic_map",
     "validate_semantic_name",
+    "verify_active_source",
     "write_capture_document",
+    "write_capture_outputs",
     "write_semantic_map",
 ]
