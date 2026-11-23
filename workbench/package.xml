@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
+  <name>Parametron</name>
+  <description>Capture FreeCAD parts, assemblies, features, parameters, and metadata into Parametron project contracts.</description>
+  <version>0.1.0</version>
+  <date>2026-11-23</date>
+  <maintainer email="maintainers@parametron.io">Parametron maintainers</maintainer>
+  <license>AGPL-3.0-or-later</license>
+  <url type="repository">https://github.com/parametron-io/parametron-freecad</url>
+  <url type="bugtracker">https://github.com/parametron-io/parametron-freecad/issues</url>
+  <content>
+    <workbench>
+      <classname>ParametronWorkbench</classname>
+      <icon>resources/parametron.svg</icon>
+    </workbench>
+  </content>
+</package>

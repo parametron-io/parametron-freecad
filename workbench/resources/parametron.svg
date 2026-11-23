@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Parametron">
+  <rect x="2" y="2" width="60" height="60" rx="10" fill="#1f2933"/>
+  <path d="M14 46V18h13a9 9 0 0 1 0 18h-7" fill="none" stroke="#f5f7fa" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="44" cy="40" r="4" fill="#7bd389"/>
+  <path d="M34 40h6" fill="none" stroke="#7bd389" stroke-width="3" stroke-linecap="round"/>
+</svg>
