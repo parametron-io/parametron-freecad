@@ -1794,6 +1794,68 @@ Complete occurrence acceptance is proven through the Engine fixture-layout
 cadruntime path against the unchanged fixture bundle. Do not replace this with a
 FreeCAD-only acceptance substitute.
 
+## Capture-to-Engine Acceptance Proof
+
+`tests/test_capture_engine_acceptance.py` proves the first working-model loop:
+
+```text
+FreeCAD document -> capture -> prm.cad.json + prm.semantic-map.json -> Engine validate/plan
+```
+
+The proof copies committed fixtures to temporary directories, opens the saved
+source with real FreeCAD, replays the committed capture decisions against a
+fresh native discovery, regenerates both project-root outputs through the
+production orchestration path, and then runs the Engine CLI on the result. No
+structural repair, hand editing, or fixture mutation is involved.
+
+```bash
+nix develop --command env PARAMETRON_ENGINE_ACCEPTANCE=1 \
+  PARAMETRON_ENGINE_REPO=../parametron-engine \
+  python -m pytest tests/test_capture_engine_acceptance.py -q
+# PASS, 3 passed
+```
+
+The Engine CLI may also be supplied directly with `PARAMETRON_ENGINE_BIN`.
+Without `PARAMETRON_ENGINE_ACCEPTANCE=1` the proof is skipped; without an
+Engine checkout or Go toolchain it skips with an explicit reason.
+
+The Engine acceptance step is the ordinary project-mode validation:
+
+```bash
+<engine>/parametron validate --project <temporary-project-copy>
+# Validation succeeded for <temporary-project-copy>
+```
+
+Accepted outcomes on FreeCAD 1.1.4 and the current Engine checkout:
+
+- canonical cube project: `Validation succeeded` after a fresh capture created
+  both outputs and a repeated capture reported `unchanged`.
+- metadata coexistence project: `Validation succeeded` after supported metadata
+  selection and a repeated capture reported `unchanged`.
+
+Fixture digests used by the proof (SHA-256):
+
+| Fixture file | Digest |
+| --- | --- |
+| `canonical_lifecycle/input/cube.FCStd` | `9376277c131ac3f361f05412b3a6b455f8574eabf99f1e02d1fa75d3fca82250` |
+| `canonical_lifecycle/prm.project.json` | `7abf55a68162c8615715232d39a45a1ba75aefbc70a4999e1992d1303b31e9a5` |
+| `canonical_lifecycle/cube.project.dsl` | `edfb6c88436ec09938f7124facba79c4980699bf9b3012ec96ad7fbece914638` |
+| `canonical_lifecycle/prm.cad.json` | `a5a8e4e6e97ac55c705ada9a86c7ba515419d9333c62a978da537d7561cda2f3` |
+| `canonical_lifecycle/prm.semantic-map.json` | `ab2fd318ed8c2b149130c62983bd5ac299b958bb72b3024625713b6fb0b30d68` |
+| `metadata_mutation/input/metadata-coexistence.FCStd` | `b6a09b7f7092db0efb594026e8e6dc3eb5fff49fa78582851e2961e0e15910c0` |
+| `metadata_mutation/prm.project.json` | `908e8b2930ec330123f47ff138ae379fc533b9f178a0e3495df93370b9bbc102` |
+| `metadata_mutation/metadata.project.dsl` | `d60510d76a390cef1032485913914697ec46fcb2fd766e62fc9f6dadb1a03c49` |
+| `metadata_mutation/prm.cad.json` | `0f925649bf7ba37a954d48a416bb8f7e27d399ad368f12ec4b17a16ebbfd5825` |
+| `metadata_mutation/prm.semantic-map.json` | `893bfef59b0a996a97d47503223c7128b63a13702ced9051e6db18025a501406` |
+
+The proof asserts that committed source documents and project mappings are
+byte-unchanged, that generated IDs and `captureId` match the committed capture,
+and that repeated capture of unchanged native state yields byte-identical
+outputs. It also asserts deterministic capture failures before Engine planning:
+name collision (`CaptureNamePolicyError`), missing parent capture
+(`CaptureDecisionError`), unsupported metadata type (`CaptureDecisionError`),
+and stale native selector (`CaptureDriftError`).
+
 ## Documentation-Only Validation
 
 For documentation-only changes, review the diff for current implementation and
