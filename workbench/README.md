@@ -1,6 +1,6 @@
 # Parametron FreeCAD workbench
 
-FreeCAD add-on shell and top-down four-tab capture UI for Parametron. The GUI is
+FreeCAD add-on shell and top-down capture UI for Parametron. The GUI is
 a frontend to the GUI-free `parametron_freecad.capture` core. It does not
 duplicate document lifecycle, target lookup, property access, discovery,
 serialization, or Engine planning logic.
@@ -10,7 +10,7 @@ serialization, or Engine planning logic.
 - `Init.py` — headless-safe startup; makes the repository and workbench packages
   importable. Never imports `FreeCADGui` or Qt.
 - `InitGui.py` — GUI startup; registers the Parametron workbench.
-- `parametron_workbench/state.py` — GUI-free four-tab state model (gating,
+- `parametron_workbench/state.py` — GUI-free top-down state model (gating,
   validation, ID previews, collisions).
 - `parametron_workbench/session.py` — GUI-free capture session tying panel state
   to orchestration preview and atomic writes.
@@ -41,11 +41,12 @@ command appear in the workbench selector and menu.
    `prm.project.json`) and save it.
 2. Run `Parametron → Capture Project…` and select the project's
    `prm.project.json`.
-3. Name the root part/assembly. The Features, Parameters, and Metadata tabs stay
-   disabled until a part/assembly is captured and named.
+3. Name the root part/assembly. The Features, Parameters, Metadata, and Drawings
+   tabs stay disabled until a part/assembly is captured and named.
 4. Select and name features, select native-property parameters (semantic types
-   come from the project's semantic map, or a conservative default), and select
-   existing supported metadata.
+   come from the project's semantic map, or a conservative default), select
+   existing supported metadata, and group discovered drawing pages into named
+   drawings with explicit sheet order.
 5. Review the deterministic diff, confirm replacement when required, and write
    `prm.cad.json` and `prm.semantic-map.json` atomically to the project root.
 
@@ -55,7 +56,8 @@ native label. The source document and project mapping are never modified.
 ## Boundaries
 
 - No GUI execution trigger for Engine runs.
-- No technical drawings, relationships/mates, or external linked documents.
+- No drawing layout automation, PDF/SVG/PNG export, relationships/mates,
+  separate `.FCStd` drawing resources, or external linked documents.
 - No project bootstrap and no `parametron/` folder.
 - Metadata must already exist; only the supported String/Bool/Float/Integer
   native metadata types are authorable.

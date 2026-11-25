@@ -106,10 +106,10 @@ The implemented capture surface lives in two places:
   `prm.semantic-map.json` template/generator/validator/merge writer, project
   context loading, source fingerprinting, drift detection, deterministic
   previews, and project-root orchestration.
-- `workbench/` — the FreeCAD add-on shell with a four-tab capture panel:
-  Part/Assembly, Features, Parameters, and Metadata. The Qt panel is a frontend
-  to the GUI-free core; importing the capture package and workbench state stays
-  safe under headless FreeCAD and plain Python.
+- `workbench/` — the FreeCAD add-on shell with a top-down capture panel:
+  Part/Assembly, Features, Parameters, Metadata, and Drawings. The Qt panel is a
+  frontend to the GUI-free core; importing the capture package and workbench
+  state stays safe under headless FreeCAD and plain Python.
 
 Capture behavior:
 
@@ -130,6 +130,12 @@ Capture behavior:
   unsupported TechDraw constructs, separate-resource drawing sources, and
   unknown native types produce diagnostics rather than invented capture
   entities.
+- Discovered pages can be grouped into user-authored logical drawings. Capture
+  emits `entities.drawings` with deterministic `drw.*`/`sht.*` IDs, explicit
+  positive sheet order, embedded drawing-resource facts, required native page
+  bindings, and drawing-level captured component linkage. Zero drawings emit
+  `"drawings": []`. FreeCAD v1.0 emits embedded drawings only; separate
+  drawing resources remain conservative diagnostics.
 - Semantic names are user-authored and validated as DSL identifiers. They are
   never derived from native object names, labels, CAD types, geometry, or
   `nativeRef`.
@@ -184,12 +190,13 @@ through normal project-mode validation without structural repair; see
   missing metadata, property groups, aliases, or fallback properties, and
   metadata authoring policy remains Engine-owned. There is no template, BOM, or
   metadata-deletion capability.
-- Capture authoring is v0-limited: it does not emit technical drawings into
-  `prm.cad.json`, and it does not implement relationships/mates, external
-  linked documents, a GUI execution trigger, project bootstrap, or the
-  `parametron/` folder layout. Read-only drawing-page discovery is implemented,
-  but drawing grouping, naming, and capture emission remain pending. Capture
-  never creates metadata and never derives semantic names.
+- Capture authoring is v0-limited: it does not implement drawing layout
+  automation, PDF/SVG/PNG export, relationships/mates, separate `.FCStd`
+  drawing resources, external linked documents, a GUI execution trigger,
+  project bootstrap, or the `parametron/` folder layout. Read-only drawing-page
+  discovery and embedded drawing capture are implemented; drawing layout and
+  export remain pending. Capture never creates metadata and never derives
+  semantic names.
 - Read-only native properties fail at the metadata stage. Unsupported
   Quantity-family native types (`App::PropertyLength`, `App::PropertyDistance`,
   `App::PropertyAngle`, `App::PropertyQuantity`) also fail deterministically.
@@ -260,7 +267,7 @@ for exact schema semantics.
 - `parametron_freecad/observation/`: requested CAD facts and observed output
 - `parametron_freecad/capture/`: GUI-free capture contract core, native
   discovery, semantic-map generation, project context, drift, and orchestration
-- `workbench/`: FreeCAD add-on shell and four-tab capture UI
+- `workbench/`: FreeCAD add-on shell and top-down capture UI
 - `scripts/`: development entrypoint and fixture maintenance generators
 - `tests/`: ordinary Python, fake-FreeCAD, and real-FreeCAD coverage
 

@@ -69,7 +69,7 @@ def _choose_model(parent: object, logical_ids: list[str]) -> str | None:
 
 
 class CaptureCommand:
-    """Open the four-tab capture panel for the active project source."""
+    """Open the top-down capture panel for the active project source."""
 
     def GetResources(self) -> dict[str, str]:
         return {

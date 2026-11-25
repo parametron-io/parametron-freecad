@@ -26,6 +26,8 @@ Parameter                ``par.<ownerSlug>.<nameSlug>``
 Group-owned parameter    ``par.<ownerSlug>.<groupSlug>.<nameSlug>``
 Metadata                 ``meta.<ownerSlug>.<keySlug>``
 Relationship             ``rel.<ownerSlug>.<nameSlug>``
+Drawing                  ``drw.<nameSlug>``
+Drawing sheet            ``sht.<drawingSlug>.<nameSlug>``
 =======================  =====================================================
 
 ``nameSlug`` lowercases the first character of the semantic name and preserves
@@ -42,6 +44,8 @@ Examples consistent with the committed capture fixtures:
 * ``VarSet`` owned by ``cmp.root`` -> ``grp.root.varSet``
 * group-owned ``pilotValue`` -> ``par.root.varSet.pilotValue``
 * ``material`` on ``cmp.enclosure`` -> ``meta.enclosure.material``
+* ``Manufacturing`` drawing -> ``drw.manufacturing``
+* ``Assembly`` sheet in ``drw.manufacturing`` -> ``sht.manufacturing.assembly``
 
 An explicit advanced ID override is accepted instead of a generated ID. It must
 be exact and unique, but it need not follow the generation convention; the
@@ -68,6 +72,7 @@ _NAMED_ENTITY_REGISTRIES = (
     "relationships",
     "parameterGroups",
     "parameters",
+    "drawings",
 )
 _ALL_ID_REGISTRIES = (
     "components",
@@ -76,6 +81,7 @@ _ALL_ID_REGISTRIES = (
     "parameterGroups",
     "parameters",
     "metadata",
+    "drawings",
 )
 
 
@@ -276,6 +282,28 @@ def generate_relationship_id(
     return f"rel.{owner_slug}.{semantic_name_slug(name, entity_path=entity_path)}"
 
 
+def generate_drawing_id(
+    name: str,
+    *,
+    entity_path: str = "name",
+) -> str:
+    """Return ``drw.<nameSlug>`` for a drawing semantic name."""
+
+    return f"drw.{semantic_name_slug(name, entity_path=entity_path)}"
+
+
+def generate_drawing_sheet_id(
+    drawing_id: str,
+    name: str,
+    *,
+    entity_path: str = "name",
+) -> str:
+    """Return ``sht.<drawingSlug>.<nameSlug>`` for a drawing sheet."""
+
+    drawing_slug = _scope_slug(drawing_id, entity_path="drawingId")
+    return f"sht.{drawing_slug}.{semantic_name_slug(name, entity_path=entity_path)}"
+
+
 def validate_capture_policy(value: object) -> None:
     """Apply semantic-name and stable-ID policy to a shape-valid capture draft."""
 
@@ -321,6 +349,31 @@ def _validate_names(value: Mapping) -> None:
             )
         parameter_names[name] = path
 
+    drawing_names: dict[str, str] = {}
+    for index, drawing in enumerate(entities["drawings"]):
+        path = f"entities.drawings[{index}].name"
+        name = drawing["name"]
+        previous = drawing_names.get(name)
+        if previous is not None:
+            raise CaptureNamePolicyError(
+                f"semantic name policy violation at {path}: "
+                f'name "{name}" collides with {previous}'
+            )
+        drawing_names[name] = path
+
+        sheet_names: dict[str, str] = {}
+        for sheet_index, sheet in enumerate(drawing["sheets"]):
+            sheet_path = f"entities.drawings[{index}].sheets[{sheet_index}].name"
+            sheet_name = sheet["name"]
+            validate_semantic_name(sheet_name, entity_path=sheet_path)
+            previous = sheet_names.get(sheet_name)
+            if previous is not None:
+                raise CaptureNamePolicyError(
+                    f"semantic name policy violation at {sheet_path}: "
+                    f'name "{sheet_name}" collides with {previous}'
+                )
+            sheet_names[sheet_name] = sheet_path
+
 
 def _validate_ids(value: Mapping) -> None:
     entities = value["entities"]
@@ -338,9 +391,23 @@ def _validate_ids(value: Mapping) -> None:
                 )
             seen[identifier] = path
 
+    for drawing_index, drawing in enumerate(entities["drawings"]):
+        for sheet_index, sheet in enumerate(drawing["sheets"]):
+            path = f"entities.drawings[{drawing_index}].sheets[{sheet_index}].id"
+            identifier = validate_explicit_id(sheet["id"], entity_path=path)
+            previous = seen.get(identifier)
+            if previous is not None:
+                raise CaptureIdPolicyError(
+                    f"stable ID policy violation at {path}: "
+                    f'id "{identifier}" collides with {previous}'
+                )
+            seen[identifier] = path
+
 
 __all__ = [
     "generate_component_id",
+    "generate_drawing_id",
+    "generate_drawing_sheet_id",
     "generate_feature_id",
     "generate_group_owned_parameter_id",
     "generate_metadata_id",

@@ -1,6 +1,6 @@
 """Parametron FreeCAD workbench: GUI-free capture state and session.
 
-This package holds the GUI-free four-tab capture state model and capture
+This package holds the GUI-free top-down capture state model and capture
 session. The FreeCAD/Qt panel, commands, and workbench registration live in
 separate modules that are only imported by ``InitGui.py``. Importing this
 package is safe under headless FreeCAD and plain Python; it does not import
@@ -21,6 +21,8 @@ from parametron_workbench.state import (
     CapturePanelState,
     CaptureTab,
     ComponentRow,
+    DrawingRow,
+    DrawingSheetRow,
     FeatureRow,
     MetadataRow,
     ParameterRow,
@@ -35,6 +37,8 @@ __all__ = [
     "CaptureSession",
     "CaptureTab",
     "ComponentRow",
+    "DrawingRow",
+    "DrawingSheetRow",
     "FeatureRow",
     "MetadataRow",
     "ParameterRow",

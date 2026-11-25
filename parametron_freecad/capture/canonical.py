@@ -2,7 +2,9 @@
 
 Canonicalization matches the Engine contract's normalization semantics:
 
-* all six entity registries are sorted by ``id``;
+* all seven entity registries are sorted by ``id``;
+* drawing ``componentIds`` are sorted lexicographically;
+* drawing sheets are sorted by ``order`` then ``id``;
 * structure nodes are sorted by ``componentId``;
 * child lists are sorted lexicographically;
 * relationship endpoint order is preserved;
@@ -30,6 +32,7 @@ _ENTITY_REGISTRIES = (
     "parameterGroups",
     "parameters",
     "metadata",
+    "drawings",
 )
 
 
@@ -64,6 +67,10 @@ def _order_capture_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
 
     for registry in _ENTITY_REGISTRIES:
         entities[registry].sort(key=lambda item: item["id"])
+
+    for drawing in entities["drawings"]:
+        drawing["componentIds"].sort()
+        drawing["sheets"].sort(key=lambda sheet: (sheet["order"], sheet["id"]))
 
     nodes = ordered["structure"]["nodes"]
     nodes.sort(key=lambda node: node["componentId"])

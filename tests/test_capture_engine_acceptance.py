@@ -206,6 +206,12 @@ def _committed_ids(capture: dict) -> dict[str, set[str]]:
         "parameterGroups": {item["id"] for item in entities["parameterGroups"]},
         "parameters": {item["id"] for item in entities["parameters"]},
         "metadata": {item["id"] for item in entities["metadata"]},
+        "drawings": {item["id"] for item in entities["drawings"]},
+        "drawingSheets": {
+            sheet["id"]
+            for drawing in entities["drawings"]
+            for sheet in drawing["sheets"]
+        },
     }
 
 

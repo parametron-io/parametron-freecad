@@ -1,4 +1,4 @@
-"""FreeCAD/Qt four-tab capture panel.
+"""FreeCAD/Qt top-down capture panel.
 
 This is the GUI layer. All capture state, validation, preview, drift, and
 writing logic lives in the GUI-free ``parametron_workbench.state`` and
@@ -13,6 +13,7 @@ the user reviews the diff and confirms.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Mapping
 from typing import Any
 
 from parametron_freecad.capture import (
@@ -51,7 +52,7 @@ def _console_error(message: str) -> None:
 
 
 class CapturePanel(QtWidgets.QDialog):
-    """Top-down four-tab capture panel for one explicit project source."""
+    """Top-down capture panel for the active project source."""
 
     def __init__(self, session: Any, parent: Any = None) -> None:
         super().__init__(parent)
@@ -120,10 +121,52 @@ class CapturePanel(QtWidgets.QDialog):
                 "Notes",
             ]
         )
+
+        drawings_tab = QtWidgets.QWidget()
+        drawings_layout = QtWidgets.QVBoxLayout(drawings_tab)
+        drawing_buttons = QtWidgets.QHBoxLayout()
+        add_drawing_button = QtWidgets.QPushButton("Add Drawing")
+        add_drawing_button.clicked.connect(self._on_add_drawing)
+        remove_drawing_button = QtWidgets.QPushButton("Remove Drawing")
+        remove_drawing_button.clicked.connect(self._on_remove_drawing)
+        drawing_buttons.addWidget(add_drawing_button)
+        drawing_buttons.addWidget(remove_drawing_button)
+        drawing_buttons.addStretch(1)
+        drawings_layout.addLayout(drawing_buttons)
+        self._drawing_table = self._make_table(
+            [
+                "Drawing",
+                "Semantic Name",
+                "Display Name",
+                "Sheets",
+                "ID Preview",
+                "Notes",
+            ]
+        )
+        drawings_layout.addWidget(QtWidgets.QLabel("Logical drawings"))
+        drawings_layout.addWidget(self._drawing_table, 1)
+        self._drawing_sheet_table = self._make_table(
+            [
+                "Capture",
+                "Page",
+                "CAD Type",
+                "Drawing",
+                "Semantic Name",
+                "Order",
+                "Display Name",
+                "Targets",
+                "ID Preview",
+                "Notes",
+            ]
+        )
+        drawings_layout.addWidget(QtWidgets.QLabel("Discovered sheets/pages"))
+        drawings_layout.addWidget(self._drawing_sheet_table, 2)
+
         self._tabs.addTab(self._part_table, "Part/Assembly")
         self._tabs.addTab(self._feature_table, "Features")
         self._tabs.addTab(self._parameter_table, "Parameters")
         self._tabs.addTab(self._metadata_table, "Metadata")
+        self._tabs.addTab(drawings_tab, "Drawings")
         layout.addWidget(self._tabs, 1)
 
         options_row = QtWidgets.QHBoxLayout()
@@ -170,6 +213,7 @@ class CapturePanel(QtWidgets.QDialog):
                 CaptureTab.FEATURES,
                 CaptureTab.PARAMETERS,
                 CaptureTab.METADATA,
+                CaptureTab.DRAWINGS,
             ):
                 index = list(CaptureTab).index(tab)
                 availability = snapshot.tabs[tab]
@@ -180,6 +224,8 @@ class CapturePanel(QtWidgets.QDialog):
             self._render_features(snapshot)
             self._render_parameters(snapshot)
             self._render_metadata(snapshot)
+            self._render_drawings(snapshot)
+            self._render_drawing_sheets(snapshot)
 
             if snapshot.errors:
                 self._status.setText("\n".join(snapshot.errors))
@@ -266,6 +312,61 @@ class CapturePanel(QtWidgets.QDialog):
             self._set_text(table, index, 7, row.id_preview or "")
             self._set_text(table, index, 8, self._notes(row))
 
+    def _render_drawings(self, snapshot: Any) -> None:
+        table = self._drawing_table
+        rows = snapshot.drawings
+        table.setRowCount(len(rows))
+        for index, row in enumerate(rows):
+            self._set_drawing_key(table, index, 0, row.drawing_key)
+            self._set_editable_drawing_text(table, index, 1, row.name, row.drawing_key)
+            self._set_editable_drawing_text(
+                table, index, 2, row.display_name, row.drawing_key
+            )
+            self._set_text(table, index, 3, str(row.included_sheet_count))
+            self._set_text(table, index, 4, row.id_preview or "")
+            self._set_text(table, index, 5, self._drawing_notes(row))
+
+    def _render_drawing_sheets(self, snapshot: Any) -> None:
+        table = self._drawing_sheet_table
+        rows = snapshot.drawing_sheets
+        labels = {item.drawing_key: item.name for item in snapshot.drawings}
+        table.setRowCount(len(rows))
+        for index, row in enumerate(rows):
+            self._set_item(table, index, 0, row, checkable=True)
+            self._set_text(table, index, 1, f"{row.native_ref} ({row.native_label})")
+            self._set_text(table, index, 2, row.cad_type)
+            self._set_drawing_group_combo(table, index, 3, row, labels)
+            self._set_editable_text(table, index, 4, row.name, row.native_ref)
+            self._set_editable_text(table, index, 5, str(row.order), row.native_ref)
+            self._set_editable_text(table, index, 6, row.display_name, row.native_ref)
+            self._set_text(table, index, 7, "; ".join(row.targets))
+            self._set_text(table, index, 8, row.id_preview or "")
+            self._set_text(table, index, 9, self._drawing_sheet_notes(row))
+
+    @staticmethod
+    def _drawing_notes(row: Any) -> str:
+        return "; ".join(
+            value
+            for value in (
+                getattr(row, "name_error", None),
+                getattr(row, "id_error", None),
+                getattr(row, "component_error", None),
+            )
+            if value
+        )
+
+    @staticmethod
+    def _drawing_sheet_notes(row: Any) -> str:
+        return "; ".join(
+            value
+            for value in (
+                getattr(row, "name_error", None),
+                getattr(row, "order_error", None),
+                getattr(row, "id_error", None),
+            )
+            if value
+        )
+
     @staticmethod
     def _notes(row: Any) -> str:
         parts = [
@@ -335,9 +436,9 @@ class CapturePanel(QtWidgets.QDialog):
             item.setCheckState(
                 QtCore.Qt.Checked if row.included else QtCore.Qt.Unchecked
             )
-        if row.disabled:
+        if getattr(row, "disabled", False):
             item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEnabled)
-            item.setToolTip(row.disabled_reason)
+            item.setToolTip(getattr(row, "disabled_reason", ""))
         item.setData(
             QtCore.Qt.UserRole,
             row.native_ref if hasattr(row, "native_ref") else row.native_path,
@@ -360,6 +461,52 @@ class CapturePanel(QtWidgets.QDialog):
         )
         table.setItem(index, column, item)
 
+    def _set_editable_text(
+        self, table: Any, index: int, column: int, text: str, key: str
+    ) -> None:
+        item = QtWidgets.QTableWidgetItem(text)
+        item.setData(QtCore.Qt.UserRole, key)
+        table.setItem(index, column, item)
+
+    def _set_drawing_key(
+        self, table: Any, index: int, column: int, drawing_key: str
+    ) -> None:
+        item = QtWidgets.QTableWidgetItem(drawing_key)
+        item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+        item.setData(QtCore.Qt.UserRole, drawing_key)
+        table.setItem(index, column, item)
+
+    def _set_editable_drawing_text(
+        self,
+        table: Any,
+        index: int,
+        column: int,
+        text: str,
+        drawing_key: str,
+    ) -> None:
+        item = QtWidgets.QTableWidgetItem(text)
+        item.setData(QtCore.Qt.UserRole, drawing_key)
+        table.setItem(index, column, item)
+
+    def _set_drawing_group_combo(
+        self, table: Any, index: int, column: int, row: Any, labels: Mapping
+    ) -> None:
+        combo = QtWidgets.QComboBox()
+        keys = self._session.state.drawing_group_keys()
+        for key in keys:
+            name = labels.get(key, "")
+            combo.addItem(f"{name} ({key})" if name else key, key)
+        current = row.drawing_key or (keys[0] if keys else "")
+        position = combo.findData(current)
+        combo.setCurrentIndex(position if position >= 0 else 0)
+        combo.setEnabled(bool(keys))
+        combo.currentIndexChanged.connect(
+            lambda _position, widget=combo, native_ref=row.native_ref: (
+                self._on_drawing_group_changed(widget, native_ref)
+            )
+        )
+        table.setCellWidget(index, column, combo)
+
     # -- interaction -----------------------------------------------------
 
     def _on_item_changed(self, item: Any) -> None:
@@ -378,6 +525,10 @@ class CapturePanel(QtWidgets.QDialog):
                 self._apply_parameter(item, key)
             elif table is self._metadata_table:
                 self._apply_metadata(item, key)
+            elif table is self._drawing_table:
+                self._apply_drawing(item, key)
+            elif table is self._drawing_sheet_table:
+                self._apply_drawing_sheet(item, key)
         except CapturePanelError as exc:
             _console_error(str(exc))
             self._status.setText(str(exc))
@@ -413,6 +564,68 @@ class CapturePanel(QtWidgets.QDialog):
             state.set_metadata_included(key, item.checkState() == QtCore.Qt.Checked)
         elif item.column() == 5:
             state.set_metadata_display_name(key, item.text())
+
+    def _apply_drawing(self, item: Any, key: str) -> None:
+        state = self._session.state
+        if item.column() == 1:
+            state.set_drawing_name(key, item.text())
+        elif item.column() == 2:
+            state.set_drawing_display_name(key, item.text())
+
+    def _apply_drawing_sheet(self, item: Any, key: str) -> None:
+        state = self._session.state
+        if item.column() == 0:
+            state.set_drawing_sheet_included(
+                key, item.checkState() == QtCore.Qt.Checked
+            )
+        elif item.column() == 4:
+            state.set_drawing_sheet_name(key, item.text())
+        elif item.column() == 5:
+            try:
+                order = int(item.text())
+            except ValueError as exc:
+                raise CapturePanelError(
+                    "drawing sheet order must be an integer"
+                ) from exc
+            state.set_drawing_sheet_order(key, order)
+        elif item.column() == 6:
+            state.set_drawing_sheet_display_name(key, item.text() or None)
+
+    def _on_drawing_group_changed(self, combo: Any, native_ref: str) -> None:
+        if self._rendering:
+            return
+        drawing_key = combo.currentData()
+        if not drawing_key:
+            return
+        try:
+            self._session.state.set_drawing_sheet_group(native_ref, drawing_key)
+        except CapturePanelError as exc:
+            _console_error(str(exc))
+            self._status.setText(str(exc))
+            self._status.setStyleSheet("color: #b00020;")
+        self._render()
+
+    def _on_add_drawing(self) -> None:
+        self._session.state.add_drawing_group()
+        self._render()
+
+    def _on_remove_drawing(self) -> None:
+        row = self._drawing_table.currentRow()
+        if row < 0:
+            return
+        item = self._drawing_table.item(row, 0)
+        if item is None:
+            return
+        drawing_key = item.data(QtCore.Qt.UserRole)
+        if not drawing_key:
+            return
+        try:
+            self._session.state.remove_drawing_group(str(drawing_key))
+        except CapturePanelError as exc:
+            _console_error(str(exc))
+            self._status.setText(str(exc))
+            self._status.setStyleSheet("color: #b00020;")
+        self._render()
 
     def _on_capture_id_changed(self) -> None:
         options = dataclasses.replace(

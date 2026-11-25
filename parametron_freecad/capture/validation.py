@@ -11,8 +11,8 @@ Validation order is intentional and deterministic:
 
 1. closed-field/required-field/scalar shape of the whole document;
 2. semantic-name and stable-ID policy;
-3. component, feature, group, parameter, metadata, identity-source, and
-   structure reference consistency.
+3. component, feature, group, parameter, metadata, drawing, sheet,
+   identity-source, and structure reference consistency.
 
 A document with a shape problem reports only shape problems. A document with a
 policy problem reports the policy failure before reference checks. This keeps
@@ -22,6 +22,8 @@ failure classification stable for callers.
 from __future__ import annotations
 
 import math
+import posixpath
+import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -52,6 +54,7 @@ ENTITY_REGISTRY_FIELDS = (
     "parameterGroups",
     "parameters",
     "metadata",
+    "drawings",
 )
 IDENTITY_SOURCE_FIELDS = (
     "kind",
@@ -148,6 +151,24 @@ METADATA_FIELDS = (
     "stabilityClass",
     "annotations",
 )
+DRAWING_FIELDS = (
+    "id",
+    "name",
+    "displayName",
+    "componentIds",
+    "resource",
+    "sheets",
+    "identitySource",
+)
+DRAWING_RESOURCE_FIELDS = ("topology", "path")
+DRAWING_SHEET_FIELDS = (
+    "id",
+    "name",
+    "displayName",
+    "order",
+    "cadType",
+    "identitySource",
+)
 
 _COMPONENT_KINDS = ("assembly", "part")
 _RELATIONSHIP_KINDS = ("mate", "relationship")
@@ -156,6 +177,7 @@ _METADATA_OWNER_KINDS = ("component", "feature", "relationship")
 _PARAMETER_GROUP_KINDS = ("varset", "design_table", "cad_native_group")
 _VALUE_TYPES = ("number", "string", "boolean")
 _STABILITY_CLASSES = ("stable", "conditionally_stable", "unstable")
+_DRAWING_TOPOLOGIES = ("embedded", "separate")
 
 
 def _join(path: str, field: str) -> str:
@@ -455,6 +477,7 @@ class _ShapeValidator:
         )
         self.entity_array(candidate, "parameters", location, self.parameter)
         self.entity_array(candidate, "metadata", location, self.metadata)
+        self.entity_array(candidate, "drawings", location, self.drawing)
 
     def entity_array(
         self,
@@ -618,6 +641,99 @@ class _ShapeValidator:
         self.require_identity_kind(identity, path, "owner_scoped_key")
         self.require_identity_field(identity, path, "ownerScopedKey")
 
+    def drawing(self, value: Mapping[str, Any], path: str) -> None:
+        self.allowed(value, path, DRAWING_FIELDS)
+        self.required_string(value, "id", path)
+        self.required_string(value, "name", path)
+        self.required_string(value, "displayName", path, allow_empty=True)
+        component_ids = self.required_array(value, "componentIds", path)
+        if component_ids is not None:
+            for index, component_id in enumerate(component_ids):
+                if not isinstance(component_id, str):
+                    self.add(f"{path}.componentIds[{index}] must be a string")
+                elif component_id.strip() == "":
+                    self.add(f"{path}.componentIds[{index}] is required")
+        self.drawing_resource(value, path)
+        self.drawing_sheets(value, path)
+        identity = self.identity_source(value, path)
+        self.require_drawing_identity_source(identity, path)
+
+    def drawing_resource(self, value: Mapping[str, Any], path: str) -> None:
+        location = _join(path, "resource")
+        candidate = self.required_object(value, "resource", path)
+        if candidate is None:
+            return
+        self.allowed(candidate, location, DRAWING_RESOURCE_FIELDS)
+        topology = self.required_string(candidate, "topology", location)
+        path_value = self.optional_string(
+            candidate,
+            "path",
+            location,
+            allow_empty=True,
+        )
+        if topology is not None and topology not in _DRAWING_TOPOLOGIES:
+            self.add(f'{location}.topology must be one of "embedded" or "separate"')
+        if topology == "embedded" and path_value:
+            self.add(f'{location}.path must be empty when topology is "embedded"')
+        if topology == "separate":
+            if path_value is None or path_value.strip() == "":
+                self.add(f'{location}.path is required when topology is "separate"')
+            elif not _is_canonical_relative_path(path_value):
+                self.add(f"{location}.path must be a canonical project-relative path")
+
+    def drawing_sheets(self, value: Mapping[str, Any], path: str) -> None:
+        sheets = self.required_array(value, "sheets", path)
+        if sheets is None:
+            return
+        for index, sheet in enumerate(sheets):
+            location = f"{path}.sheets[{index}]"
+            if not isinstance(sheet, Mapping):
+                self.add(f"{location} must be an object")
+                continue
+            self.drawing_sheet(sheet, location)
+
+    def drawing_sheet(self, value: Mapping[str, Any], path: str) -> None:
+        self.allowed(value, path, DRAWING_SHEET_FIELDS)
+        self.required_string(value, "id", path)
+        self.required_string(value, "name", path)
+        self.required_string(value, "displayName", path, allow_empty=True)
+        order = self.required_int(value, "order", path)
+        if order is not None and order < 1:
+            self.add(f"{path}.order must be a positive integer")
+        self.required_string(value, "cadType", path)
+        identity = self.required_identity_source(value, path)
+        if identity is None:
+            return
+        kind = identity.get("kind")
+        if isinstance(kind, str) and kind.strip() != "" and kind != "native_ref":
+            self.add(f'{path}.identitySource.kind must be "native_ref"')
+        native_ref = identity.get("nativeRef")
+        if not isinstance(native_ref, str) or native_ref.strip() == "":
+            self.add(f"{path}.identitySource.nativeRef is required")
+
+    def required_identity_source(
+        self,
+        value: Mapping[str, Any],
+        path: str,
+    ) -> Mapping[str, Any] | None:
+        if "identitySource" not in value:
+            self.add(f"{_join(path, 'identitySource')} is required")
+            return None
+        return self.identity_source(value, path)
+
+    def require_drawing_identity_source(
+        self,
+        identity: Mapping[str, Any] | None,
+        path: str,
+    ) -> None:
+        if identity is None:
+            return
+        kind = identity.get("kind")
+        if isinstance(kind, str) and kind == "native_ref":
+            native_ref = identity.get("nativeRef")
+            if not isinstance(native_ref, str) or native_ref.strip() == "":
+                self.add(f"{path}.identitySource.nativeRef is required")
+
     def current_value(
         self,
         value: Mapping[str, Any],
@@ -710,6 +826,18 @@ def _is_json_scalar(value: Any) -> bool:
     return False
 
 
+def _is_canonical_relative_path(value: str) -> bool:
+    if value == "" or value.strip() != value or "\\" in value or "\x00" in value:
+        return False
+    if value.startswith("/") or posixpath.isabs(value):
+        return False
+    if posixpath.normpath(value) != value:
+        return False
+    if value in (".", "..") or value.startswith("../"):
+        return False
+    return re.match(r"^[A-Za-z]:/", value) is None
+
+
 def _validate_semantics(value: Mapping[str, Any]) -> tuple[str, ...]:
     problems: list[str] = []
 
@@ -720,6 +848,7 @@ def _validate_semantics(value: Mapping[str, Any]) -> tuple[str, ...]:
     groups = entities["parameterGroups"]
     parameters = entities["parameters"]
     metadata = entities["metadata"]
+    drawings = entities["drawings"]
 
     component_by_id = {component["id"]: component for component in components}
     feature_by_id = {feature["id"]: feature for feature in features}
@@ -890,6 +1019,7 @@ def _validate_semantics(value: Mapping[str, Any]) -> tuple[str, ...]:
             metadata,
         )
     )
+    problems.extend(_validate_drawing_semantics(drawings, component_by_id))
     problems.extend(_validate_structure(value, component_by_id))
 
     return tuple(problems)
@@ -983,6 +1113,50 @@ def _validate_identity_source_uniqueness(
                 "ownerScopedKey",
             )
 
+    return problems
+
+
+def _validate_drawing_semantics(
+    drawings: list[Mapping[str, Any]],
+    component_by_id: Mapping[str, Mapping[str, Any]],
+) -> list[str]:
+    problems: list[str] = []
+
+    for index, drawing in enumerate(drawings):
+        location = f"entities.drawings[{index}]"
+        component_ids = drawing["componentIds"]
+        if not component_ids:
+            problems.append(f"{location}.componentIds must not be empty")
+        seen_components: set[str] = set()
+        for component_index, component_id in enumerate(component_ids):
+            if component_id in seen_components:
+                problems.append(
+                    f"{location}.componentIds[{component_index}] duplicates "
+                    f'component ID "{component_id}"'
+                )
+            else:
+                seen_components.add(component_id)
+            if component_id not in component_by_id:
+                problems.append(
+                    f'{location}.componentIds[{component_index}] "{component_id}" '
+                    "must resolve to an existing component"
+                )
+
+        sheets = drawing["sheets"]
+        if not sheets:
+            problems.append(f"{location}.sheets must not be empty")
+        seen_orders: dict[int, int] = {}
+        for sheet_index, sheet in enumerate(sheets):
+            sheet_location = f"{location}.sheets[{sheet_index}]"
+            order = sheet.get("order")
+            if isinstance(order, int) and not isinstance(order, bool):
+                if order in seen_orders:
+                    problems.append(
+                        f"{sheet_location}.order duplicates order already "
+                        f"declared at {location}.sheets[{seen_orders[order]}].order"
+                    )
+                else:
+                    seen_orders[order] = sheet_index
     return problems
 
 

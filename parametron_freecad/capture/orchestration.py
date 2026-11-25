@@ -32,6 +32,8 @@ from parametron_freecad.capture.canonical import canonical_capture_bytes
 from parametron_freecad.capture.decisions import (
     CaptureDecisions,
     ComponentDecision,
+    DrawingDecision,
+    DrawingSheetDecision,
     FeatureDecision,
     MetadataDecision,
     ParameterDecision,
@@ -40,6 +42,8 @@ from parametron_freecad.capture.decisions import (
 from parametron_freecad.capture.discovery import (
     CaptureDiscovery,
     ComponentCandidate,
+    DrawingPageCandidate,
+    FeatureCandidate,
     MetadataCandidate,
     ParameterCandidate,
     TargetabilityEvidence,
@@ -55,6 +59,8 @@ from parametron_freecad.capture.model import (
 )
 from parametron_freecad.capture.naming import (
     generate_component_id,
+    generate_drawing_id,
+    generate_drawing_sheet_id,
     generate_feature_id,
     generate_group_owned_parameter_id,
     generate_metadata_id,
@@ -239,6 +245,12 @@ def _build_capture_mapping(
     metadata_by_path = _index_by(
         discovery.metadata, "nativePath", lambda item: item.native_path, problems
     )
+    pages_by_ref = _index_by(
+        discovery.drawings,
+        "technical drawing page",
+        lambda item: item.native_ref,
+        problems,
+    )
 
     component_decisions = _unique_decisions(
         decisions.components, "nativeRef", lambda item: item.native_ref, problems
@@ -387,6 +399,17 @@ def _build_capture_mapping(
         component_ids,
         feature_ids,
     )
+
+    drawing_entries = _build_drawings(
+        decisions.drawings,
+        pages_by_ref,
+        features_by_ref,
+        component_decisions,
+        component_ids,
+        problems,
+    )
+    if problems:
+        raise CaptureDecisionError(problems)
 
     components: list[dict[str, Any]] = []
     for ref in sorted(component_decisions):
@@ -557,6 +580,7 @@ def _build_capture_mapping(
             "parameterGroups": groups,
             "parameters": parameters,
             "metadata": metadata,
+            "drawings": drawing_entries,
         },
         "structure": structure,
     }
@@ -785,6 +809,150 @@ def _metadata_ids(
     return result
 
 
+def _build_drawings(
+    decisions: tuple[DrawingDecision, ...],
+    pages_by_ref: Mapping[str, DrawingPageCandidate],
+    features_by_ref: Mapping[str, FeatureCandidate],
+    component_decisions: Mapping[str, ComponentDecision],
+    component_ids: Mapping[str, str],
+    problems: list[str],
+) -> list[dict[str, Any]]:
+    if not decisions:
+        return []
+
+    entries: list[dict[str, Any]] = []
+    selected_pages: dict[str, int] = {}
+    for drawing_index, decision in enumerate(decisions):
+        location = f"drawings[{drawing_index}]"
+        if not decision.sheets:
+            problems.append(f"{location} must select at least one drawing sheet")
+            continue
+
+        drawing_id = decision.id or generate_drawing_id(
+            decision.name,
+            entity_path=f"{location}.name",
+        )
+        drawing_components: set[str] = set()
+        sheets: list[dict[str, Any]] = []
+        seen_orders: dict[int, int] = {}
+
+        for sheet_index, sheet in enumerate(decision.sheets):
+            sheet_location = f"{location}.sheets[{sheet_index}]"
+            page = pages_by_ref.get(sheet.native_ref)
+            if page is None:
+                problems.append(
+                    f"{sheet_location} selects unknown technical drawing page "
+                    f'"{sheet.native_ref}"'
+                )
+                continue
+            previous = selected_pages.get(page.native_ref)
+            if previous is not None:
+                problems.append(
+                    f'technical drawing page "{page.native_ref}" is selected by '
+                    f"more than one drawing ({previous} and {drawing_index})"
+                )
+                continue
+            selected_pages[page.native_ref] = drawing_index
+
+            if page.resource.topology != "embedded":
+                problems.append(
+                    f'{sheet_location} page "{page.native_ref}" has unsupported '
+                    f'drawing resource topology "{page.resource.topology}"'
+                )
+                continue
+
+            if sheet.order < 1:
+                problems.append(f"{sheet_location}.order must be a positive integer")
+            elif sheet.order in seen_orders:
+                problems.append(
+                    f"{sheet_location}.order duplicates order already declared "
+                    f"at {location}.sheets[{seen_orders[sheet.order]}].order"
+                )
+            else:
+                seen_orders[sheet.order] = sheet_index
+
+            for target in page.targets:
+                if target.kind == "component":
+                    if target.native_ref not in component_decisions:
+                        problems.append(
+                            f"{sheet_location} target component "
+                            f'"{target.native_ref}" must be selected for capture'
+                        )
+                    else:
+                        drawing_components.add(component_ids[target.native_ref])
+                    continue
+                if target.kind == "feature":
+                    feature = features_by_ref.get(target.native_ref)
+                    if feature is None:
+                        problems.append(
+                            f"{sheet_location} target feature "
+                            f'"{target.native_ref}" is not a discovered feature'
+                        )
+                        continue
+                    owner = feature.component_native_ref
+                    if owner not in component_decisions:
+                        problems.append(
+                            f"{sheet_location} target feature "
+                            f'"{target.native_ref}" requires component "{owner}" '
+                            "to be selected for capture"
+                        )
+                    else:
+                        drawing_components.add(component_ids[owner])
+                    continue
+                problems.append(
+                    f'{sheet_location} target "{target.native_ref}" has '
+                    f'unsupported kind "{target.kind}"'
+                )
+
+            sheet_id = sheet.id or generate_drawing_sheet_id(
+                drawing_id,
+                sheet.name,
+                entity_path=f"{sheet_location}.name",
+            )
+            display_name = (
+                page.native_label if sheet.display_name is None else sheet.display_name
+            )
+            sheets.append(
+                {
+                    "id": sheet_id,
+                    "name": sheet.name,
+                    "displayName": display_name,
+                    "order": sheet.order,
+                    "cadType": page.cad_type,
+                    "identitySource": {
+                        "kind": "native_ref",
+                        "nativeRef": page.native_ref,
+                    },
+                }
+            )
+
+        if not drawing_components:
+            problems.append(
+                f'{location} "{decision.name}" must reference at least one '
+                "captured component"
+            )
+
+        entries.append(
+            {
+                "id": drawing_id,
+                "name": decision.name,
+                "displayName": (
+                    decision.name
+                    if decision.display_name is None
+                    else decision.display_name
+                ),
+                "componentIds": sorted(drawing_components),
+                "resource": {"topology": "embedded"},
+                "sheets": sorted(
+                    sheets,
+                    key=lambda item: (item["order"], item["id"]),
+                ),
+            }
+        )
+
+    return sorted(entries, key=lambda item: item["id"])
+
+
 def _owner_id(
     candidate: ParameterCandidate | MetadataCandidate,
     component_ids: Mapping[str, str],
@@ -950,6 +1118,14 @@ def _entity_index(mapping: Mapping[str, Any]) -> dict[tuple[str, str], dict[str,
             return ()
         return tuple(item for item in value if isinstance(item, Mapping))
 
+    def _nested_list(
+        item: Mapping[str, Any], name: str
+    ) -> tuple[Mapping[str, Any], ...]:
+        value = item.get(name)
+        if not isinstance(value, (list, tuple)):
+            return ()
+        return tuple(entry for entry in value if isinstance(entry, Mapping))
+
     for item in _list("components"):
         identity = item.get("identitySource") or {}
         add(
@@ -1000,6 +1176,30 @@ def _entity_index(mapping: Mapping[str, Any]) -> dict[tuple[str, str], dict[str,
             item,
             f"owner:{item.get('ownerKind')}:{item.get('ownerId')}",
         )
+
+    for item in _list("drawings"):
+        identity = item.get("identitySource") or {}
+        resource = item.get("resource") or {}
+        component_ids = item.get("componentIds")
+        components = (
+            ",".join(sorted(component_ids))
+            if isinstance(component_ids, (list, tuple))
+            else ""
+        )
+        dependency = (
+            f"resource:{resource.get('topology')}:{resource.get('path') or ''}"
+            f":components:{components}"
+        )
+        add("drawing", identity, item, dependency)
+        drawing_id = item.get("id")
+        for sheet in _nested_list(item, "sheets"):
+            sheet_identity = sheet.get("identitySource") or {}
+            add(
+                "drawingSheet",
+                sheet_identity,
+                sheet,
+                f"drawing:{drawing_id}:components:{components}",
+            )
     return result
 
 
