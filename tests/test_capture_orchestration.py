@@ -21,6 +21,9 @@ from parametron_freecad.capture import (
     CaptureSourceError,
     CaptureUnsavedDocumentError,
     ComponentDecision,
+    DrawingDecision,
+    DrawingResourceEvidence,
+    DrawingSheetDecision,
     EnginePreflightResult,
     EnginePreflightRunner,
     FeatureDecision,
@@ -47,6 +50,8 @@ from tests.capture_discovery_support import (
     FakeDocument,
     app_part,
     body,
+    drawing_page,
+    drawing_view,
     pad,
     property_length,
     property_string,
@@ -107,6 +112,61 @@ def _fake_discovery():
     root = app_part("root", group=[body_obj, vset])
     document = FakeDocument("model", objects=[root, body_obj, pad_obj, vset])
     return discover_capture_candidates(document)
+
+
+def _drawing_discovery():
+    pad_obj = pad("Pad")
+    body_obj = body("Body", group=[pad_obj])
+    root = app_part("root", group=[body_obj])
+    body_view = drawing_view("BodyView", source=[body_obj])
+    feature_view = drawing_view("FeatureView", source=[pad_obj])
+    page_a = drawing_page("PageA", label="Sheet A", views=[body_view])
+    page_b = drawing_page("PageB", label="Sheet B", views=[feature_view])
+    document = FakeDocument(
+        "model",
+        objects=[
+            root,
+            body_obj,
+            pad_obj,
+            body_view,
+            feature_view,
+            page_a,
+            page_b,
+        ],
+    )
+    return discover_capture_candidates(document)
+
+
+def _drawing_decisions(
+    *, drawings: tuple[DrawingDecision, ...] | None = None
+) -> CaptureDecisions:
+    if drawings is None:
+        drawings = (
+            DrawingDecision(
+                name="Manufacturing",
+                display_name="Manufacturing Drawing",
+                sheets=(
+                    DrawingSheetDecision(
+                        native_ref="PageA",
+                        name="assembly",
+                        order=1,
+                    ),
+                    DrawingSheetDecision(
+                        native_ref="PageB",
+                        name="detail",
+                        order=2,
+                    ),
+                ),
+            ),
+        )
+    return CaptureDecisions(
+        components=(
+            ComponentDecision(native_ref="root", name="Root"),
+            ComponentDecision(native_ref="Body", name="Body"),
+        ),
+        drawings=drawings,
+        cad_system_version="1.1.4",
+    )
 
 
 def _full_decisions() -> CaptureDecisions:
@@ -335,6 +395,7 @@ class CaptureBuildDocumentTests(unittest.TestCase):
         self.assertEqual(metadata["id"], "meta.body.material")
         self.assertEqual(metadata["key"], "material")
         self.assertNotIn("identitySource", metadata)
+        self.assertEqual(mapping["entities"]["drawings"], [])
         self.assertEqual(mapping["structure"]["rootComponentId"], "cmp.root")
 
     def test_root_component_is_required(self) -> None:
@@ -451,6 +512,311 @@ class CaptureBuildDocumentTests(unittest.TestCase):
             if item["id"] == "cmp.assembly"
         )
         self.assertEqual(root["stabilityClass"], "stable")
+
+
+class CaptureDrawingDocumentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self._temporary.cleanup)
+        self.root = Path(self._temporary.name)
+        _write_project(self.root, models={"input/model.FCStd": b"native bytes"})
+        self.context = load_project_context(self.root)
+        self.model = resolve_selected_model(self.context, "model")
+        self.discovery = _drawing_discovery()
+
+    def test_builds_embedded_drawing_with_ordered_sheets(self) -> None:
+        mapping = build_capture_document(
+            context=self.context,
+            model=self.model,
+            discovery=self.discovery,
+            decisions=_drawing_decisions(),
+        ).to_mapping()
+
+        self.assertEqual(len(mapping["entities"]["drawings"]), 1)
+        drawing = mapping["entities"]["drawings"][0]
+        self.assertEqual(drawing["id"], "drw.manufacturing")
+        self.assertEqual(drawing["name"], "Manufacturing")
+        self.assertEqual(drawing["displayName"], "Manufacturing Drawing")
+        self.assertEqual(drawing["componentIds"], ["cmp.body"])
+        self.assertEqual(drawing["resource"], {"topology": "embedded"})
+        self.assertNotIn("identitySource", drawing)
+        self.assertEqual(
+            [sheet["id"] for sheet in drawing["sheets"]],
+            ["sht.manufacturing.assembly", "sht.manufacturing.detail"],
+        )
+        self.assertEqual(
+            [sheet["order"] for sheet in drawing["sheets"]],
+            [1, 2],
+        )
+        self.assertEqual(
+            [sheet["identitySource"]["nativeRef"] for sheet in drawing["sheets"]],
+            ["PageA", "PageB"],
+        )
+        self.assertEqual(
+            [sheet["cadType"] for sheet in drawing["sheets"]],
+            ["TechDraw::DrawPage", "TechDraw::DrawPage"],
+        )
+        self.assertEqual(
+            [sheet["displayName"] for sheet in drawing["sheets"]],
+            ["Sheet A", "Sheet B"],
+        )
+
+    def test_feature_target_resolves_to_owning_component(self) -> None:
+        mapping = build_capture_document(
+            context=self.context,
+            model=self.model,
+            discovery=self.discovery,
+            decisions=_drawing_decisions(),
+        ).to_mapping()
+
+        drawing = mapping["entities"]["drawings"][0]
+        self.assertEqual(drawing["componentIds"], ["cmp.body"])
+        self.assertEqual(mapping["entities"]["features"], [])
+
+    def test_multiple_drawings_are_supported(self) -> None:
+        decisions = _drawing_decisions(
+            drawings=(
+                DrawingDecision(
+                    name="Manufacturing",
+                    sheets=(
+                        DrawingSheetDecision(
+                            native_ref="PageA",
+                            name="assembly",
+                            order=1,
+                        ),
+                    ),
+                ),
+                DrawingDecision(
+                    name="Inspection",
+                    sheets=(
+                        DrawingSheetDecision(
+                            native_ref="PageB",
+                            name="detail",
+                            order=1,
+                        ),
+                    ),
+                ),
+            )
+        )
+        mapping = build_capture_document(
+            context=self.context,
+            model=self.model,
+            discovery=self.discovery,
+            decisions=decisions,
+        ).to_mapping()
+
+        self.assertEqual(
+            [drawing["id"] for drawing in mapping["entities"]["drawings"]],
+            ["drw.inspection", "drw.manufacturing"],
+        )
+
+    def test_unknown_page_and_duplicate_page_selection_are_rejected(self) -> None:
+        with self.assertRaises(CaptureDecisionError):
+            build_capture_document(
+                context=self.context,
+                model=self.model,
+                discovery=self.discovery,
+                decisions=_drawing_decisions(
+                    drawings=(
+                        DrawingDecision(
+                            name="Manufacturing",
+                            sheets=(
+                                DrawingSheetDecision(
+                                    native_ref="MissingPage",
+                                    name="assembly",
+                                    order=1,
+                                ),
+                            ),
+                        ),
+                    )
+                ),
+            )
+
+        with self.assertRaises(CaptureDecisionError):
+            build_capture_document(
+                context=self.context,
+                model=self.model,
+                discovery=self.discovery,
+                decisions=_drawing_decisions(
+                    drawings=(
+                        DrawingDecision(
+                            name="First",
+                            sheets=(
+                                DrawingSheetDecision(
+                                    native_ref="PageA",
+                                    name="assembly",
+                                    order=1,
+                                ),
+                            ),
+                        ),
+                        DrawingDecision(
+                            name="Second",
+                            sheets=(
+                                DrawingSheetDecision(
+                                    native_ref="PageA",
+                                    name="detail",
+                                    order=1,
+                                ),
+                            ),
+                        ),
+                    )
+                ),
+            )
+
+    def test_invalid_sheet_orders_and_empty_sheets_are_rejected(self) -> None:
+        for sheets in (
+            (),
+            (DrawingSheetDecision(native_ref="PageA", name="a", order=0),),
+            (
+                DrawingSheetDecision(native_ref="PageA", name="a", order=1),
+                DrawingSheetDecision(native_ref="PageB", name="b", order=1),
+            ),
+        ):
+            with self.subTest(sheets=sheets):
+                with self.assertRaises(CaptureDecisionError):
+                    build_capture_document(
+                        context=self.context,
+                        model=self.model,
+                        discovery=self.discovery,
+                        decisions=_drawing_decisions(
+                            drawings=(
+                                DrawingDecision(
+                                    name="Manufacturing",
+                                    sheets=sheets,
+                                ),
+                            )
+                        ),
+                    )
+
+    def test_separate_page_resource_is_rejected_by_freecad_capture(self) -> None:
+        discovery = replace(
+            self.discovery,
+            drawings=tuple(
+                replace(
+                    page,
+                    resource=DrawingResourceEvidence(
+                        "separate",
+                        "drawing_doc",
+                        "Drawing Document",
+                    ),
+                )
+                for page in self.discovery.drawings
+            ),
+        )
+        with self.assertRaises(CaptureDecisionError):
+            build_capture_document(
+                context=self.context,
+                model=self.model,
+                discovery=discovery,
+                decisions=_drawing_decisions(),
+            )
+
+    def test_unselected_drawing_target_component_is_rejected(self) -> None:
+        decisions = CaptureDecisions(
+            components=(ComponentDecision(native_ref="root", name="Root"),),
+            drawings=_drawing_decisions().drawings,
+            cad_system_version="1.1.4",
+        )
+        with self.assertRaises(CaptureDecisionError):
+            build_capture_document(
+                context=self.context,
+                model=self.model,
+                discovery=self.discovery,
+                decisions=decisions,
+            )
+
+    def test_drawing_drift_detects_sheet_changes(self) -> None:
+        retained = build_capture_document(
+            context=self.context,
+            model=self.model,
+            discovery=self.discovery,
+            decisions=_drawing_decisions(),
+        ).to_mapping()
+        self.assertEqual(detect_capture_drift(retained, copy.deepcopy(retained)), ())
+
+        proposed = copy.deepcopy(retained)
+        proposed["entities"]["drawings"][0]["sheets"][0]["cadType"] = (
+            "TechDraw::DrawViewPart"
+        )
+        entries = detect_capture_drift(retained, proposed)
+        self.assertTrue(
+            any(
+                entry.entity == "drawingSheet" and entry.code == "changed_native_type"
+                for entry in entries
+            ),
+            entries,
+        )
+
+        proposed = copy.deepcopy(retained)
+        proposed["entities"]["drawings"][0]["componentIds"] = ["cmp.root"]
+        entries = detect_capture_drift(retained, proposed)
+        self.assertTrue(
+            any(
+                entry.entity == "drawingSheet" and entry.code == "dependency_change"
+                for entry in entries
+            ),
+            entries,
+        )
+
+        proposed = build_capture_document(
+            context=self.context,
+            model=self.model,
+            discovery=self.discovery,
+            decisions=_drawing_decisions(
+                drawings=(
+                    DrawingDecision(
+                        name="Inspection",
+                        sheets=_drawing_decisions().drawings[0].sheets,
+                    ),
+                )
+            ),
+        ).to_mapping()
+        entries = detect_capture_drift(retained, proposed)
+        self.assertTrue(
+            any(
+                entry.entity == "drawingSheet"
+                and entry.code == "semantic_identity_change"
+                for entry in entries
+            ),
+            entries,
+        )
+
+    def test_removed_page_is_missing_drawing_sheet_drift(self) -> None:
+        retained = build_capture_document(
+            context=self.context,
+            model=self.model,
+            discovery=self.discovery,
+            decisions=_drawing_decisions(),
+        ).to_mapping()
+        proposed = build_capture_document(
+            context=self.context,
+            model=self.model,
+            discovery=self.discovery,
+            decisions=_drawing_decisions(
+                drawings=(
+                    DrawingDecision(
+                        name="Manufacturing",
+                        sheets=(
+                            DrawingSheetDecision(
+                                native_ref="PageA",
+                                name="assembly",
+                                order=1,
+                            ),
+                        ),
+                    ),
+                )
+            ),
+        ).to_mapping()
+
+        entries = detect_capture_drift(retained, proposed)
+        self.assertTrue(
+            any(
+                entry.entity == "drawingSheet"
+                and entry.code == "missing_native_selector"
+                for entry in entries
+            ),
+            entries,
+        )
 
 
 class CaptureDriftTests(unittest.TestCase):

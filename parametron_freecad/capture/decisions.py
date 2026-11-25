@@ -118,6 +118,27 @@ class MetadataDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class DrawingSheetDecision:
+    """User decision for one discovered technical drawing page."""
+
+    native_ref: str
+    name: str
+    order: int
+    id: str = ""
+    display_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DrawingDecision:
+    """User decision grouping discovered pages into one logical drawing."""
+
+    name: str
+    sheets: tuple[DrawingSheetDecision, ...]
+    id: str = ""
+    display_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class CaptureDecisions:
     """Complete explicit decision set for one capture operation."""
 
@@ -126,6 +147,7 @@ class CaptureDecisions:
     parameter_groups: tuple[ParameterGroupDecision, ...] = ()
     parameters: tuple[ParameterDecision, ...] = ()
     metadata: tuple[MetadataDecision, ...] = ()
+    drawings: tuple[DrawingDecision, ...] = ()
     capture_id: str = ""
     adapter_version: str = ""
     cad_system_version: str = ""
@@ -170,12 +192,30 @@ class CaptureDecisions:
                 {"nativePath": item.native_path, "id": item.id}
                 for item in self.metadata
             ],
+            "drawings": [
+                {
+                    "name": item.name,
+                    "id": item.id,
+                    "sheets": [
+                        {
+                            "nativeRef": sheet.native_ref,
+                            "name": sheet.name,
+                            "order": sheet.order,
+                            "id": sheet.id,
+                        }
+                        for sheet in item.sheets
+                    ],
+                }
+                for item in self.drawings
+            ],
         }
 
 
 __all__ = [
     "CaptureDecisions",
     "ComponentDecision",
+    "DrawingDecision",
+    "DrawingSheetDecision",
     "FeatureDecision",
     "MetadataDecision",
     "ParameterDecision",

@@ -1,7 +1,7 @@
 """GUI-free capture session that ties panel state to core orchestration.
 
 The session owns the project context, explicit model selection, native
-discovery, and the four-tab panel state. It exposes review previews and the
+discovery, and the top-down panel state. It exposes review previews and the
 confirmed atomic write from the GUI-free capture orchestration layer. It never
 imports FreeCAD, FreeCADGui, or Qt.
 

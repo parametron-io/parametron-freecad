@@ -177,6 +177,7 @@ def valid_mapping() -> dict[str, Any]:
                     "annotations": empty_annotations(),
                 }
             ],
+            "drawings": [],
         },
         "structure": {
             "rootComponentId": "cmp.root",

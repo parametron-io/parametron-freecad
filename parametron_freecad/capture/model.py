@@ -522,6 +522,97 @@ class Metadata:
 
 
 @dataclass(frozen=True, slots=True)
+class DrawingResource:
+    topology: str
+    path: str = ""
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> DrawingResource:
+        return cls(
+            topology=value["topology"],
+            path=value.get("path", ""),
+        )
+
+    def to_mapping(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"topology": self.topology}
+        if self.path:
+            result["path"] = self.path
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class DrawingSheet:
+    id: str
+    name: str
+    display_name: str
+    order: int
+    cad_type: str
+    identity_source: IdentitySource
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> DrawingSheet:
+        return cls(
+            id=value["id"],
+            name=value["name"],
+            display_name=value["displayName"],
+            order=value["order"],
+            cad_type=value["cadType"],
+            identity_source=IdentitySource.from_mapping(value["identitySource"]),
+        )
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "displayName": self.display_name,
+            "order": self.order,
+            "cadType": self.cad_type,
+            "identitySource": self.identity_source.to_mapping(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class Drawing:
+    id: str
+    name: str
+    display_name: str
+    component_ids: tuple[str, ...]
+    resource: DrawingResource
+    sheets: tuple[DrawingSheet, ...]
+    identity_source: IdentitySource | None = None
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> Drawing:
+        identity = value.get("identitySource")
+        return cls(
+            id=value["id"],
+            name=value["name"],
+            display_name=value["displayName"],
+            component_ids=tuple(value["componentIds"]),
+            resource=DrawingResource.from_mapping(value["resource"]),
+            sheets=tuple(DrawingSheet.from_mapping(sheet) for sheet in value["sheets"]),
+            identity_source=(
+                IdentitySource.from_mapping(identity)
+                if isinstance(identity, Mapping)
+                else None
+            ),
+        )
+
+    def to_mapping(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "id": self.id,
+            "name": self.name,
+            "displayName": self.display_name,
+            "componentIds": list(self.component_ids),
+            "resource": self.resource.to_mapping(),
+            "sheets": [sheet.to_mapping() for sheet in self.sheets],
+        }
+        if self.identity_source is not None:
+            result["identitySource"] = self.identity_source.to_mapping()
+        return result
+
+
+@dataclass(frozen=True, slots=True)
 class StructureNode:
     component_id: str
     parent_component_id: str = ""
@@ -570,6 +661,7 @@ class Entities:
     parameter_groups: tuple[ParameterGroup, ...] = ()
     parameters: tuple[Parameter, ...] = ()
     metadata: tuple[Metadata, ...] = ()
+    drawings: tuple[Drawing, ...] = ()
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> Entities:
@@ -588,6 +680,7 @@ class Entities:
                 Parameter.from_mapping(item) for item in value["parameters"]
             ),
             metadata=tuple(Metadata.from_mapping(item) for item in value["metadata"]),
+            drawings=tuple(Drawing.from_mapping(item) for item in value["drawings"]),
         )
 
     def to_mapping(self) -> dict[str, Any]:
@@ -600,6 +693,7 @@ class Entities:
             "parameterGroups": [group.to_mapping() for group in self.parameter_groups],
             "parameters": [parameter.to_mapping() for parameter in self.parameters],
             "metadata": [entry.to_mapping() for entry in self.metadata],
+            "drawings": [drawing.to_mapping() for drawing in self.drawings],
         }
 
 
@@ -653,6 +747,9 @@ __all__ = [
     "Annotations",
     "CaptureDocument",
     "Component",
+    "Drawing",
+    "DrawingResource",
+    "DrawingSheet",
     "Entities",
     "Feature",
     "IdentitySource",
