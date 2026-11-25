@@ -41,6 +41,49 @@ CANONICAL_MODEL = "cube_canonical_lifecycle_model"
 METADATA_PROJECT = FIXTURE_ROOT / "metadata_mutation"
 METADATA_MODEL = "metadata_coexistence_model"
 
+DRAWING_ROOT = FIXTURE_ROOT / "capture_drawings"
+DRAWING_SINGLE_SOURCE = DRAWING_ROOT / "single-page.FCStd"
+DRAWING_MULTIPLE_SOURCE = DRAWING_ROOT / "multiple-pages.FCStd"
+
+DRAWING_SCENARIOS = {
+    "single-sheet": {
+        "template": DRAWING_ROOT / "single-sheet",
+        "source": DRAWING_SINGLE_SOURCE,
+        "model": "drawing_single_sheet_model",
+        "drawings": ["drw.manufacturing"],
+        "sheets": ["sht.manufacturing.assembly"],
+        "name_collision": False,
+    },
+    "multi-sheet": {
+        "template": DRAWING_ROOT / "multi-sheet",
+        "source": DRAWING_MULTIPLE_SOURCE,
+        "model": "drawing_multi_sheet_model",
+        "drawings": ["drw.manufacturing"],
+        "sheets": [
+            "sht.manufacturing.assembly",
+            "sht.manufacturing.detail",
+        ],
+        "name_collision": True,
+    },
+    "multiple-drawings": {
+        "template": DRAWING_ROOT / "multiple-drawings",
+        "source": DRAWING_MULTIPLE_SOURCE,
+        "model": "drawing_multiple_drawings_model",
+        "drawings": ["drw.inspection", "drw.manufacturing"],
+        "sheets": ["sht.inspection.detail", "sht.manufacturing.assembly"],
+        "name_collision": True,
+    },
+}
+
+DRAWING_NEGATIVE_KEYS = (
+    "unknown_drawing_page",
+    "duplicate_page_selection",
+    "invalid_sheet_order",
+    "uncaptured_drawing_target",
+    "drawing_name_collision",
+    "stale_drawing_sheet",
+)
+
 LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 
 pytestmark = pytest.mark.skipif(
@@ -116,6 +159,29 @@ def _copy_project(fixture: Path, destination: Path) -> Path:
     return destination
 
 
+def _prepare_drawing_project(
+    fixture: Path,
+    source_fixture: Path,
+    logical_id: str,
+    destination: Path,
+) -> tuple[Path, Path]:
+    """Copy a drawing project template and materialize its declared model source.
+
+    The committed binary ``.FCStd`` fixture is copied at run time to the
+    project-relative source path declared by ``prm.project.json``. Committed
+    capture outputs are removed so the run proves the create path.
+    """
+
+    shutil.copytree(fixture, destination)
+    (destination / "prm.cad.json").unlink()
+    (destination / "prm.semantic-map.json").unlink()
+    context = load_project_context(destination)
+    source = context.source_path(context.model(logical_id))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_fixture, source)
+    return destination, source
+
+
 def _run_capture(
     project: Path,
     logical_id: str,
@@ -185,6 +251,27 @@ def _assert_negative_evidence(payload: dict, *, unsupported_metadata: bool) -> N
         assert negatives["unsupported_metadata_type"] == "CaptureDecisionError"
     else:
         assert negatives["unsupported_metadata_type"] == "not_applicable"
+    for key in DRAWING_NEGATIVE_KEYS:
+        assert negatives[key] == "not_applicable"
+
+
+def _assert_drawing_negative_evidence(
+    payload: dict, *, expect_name_collision: bool
+) -> None:
+    negatives = payload["negativeCases"]
+    assert negatives["name_collision"] == "CaptureNamePolicyError"
+    assert negatives["missing_parent_capture"] == "not_applicable"
+    assert negatives["stale_native_selector"] == "not_applicable"
+    assert negatives["unsupported_metadata_type"] == "not_applicable"
+    assert negatives["unknown_drawing_page"] == "CaptureDecisionError"
+    assert negatives["duplicate_page_selection"] == "CaptureDecisionError"
+    assert negatives["invalid_sheet_order"] == "CaptureDecisionError"
+    assert negatives["uncaptured_drawing_target"] == "CaptureDecisionError"
+    assert negatives["stale_drawing_sheet"] == "CaptureDriftError"
+    if expect_name_collision:
+        assert negatives["drawing_name_collision"] == "CaptureNamePolicyError"
+    else:
+        assert negatives["drawing_name_collision"] == "not_applicable"
 
 
 def _load_outputs(project: Path) -> tuple[dict, dict, bytes, bytes]:
@@ -236,7 +323,7 @@ def test_canonical_capture_is_accepted_by_engine(
     assert _sha256(source) == source_before
     assert _sha256(project / "prm.project.json") == mapping_before
 
-    capture, semantic, _, _ = _load_outputs(project)
+    capture, semantic, capture_bytes, _ = _load_outputs(project)
     CaptureDocument.from_mapping(capture)
     validate_capture_document(capture)
     validate_semantic_map(semantic)
@@ -245,6 +332,8 @@ def test_canonical_capture_is_accepted_by_engine(
     committed = json.loads((CANONICAL_PROJECT / "prm.cad.json").read_text())
     assert capture["captureId"] == committed["captureId"]
     assert _committed_ids(capture) == _committed_ids(committed)
+    assert capture["entities"]["drawings"] == []
+    assert '"drawings":[]' in capture_bytes.decode("utf-8")
 
     _engine_validate(engine_binary, project)
 
@@ -314,3 +403,103 @@ def test_repeated_capture_is_semantically_deterministic(tmp_path: Path) -> None:
     first_identity = json.loads(first_capture_bytes)["captureId"]
     second_identity = json.loads(second_capture_bytes)["captureId"]
     assert first_identity == second_identity
+
+
+@pytest.mark.parametrize("scenario", sorted(DRAWING_SCENARIOS))
+def test_drawing_capture_is_accepted_by_engine(
+    scenario: str, engine_binary: Path, tmp_path: Path
+) -> None:
+    spec = DRAWING_SCENARIOS[scenario]
+    project, source = _prepare_drawing_project(
+        spec["template"],
+        spec["source"],
+        spec["model"],
+        tmp_path / "project",
+    )
+    source_before = _sha256(source)
+    mapping_before = _sha256(project / "prm.project.json")
+
+    payload = _run_capture(
+        project,
+        spec["model"],
+        spec["template"] / "prm.cad.json",
+        spec["template"] / "prm.semantic-map.json",
+        tmp_path / "evidence",
+    )
+    _assert_positive_evidence(payload)
+    _assert_drawing_negative_evidence(
+        payload, expect_name_collision=spec["name_collision"]
+    )
+    assert _sha256(source) == source_before
+    assert _sha256(project / "prm.project.json") == mapping_before
+
+    capture, semantic, capture_bytes, semantic_bytes = _load_outputs(project)
+    CaptureDocument.from_mapping(capture)
+    validate_capture_document(capture)
+    validate_semantic_map(semantic)
+    assert "/home/" not in json.dumps(capture, sort_keys=True)
+
+    committed = json.loads((spec["template"] / "prm.cad.json").read_text())
+    assert capture["captureId"] == committed["captureId"]
+    assert _committed_ids(capture) == _committed_ids(committed)
+    assert capture_bytes == (spec["template"] / "prm.cad.json").read_bytes()
+    assert semantic_bytes == (spec["template"] / "prm.semantic-map.json").read_bytes()
+
+    drawings = capture["entities"]["drawings"]
+    assert [drawing["id"] for drawing in drawings] == spec["drawings"]
+    assert [sheet["id"] for drawing in drawings for sheet in drawing["sheets"]] == (
+        spec["sheets"]
+    )
+    for drawing in drawings:
+        assert drawing["resource"] == {"topology": "embedded"}
+        assert drawing["componentIds"]
+        assert "identitySource" not in drawing
+        for sheet in drawing["sheets"]:
+            assert sheet["identitySource"]["kind"] == "native_ref"
+            assert sheet["identitySource"]["nativeRef"]
+            assert sheet["cadType"] == "TechDraw::DrawPage"
+
+    assert payload["counts"]["selectedDrawings"] == len(spec["drawings"])
+    assert payload["counts"]["selectedDrawingSheets"] == len(spec["sheets"])
+
+    _engine_validate(engine_binary, project)
+
+
+@pytest.mark.parametrize("scenario", sorted(DRAWING_SCENARIOS))
+def test_repeated_drawing_capture_is_byte_identical(
+    scenario: str, tmp_path: Path
+) -> None:
+    spec = DRAWING_SCENARIOS[scenario]
+    first_project, _ = _prepare_drawing_project(
+        spec["template"], spec["source"], spec["model"], tmp_path / "first"
+    )
+    second_project, _ = _prepare_drawing_project(
+        spec["template"], spec["source"], spec["model"], tmp_path / "second"
+    )
+
+    first = _run_capture(
+        first_project,
+        spec["model"],
+        spec["template"] / "prm.cad.json",
+        spec["template"] / "prm.semantic-map.json",
+        tmp_path / "first-evidence",
+    )
+    second = _run_capture(
+        second_project,
+        spec["model"],
+        spec["template"] / "prm.cad.json",
+        spec["template"] / "prm.semantic-map.json",
+        tmp_path / "second-evidence",
+    )
+
+    _, _, first_capture_bytes, first_semantic_bytes = _load_outputs(first_project)
+    _, _, second_capture_bytes, second_semantic_bytes = _load_outputs(second_project)
+
+    assert first_capture_bytes == second_capture_bytes
+    assert first_semantic_bytes == second_semantic_bytes
+    assert first["outputs"]["captureSha256"] == second["outputs"]["captureSha256"]
+    assert first["outputs"]["semanticSha256"] == second["outputs"]["semanticSha256"]
+    assert (
+        json.loads(first_capture_bytes)["captureId"]
+        == json.loads(second_capture_bytes)["captureId"]
+    )

@@ -19,6 +19,8 @@ from parametron_freecad.capture import (
     CaptureDecisions,
     CaptureDiscovery,
     ComponentDecision,
+    DrawingDecision,
+    DrawingSheetDecision,
     FeatureDecision,
     FreeCADSemanticMapSelection,
     MetadataDecision,
@@ -53,6 +55,7 @@ def replay_decisions(
     groups_by_ref = {item.native_ref: item for item in discovery.parameter_groups}
     parameters_by_path = {item.native_path: item for item in discovery.parameters}
     metadata_by_path = {item.native_path: item for item in discovery.metadata}
+    pages_by_ref = {item.native_ref: item for item in discovery.drawings}
 
     component_native_by_id: dict[str, str] = {}
     feature_native_by_id: dict[str, str] = {}
@@ -195,12 +198,41 @@ def replay_decisions(
             )
         )
 
+    drawings: list[DrawingDecision] = []
+    for item in entities["drawings"]:
+        sheets: list[DrawingSheetDecision] = []
+        for sheet in item["sheets"]:
+            native_ref = _native_ref(sheet)
+            if native_ref is None or native_ref not in pages_by_ref:
+                raise AssertionError(
+                    f"committed drawing sheet {sheet['id']!r} has no current "
+                    "native page selector"
+                )
+            sheets.append(
+                DrawingSheetDecision(
+                    native_ref=native_ref,
+                    name=sheet["name"],
+                    order=sheet["order"],
+                    id=sheet["id"],
+                    display_name=sheet.get("displayName"),
+                )
+            )
+        drawings.append(
+            DrawingDecision(
+                name=item["name"],
+                sheets=tuple(sheets),
+                id=item["id"],
+                display_name=item.get("displayName"),
+            )
+        )
+
     return CaptureDecisions(
         components=tuple(components),
         features=tuple(features),
         parameter_groups=tuple(groups),
         parameters=tuple(parameters),
         metadata=tuple(metadata),
+        drawings=tuple(drawings),
         capture_id=committed["captureId"],
         adapter_version=committed["adapter"]["version"],
         cad_system_version=committed["cadSystem"]["version"],

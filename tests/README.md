@@ -171,17 +171,30 @@ report and is not hidden or replaced by a FreeCAD-only acceptance check.
 ## Capture authoring tests
 
 Capture authoring is covered by GUI-free contract, discovery, semantic-map, and
-orchestration tests plus real-FreeCAD fixture tests. The workbench four-tab
-state is GUI-free and covered by ordinary tests; `workbench/` add-on metadata and
-import boundaries are validated statically. The opt-in capture-to-Engine
-acceptance proof regenerates representative captures and asks the Engine CLI to
-validate them:
+orchestration tests plus real-FreeCAD fixture tests. The workbench five-tab
+(Part/Assembly, Features, Parameters, Metadata, Drawings) state is GUI-free and
+covered by ordinary tests; `workbench/` add-on metadata and import boundaries
+are validated statically. The opt-in capture-to-Engine acceptance proof
+regenerates representative captures and asks the Engine CLI to validate them:
 
 ```bash
 nix develop --command env PARAMETRON_ENGINE_ACCEPTANCE=1 \
   PARAMETRON_ENGINE_REPO=../parametron-engine \
   python -m pytest tests/test_capture_engine_acceptance.py -q
 ```
+
+The proof covers zero drawings (the canonical cube and metadata projects emit
+`"drawings": []`) plus three real TechDraw scenarios built from the committed
+`tests/fixtures/capture_drawings/` fixtures: single drawing with one sheet,
+single drawing with two ordered sheets, and two drawings with one sheet each.
+Each real scenario copies a committed project template, materializes the
+binary `.FCStd` fixture at its declared project-relative source path, replays
+explicit drawing/sheet decisions against fresh native discovery, and asserts
+Engine `Validation succeeded`. The source `.FCStd` and `prm.project.json` stay
+byte-unchanged, repeated capture of both outputs is byte-identical, and
+negative drawing decisions (unknown page, duplicate page selection, invalid
+order, uncaptured target component, drawing/sheet name collision, stale sheet
+selector) fail deterministically before Engine planning.
 
 See [docs/test-matrix.md](../docs/test-matrix.md) for the recorded commands,
 fixture digests, and accepted Engine outcome.
