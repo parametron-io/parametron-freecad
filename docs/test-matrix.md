@@ -296,7 +296,7 @@ uses the rich `reference_traversal_output` serializer and one atomic writer.
 | Semantic-map generation and merge | Covered | `tests/test_capture_semantic_map.py`, `tests/test_capture_import_safety.py` | Versioned FreeCAD template; explicit semantic parameter types, default units, and native-to-semantic mappings; full Engine schema 1.0 validation including closed sections, canonical ordering, coercions, known mutation collections, and operation capabilities; deterministic create/no-op/merge planning that preserves user edits; atomic writer with an explicit confirmation decision. |
 | Capture orchestration, drift, and project-root writes | Covered, real FreeCAD | `tests/test_capture_orchestration.py`, `tests/test_capture_orchestration_real_fixtures.py`, `tests/freecad_capture_orchestration_fixture_runner.py` | Project-context loading and confined model resolution; active-source verification and saved-source fingerprinting; explicit decisions with top-down owner/ancestor closure; deterministic `captureId`; drawing/sheet grouping and component linkage from discovered page targets; drift detection for missing selectors, changed native types, ownership changes, drawing-sheet dependencies, and semantic identity changes; JSON-pointer previews; atomic writes of both project-root files behind one confirmation decision; real fixtures prove create, unchanged repeat, byte-identical determinism, and unchanged source/project mapping. |
 | Workbench capture state and add-on | Covered, opt-in GUI | `tests/test_workbench_panel_state.py`, `tests/test_workbench_addon_import_safety.py`, `workbench/` | GUI-free top-down state covering Part/Assembly, Features, Parameters, Metadata, and Drawings; tab gating; user-authored names with ID previews and collision diagnostics; parameter semantic type/unit selection and observable/writable display; existing supported metadata filtering; feature captured/authorized actions and delete dependency evidence; drawing group creation/removal, sheet inclusion/grouping/order, target-component diagnostics, and drawing/sheet ID previews; review/commit through the core atomic writer; `package.xml`/icon validity and headless import safety. Interactive workbench loading is an opt-in manual GUI check (`PARAMETRON_FREECAD_GUI=1`). |
-| Capture-to-Engine acceptance | Covered, opt-in real FreeCAD | `tests/test_capture_engine_acceptance.py`, `tests/freecad_capture_engine_acceptance_runner.py`, `tests/capture_engine_acceptance_support.py` | Production capture on temporary copies of the canonical cube and metadata projects; committed decisions replayed against fresh native discovery; Engine CLI project-mode validation accepts both generated project roots without structural repair; repeated capture is byte-identical; sources and project mappings stay unchanged; deterministic pre-Engine failures for name collision, missing parent capture, unsupported metadata type, and stale native selector. See [Capture-to-Engine Acceptance Proof](#capture-to-engine-acceptance-proof). |
+| Capture-to-Engine acceptance | Covered, opt-in real FreeCAD | `tests/test_capture_engine_acceptance.py`, `tests/freecad_capture_engine_acceptance_runner.py`, `tests/capture_engine_acceptance_support.py`, `tests/fixtures/capture_drawings/{single-sheet,multi-sheet,multiple-drawings}/` | Production capture on temporary project copies; explicit decisions (including drawings and ordered sheets) replayed against fresh native discovery; Engine CLI project-mode validation accepts the canonical cube, metadata, single-sheet drawing, multi-sheet drawing, and multiple-drawing project roots without structural repair (`Validation succeeded`); repeated capture is byte-identical; sources and project mappings stay unchanged; deterministic pre-Engine failures for name collision, missing parent capture, unsupported metadata type, stale native selector, unknown drawing page, duplicate page selection, invalid sheet order, uncaptured drawing target component, drawing/sheet name collision, and stale drawing sheet selector. See [Capture-to-Engine Acceptance Proof](#capture-to-engine-acceptance-proof). |
 
 Semantic-output-exclusion validation is recorded as separate overlapping runs:
 82 focused tests passed with 644 deselected and 6 subtests; 726 complete
@@ -1804,7 +1804,8 @@ FreeCAD-only acceptance substitute.
 
 ## Capture-to-Engine Acceptance Proof
 
-`tests/test_capture_engine_acceptance.py` proves the first working-model loop:
+`tests/test_capture_engine_acceptance.py` proves the capture loop for the
+canonical working model and for real technical drawing captures:
 
 ```text
 FreeCAD document -> capture -> prm.cad.json + prm.semantic-map.json -> Engine validate/plan
@@ -1820,12 +1821,23 @@ structural repair, hand editing, or fixture mutation is involved.
 nix develop --command env PARAMETRON_ENGINE_ACCEPTANCE=1 \
   PARAMETRON_ENGINE_REPO=../parametron-engine \
   python -m pytest tests/test_capture_engine_acceptance.py -q
-# PASS, 3 passed
+# PASS, 9 passed
 ```
 
 The Engine CLI may also be supplied directly with `PARAMETRON_ENGINE_BIN`.
 Without `PARAMETRON_ENGINE_ACCEPTANCE=1` the proof is skipped; without an
 Engine checkout or Go toolchain it skips with an explicit reason.
+
+The three technical drawing scenarios reuse the committed binary
+`tests/fixtures/capture_drawings/single-page.FCStd` and
+`multiple-pages.FCStd` fixtures. Each scenario is a small committed project
+template (`prm.project.json`, `*.project.dsl`, `prm.cad.json`, and
+`prm.semantic-map.json`) whose `prm.project.json` declares the source as
+`input/model.FCStd`. The test copies the template, materializes the `.FCStd`
+fixture at that project-relative path, deletes the committed capture outputs,
+and replays the committed decisions (including explicit drawing grouping and
+sheet order). The binary fixture is never duplicated in the repository and is
+never regenerated or modified.
 
 The Engine acceptance step is the ordinary project-mode validation:
 
@@ -1837,9 +1849,21 @@ The Engine acceptance step is the ordinary project-mode validation:
 Accepted outcomes on FreeCAD 1.1.4 and the current Engine checkout:
 
 - canonical cube project: `Validation succeeded` after a fresh capture created
-  both outputs and a repeated capture reported `unchanged`.
+  both outputs and a repeated capture reported `unchanged`; zero drawings emit
+  `"drawings": []`.
 - metadata coexistence project: `Validation succeeded` after supported metadata
-  selection and a repeated capture reported `unchanged`.
+  selection and a repeated capture reported `unchanged`; zero drawings emit
+  `"drawings": []`.
+- single drawing with one sheet (`single-sheet`): `Validation succeeded` with
+  `drw.manufacturing` / `sht.manufacturing.assembly`, `identitySource.nativeRef`
+  `Page`, and `resource.topology` `embedded`.
+- single drawing with two ordered sheets (`multi-sheet`): `Validation succeeded`
+  with `drw.manufacturing` and sheets `sht.manufacturing.assembly` (order 1)
+  and `sht.manufacturing.detail` (order 2) bound to native pages `PageA` and
+  `PageB`.
+- two drawings with one sheet each (`multiple-drawings`): `Validation succeeded`
+  with `drw.inspection` and `drw.manufacturing`, each carrying the component
+  linkage resolved from its page targets.
 
 Fixture digests used by the proof (SHA-256):
 
@@ -1855,14 +1879,29 @@ Fixture digests used by the proof (SHA-256):
 | `metadata_mutation/metadata.project.dsl` | `d60510d76a390cef1032485913914697ec46fcb2fd766e62fc9f6dadb1a03c49` |
 | `metadata_mutation/prm.cad.json` | `0f925649bf7ba37a954d48a416bb8f7e27d399ad368f12ec4b17a16ebbfd5825` |
 | `metadata_mutation/prm.semantic-map.json` | `893bfef59b0a996a97d47503223c7128b63a13702ced9051e6db18025a501406` |
+| `capture_drawings/single-page.FCStd` | `a4a0a30895121eafbd53db28ab2cabaf7fbabe3d0c8c06a490b3d30222513306` |
+| `capture_drawings/multiple-pages.FCStd` | `b8807f20ac6ac936e23a801a84f424afa9847faf20611ce4557c0ee988b1772c` |
+| `capture_drawings/single-sheet/prm.project.json` | `a911e4f844b45eea07bcb82bd7f40f228147f1b7408e1d3a5cd3c625eb7dcd3d` |
+| `capture_drawings/single-sheet/drawing-single-sheet.project.dsl` | `04c3408b4e789c47ca99006b8a18f771e8e8b342951931620c0249d9e0ff5267` |
+| `capture_drawings/single-sheet/prm.cad.json` | `0a7f3d42259a9e0d13e74f6d2e391b7f99977674e869794bc26aa4d225ed6d89` |
+| `capture_drawings/single-sheet/prm.semantic-map.json` | `b183d30b8cbed602b11a4dfafd88ff7e6f328c86c28a6c75097bce6ed71e91b8` |
+| `capture_drawings/multi-sheet/prm.cad.json` | `0eac9b44ed19f07ed8f21ef15841e267a7cba457259cd255b9e74368d4156299` |
+| `capture_drawings/multi-sheet/prm.semantic-map.json` | `16f06538add07b9a664fc00999d5d46b88dac84cf46d1aea706c19de1dfe9130` |
+| `capture_drawings/multiple-drawings/prm.cad.json` | `75a17bd0cc7a3050441ca30cbf40c3485cc7e9fd223e12e55b44314c25ad01bc` |
+| `capture_drawings/multiple-drawings/prm.semantic-map.json` | `b290da5fca770b095b691357e11ca60023d249422e73c4ecf67bd20dc69f7ed5` |
 
 The proof asserts that committed source documents and project mappings are
-byte-unchanged, that generated IDs and `captureId` match the committed capture,
-and that repeated capture of unchanged native state yields byte-identical
-outputs. It also asserts deterministic capture failures before Engine planning:
-name collision (`CaptureNamePolicyError`), missing parent capture
-(`CaptureDecisionError`), unsupported metadata type (`CaptureDecisionError`),
-and stale native selector (`CaptureDriftError`).
+byte-unchanged, that generated IDs and `captureId` match the committed capture
+(including drawing and sheet identities), and that repeated capture of unchanged
+native state yields byte-identical `prm.cad.json` and `prm.semantic-map.json`
+across independent temporary project copies. It also asserts deterministic
+capture failures before Engine planning: name collision
+(`CaptureNamePolicyError`), missing parent capture (`CaptureDecisionError`),
+unsupported metadata type (`CaptureDecisionError`), and stale native selector
+(`CaptureDriftError`), plus drawing-specific unknown page, duplicate page
+selection, invalid sheet order, and uncaptured target component
+(`CaptureDecisionError`), drawing/sheet name collision
+(`CaptureNamePolicyError`), and stale drawing sheet selector (`CaptureDriftError`).
 
 ## Documentation-Only Validation
 

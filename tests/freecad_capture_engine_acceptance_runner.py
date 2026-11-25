@@ -224,6 +224,182 @@ def _stale_native_selector(
         capture_path.write_bytes(original)
 
 
+def _drawing_target_component(discovery, selected_pages):
+    """Return a non-root component targeted by one of the selected pages."""
+
+    for page in discovery.drawings:
+        if page.native_ref not in selected_pages:
+            continue
+        for target in page.targets:
+            if target.kind == "component":
+                candidate = target.native_ref
+            elif target.kind == "feature":
+                feature = next(
+                    (
+                        item
+                        for item in discovery.features
+                        if item.native_ref == target.native_ref
+                    ),
+                    None,
+                )
+                candidate = None if feature is None else feature.component_native_ref
+            else:
+                candidate = None
+            if (
+                candidate is not None
+                and candidate != discovery.root_component_native_ref
+            ):
+                return candidate
+    return None
+
+
+def _drawing_name_collision(decisions):
+    drawings = decisions.drawings
+    if len(drawings) >= 2:
+        renamed = dataclasses.replace(drawings[1], name=drawings[0].name)
+        return dataclasses.replace(
+            decisions,
+            drawings=(drawings[0], renamed, *drawings[2:]),
+        )
+    for drawing in drawings:
+        if len(drawing.sheets) >= 2:
+            renamed = dataclasses.replace(
+                drawing.sheets[1], name=drawing.sheets[0].name
+            )
+            return dataclasses.replace(
+                decisions,
+                drawings=(
+                    dataclasses.replace(
+                        drawing,
+                        sheets=(drawing.sheets[0], renamed, *drawing.sheets[2:]),
+                    ),
+                ),
+            )
+    return None
+
+
+def _stale_drawing_sheet(
+    capture_path: Path, context, model, discovery, decisions, selection
+):
+    original = capture_path.read_bytes()
+    try:
+        existing = _read_json(capture_path)
+        drawings = existing["entities"]["drawings"]
+        if not drawings:
+            return "not_applicable"
+        drawings[0]["sheets"].append(
+            {
+                "id": "sht.staleSheet.ghost",
+                "name": "ghost",
+                "displayName": "Ghost",
+                "order": 99,
+                "cadType": "TechDraw::DrawPage",
+                "identitySource": {
+                    "kind": "native_ref",
+                    "nativeRef": "GhostPage",
+                },
+            }
+        )
+        capture_path.write_bytes(
+            (json.dumps(existing, ensure_ascii=False, sort_keys=True) + "\n").encode(
+                "utf-8"
+            )
+        )
+        return _classify(
+            lambda: plan_capture_outputs(
+                context=context,
+                model=model,
+                discovery=discovery,
+                decisions=decisions,
+                semantic_selection=selection,
+            )
+        )
+    finally:
+        capture_path.write_bytes(original)
+
+
+def _drawing_negatives(
+    capture_path: Path, context, model, discovery, decisions, selection
+):
+    keys = (
+        "unknown_drawing_page",
+        "duplicate_page_selection",
+        "invalid_sheet_order",
+        "uncaptured_drawing_target",
+        "drawing_name_collision",
+        "stale_drawing_sheet",
+    )
+    if not decisions.drawings:
+        return {key: "not_applicable" for key in keys}
+
+    def build(mutated):
+        return _classify(
+            lambda: build_capture_document(
+                context=context,
+                model=model,
+                discovery=discovery,
+                decisions=mutated,
+            )
+        )
+
+    first = decisions.drawings[0]
+    first_sheet = first.sheets[0]
+    selected_pages = {
+        sheet.native_ref for drawing in decisions.drawings for sheet in drawing.sheets
+    }
+
+    unknown = dataclasses.replace(
+        decisions,
+        drawings=(
+            dataclasses.replace(
+                first,
+                sheets=(dataclasses.replace(first_sheet, native_ref="GhostPage"),),
+            ),
+        ),
+    )
+    duplicate = dataclasses.replace(first, id="", display_name=None)
+    duplicate = dataclasses.replace(duplicate, name=f"{first.name}Duplicate")
+    invalid_order = dataclasses.replace(
+        decisions,
+        drawings=(
+            dataclasses.replace(
+                first,
+                sheets=(dataclasses.replace(first_sheet, order=0),),
+            ),
+        ),
+    )
+
+    results = {
+        "unknown_drawing_page": build(unknown),
+        "duplicate_page_selection": build(
+            dataclasses.replace(decisions, drawings=(first, duplicate))
+        ),
+        "invalid_sheet_order": build(invalid_order),
+    }
+
+    target = _drawing_target_component(discovery, selected_pages)
+    if target is None:
+        results["uncaptured_drawing_target"] = "not_applicable"
+    else:
+        results["uncaptured_drawing_target"] = build(
+            dataclasses.replace(
+                decisions,
+                components=tuple(
+                    item for item in decisions.components if item.native_ref != target
+                ),
+            )
+        )
+
+    collision = _drawing_name_collision(decisions)
+    results["drawing_name_collision"] = (
+        "not_applicable" if collision is None else build(collision)
+    )
+    results["stale_drawing_sheet"] = _stale_drawing_sheet(
+        capture_path, context, model, discovery, decisions, selection
+    )
+    return results
+
+
 def main() -> None:
     project_root, logical_id, committed_cad_path, committed_map_path, output_path = (
         _arguments()
@@ -276,6 +452,11 @@ def main() -> None:
                 plan.capture_path, context, model, discovery, decisions, selection
             ),
         }
+        negatives.update(
+            _drawing_negatives(
+                plan.capture_path, context, model, discovery, decisions, selection
+            )
+        )
     finally:
         _close_all_documents()
 
@@ -317,6 +498,11 @@ def main() -> None:
             "selectedFeatures": len(decisions.features),
             "selectedParameters": len(decisions.parameters),
             "selectedMetadata": len(decisions.metadata),
+            "discoveredDrawings": len(discovery.drawings),
+            "selectedDrawings": len(decisions.drawings),
+            "selectedDrawingSheets": sum(
+                len(drawing.sheets) for drawing in decisions.drawings
+            ),
         },
     }
     output_path.write_text(
