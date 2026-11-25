@@ -122,9 +122,14 @@ Capture behavior:
 - Discovery is top-down and read-only. Components come from supported
   assembly/part containers, features from PartDesign features and sketches,
   parameter groups from `App::VarSet`, parameters from supported native scalar
-  properties, and metadata from existing supported native properties. Links,
-  joints, object groups, spreadsheets, technical drawings, and unknown native
-  types produce diagnostics rather than invented capture entities.
+  properties, and metadata from existing supported native properties. Supported
+  `TechDraw::DrawPage` sheets are discovered as drawing-page candidates with
+  descriptive labels, one-based page-order signals, embedded drawing-resource
+  facts, and captured component/feature targets resolved from native view
+  `Source`/`XSource` evidence. Links, joints, object groups, spreadsheets,
+  unsupported TechDraw constructs, separate-resource drawing sources, and
+  unknown native types produce diagnostics rather than invented capture
+  entities.
 - Semantic names are user-authored and validated as DSL identifiers. They are
   never derived from native object names, labels, CAD types, geometry, or
   `nativeRef`.
@@ -179,10 +184,12 @@ through normal project-mode validation without structural repair; see
   missing metadata, property groups, aliases, or fallback properties, and
   metadata authoring policy remains Engine-owned. There is no template, BOM, or
   metadata-deletion capability.
-- Capture authoring is v0-limited: it does not implement technical drawings,
-  relationships/mates, external linked documents, a GUI execution trigger,
-  project bootstrap, or the `parametron/` folder layout. Capture never creates
-  metadata and never derives semantic names.
+- Capture authoring is v0-limited: it does not emit technical drawings into
+  `prm.cad.json`, and it does not implement relationships/mates, external
+  linked documents, a GUI execution trigger, project bootstrap, or the
+  `parametron/` folder layout. Read-only drawing-page discovery is implemented,
+  but drawing grouping, naming, and capture emission remain pending. Capture
+  never creates metadata and never derives semantic names.
 - Read-only native properties fail at the metadata stage. Unsupported
   Quantity-family native types (`App::PropertyLength`, `App::PropertyDistance`,
   `App::PropertyAngle`, `App::PropertyQuantity`) also fail deterministically.

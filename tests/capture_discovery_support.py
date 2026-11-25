@@ -41,6 +41,33 @@ TYPE_BASES: dict[str, set[str]] = {
     "App::DocumentObjectGroup": {"App::DocumentObjectGroup"},
     "Spreadsheet::Sheet": {"Spreadsheet::Sheet"},
     "App::FeaturePython": {"App::FeaturePython"},
+    "TechDraw::DrawPage": {"TechDraw::DrawPage"},
+    "TechDraw::DrawViewPart": {
+        "TechDraw::DrawViewPart",
+        "TechDraw::DrawView",
+    },
+    "TechDraw::DrawProjGroup": {
+        "TechDraw::DrawProjGroup",
+        "TechDraw::DrawView",
+    },
+    "TechDraw::DrawProjGroupItem": {
+        "TechDraw::DrawProjGroupItem",
+        "TechDraw::DrawViewPart",
+        "TechDraw::DrawView",
+    },
+    "TechDraw::DrawViewClip": {
+        "TechDraw::DrawViewClip",
+        "TechDraw::DrawView",
+    },
+    "TechDraw::DrawViewAnnotation": {
+        "TechDraw::DrawViewAnnotation",
+        "TechDraw::DrawView",
+    },
+    "TechDraw::DrawViewSymbol": {
+        "TechDraw::DrawViewSymbol",
+        "TechDraw::DrawView",
+    },
+    "TechDraw::DrawSVGTemplate": {"TechDraw::DrawSVGTemplate"},
 }
 
 
@@ -267,6 +294,11 @@ class FakeDocument:
             self.PropertiesList = list(self._properties)
         if include_objects:
             self.Objects = list(objects or [])
+        for value in self.Objects if include_objects else ():
+            try:
+                value.Document = self
+            except Exception:
+                continue
 
     def isDerivedFrom(self, type_id: str) -> bool:
         return type_id == "App::Document"
@@ -427,4 +459,109 @@ def part_box(
         properties={"Visibility": visibility_property(), **(properties or {})},
         in_list=in_list,
         out_list=out_list,
+    )
+
+
+def link_list(value: list[Any] | None = None) -> FakeProperty:
+    return FakeProperty(
+        "App::PropertyLinkList",
+        status=(21,),
+        value=list(value or []),
+    )
+
+
+def drawing_page(
+    name: str,
+    *,
+    label: str | None = None,
+    views: list[Any] | None = None,
+    properties: dict[str, FakeProperty] | None = None,
+) -> FakeObject:
+    return FakeObject(
+        name,
+        "TechDraw::DrawPage",
+        label=label,
+        properties={"Views": link_list(views), **(properties or {})},
+    )
+
+
+def drawing_view(
+    name: str,
+    *,
+    label: str | None = None,
+    source: list[Any] | None = None,
+    x_source: list[Any] | None = None,
+    views: list[Any] | None = None,
+    properties: dict[str, FakeProperty] | None = None,
+) -> FakeObject:
+    values = {
+        "Source": link_list(source),
+        "XSource": link_list(x_source),
+        **(properties or {}),
+    }
+    if views is not None:
+        values["Views"] = link_list(views)
+    return FakeObject(
+        name,
+        "TechDraw::DrawViewPart",
+        label=label,
+        properties=values,
+    )
+
+
+def projection_group(
+    name: str,
+    *,
+    label: str | None = None,
+    source: list[Any] | None = None,
+    x_source: list[Any] | None = None,
+    views: list[Any] | None = None,
+) -> FakeObject:
+    return FakeObject(
+        name,
+        "TechDraw::DrawProjGroup",
+        label=label,
+        properties={
+            "Source": link_list(source),
+            "XSource": link_list(x_source),
+            "Views": link_list(views),
+        },
+    )
+
+
+def projection_item(
+    name: str,
+    *,
+    label: str | None = None,
+    source: list[Any] | None = None,
+    x_source: list[Any] | None = None,
+) -> FakeObject:
+    return FakeObject(
+        name,
+        "TechDraw::DrawProjGroupItem",
+        label=label,
+        properties={
+            "Source": link_list(source),
+            "XSource": link_list(x_source),
+        },
+    )
+
+
+def drawing_annotation(name: str, *, label: str | None = None) -> FakeObject:
+    return FakeObject(name, "TechDraw::DrawViewAnnotation", label=label)
+
+
+def drawing_symbol(name: str, *, label: str | None = None) -> FakeObject:
+    return FakeObject(name, "TechDraw::DrawViewSymbol", label=label)
+
+
+def drawing_view_clip(
+    name: str,
+    *,
+    views: list[Any] | None = None,
+) -> FakeObject:
+    return FakeObject(
+        name,
+        "TechDraw::DrawViewClip",
+        properties={"Views": link_list(views)},
     )

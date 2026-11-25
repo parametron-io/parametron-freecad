@@ -14,7 +14,16 @@ The native facts captured here are:
 * properties in the native ``Metadata`` property group;
 * observable/writable capability evidence;
 * ``App::PropertyBool`` Suppressed and Visibility target capability;
-* conservative deletion evidence from native ``InList``/``OutList``.
+* conservative deletion evidence from native ``InList``/``OutList``;
+* supported ``TechDraw::DrawPage`` sheets with deterministic page order,
+  embedded/separate drawing-resource facts, page display labels, and captured
+  component/feature targets resolved through native view ``Source``/``XSource``
+  evidence.
+
+Only ``TechDraw::DrawPage`` objects owned by the active document are emitted as
+drawing candidates. Pages that are linked from a separate ``.FCStd`` resource
+are diagnosed conservatively instead of being converted into candidates,
+because active-document capture cannot prove their contents.
 
 A single-part document, or a document without one unambiguous assembly
 container, gets a synthetic document-level root assembly candidate. The
@@ -24,9 +33,11 @@ its native reference. If a natural ``App::Part`` or
 root instead.
 
 Candidate order is deterministic: components/features/parameter groups by native
-path, parameters/metadata by owner path then exact native key, and diagnostics
-by code and native reference. Native ``InList``/``OutList`` names are sorted and
-deduplicated. Child lists are sorted by native Name.
+path, parameters/metadata by owner path then exact native key, drawing pages by
+native page selector with a one-based ``pageOrder`` signal, drawing targets by
+native reference, and diagnostics by code and native reference. Native
+``InList``/``OutList`` names are sorted and deduplicated. Child lists are sorted
+by native Name.
 """
 
 from __future__ import annotations
@@ -45,6 +56,9 @@ from parametron_freecad.capture.native_probe import (
     group_members,
     is_derived_from,
     is_read_only_status,
+    linked_objects,
+    native_document_label,
+    native_document_name,
     native_label,
     native_name_or_none,
     native_type_id,
@@ -108,9 +122,14 @@ _EXCLUDED_DIAGNOSTIC_DETAILS = {
         "object type is outside supported component/feature capture"
     ),
     "unsupported_technical_drawing": (
-        "technical drawing objects are outside capture scope"
+        "technical drawing object is outside supported page discovery"
     ),
 }
+
+_TECHDRAW_PAGE_TYPE = "TechDraw::DrawPage"
+_TECHDRAW_PROJECTION_GROUP_TYPE = "TechDraw::DrawProjGroup"
+_TECHDRAW_VIEW_PART_TYPE = "TechDraw::DrawViewPart"
+_TECHDRAW_VIEW_CONTAINER_TYPES = frozenset({"TechDraw::DrawViewClip"})
 
 # ---------------------------------------------------------------------------
 # Candidate records
@@ -326,6 +345,60 @@ class MetadataCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class DrawingResourceEvidence:
+    """Native storage facts for one technical drawing page resource."""
+
+    topology: str
+    document_name: str
+    document_label: str
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "topology": self.topology,
+            "documentName": self.document_name,
+            "documentLabel": self.document_label,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DrawingTargetCandidate:
+    """Captured component or feature referenced by a technical drawing view."""
+
+    native_ref: str
+    cad_type: str
+    kind: str
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "nativeRef": self.native_ref,
+            "cadType": self.cad_type,
+            "kind": self.kind,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DrawingPageCandidate:
+    """One native ``TechDraw::DrawPage`` sheet candidate without a semantic ID."""
+
+    native_ref: str
+    native_label: str
+    cad_type: str
+    page_order: int
+    resource: DrawingResourceEvidence
+    targets: tuple[DrawingTargetCandidate, ...]
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "nativeRef": self.native_ref,
+            "nativeLabel": self.native_label,
+            "cadType": self.cad_type,
+            "pageOrder": self.page_order,
+            "resource": self.resource.to_mapping(),
+            "targets": [item.to_mapping() for item in self.targets],
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class DiscoveryDiagnostic:
     """Deterministic unsupported or ambiguous native discovery evidence."""
 
@@ -352,6 +425,7 @@ class CaptureDiscovery:
     parameter_groups: tuple[ParameterGroupCandidate, ...]
     parameters: tuple[ParameterCandidate, ...]
     metadata: tuple[MetadataCandidate, ...]
+    drawings: tuple[DrawingPageCandidate, ...]
     diagnostics: tuple[DiscoveryDiagnostic, ...]
 
     def to_mapping(self) -> dict[str, Any]:
@@ -363,6 +437,7 @@ class CaptureDiscovery:
             "parameterGroups": [item.to_mapping() for item in self.parameter_groups],
             "parameters": [item.to_mapping() for item in self.parameters],
             "metadata": [item.to_mapping() for item in self.metadata],
+            "drawings": [item.to_mapping() for item in self.drawings],
             "diagnostics": [item.to_mapping() for item in self.diagnostics],
         }
 
@@ -551,6 +626,20 @@ def discover_capture_candidates(document: Any) -> CaptureDiscovery:
         diagnostics,
     )
 
+    drawings = _build_drawing_pages(
+        document_name,
+        document,
+        object_by_name,
+        component_names,
+        feature_names,
+        diagnostics,
+    )
+    _diagnose_technical_drawing_links(
+        object_by_name,
+        document_name,
+        diagnostics,
+    )
+
     return CaptureDiscovery(
         document=DocumentEvidence(
             name=document_name,
@@ -586,6 +675,12 @@ def discover_capture_candidates(document: Any) -> CaptureDiscovery:
             sorted(
                 metadata,
                 key=lambda item: (item.native_path, item.property.native_key),
+            )
+        ),
+        drawings=tuple(
+            sorted(
+                drawings,
+                key=lambda item: item.native_ref,
             )
         ),
         diagnostics=tuple(
@@ -681,6 +776,45 @@ def _is_technical_drawing(value: Any) -> bool:
     return isinstance(type_id, str) and type_id.startswith("TechDraw::")
 
 
+def _is_technical_drawing_page(value: Any) -> bool:
+    type_id = getattr(value, "TypeId", None)
+    return type_id == _TECHDRAW_PAGE_TYPE
+
+
+def _is_technical_drawing_projection_group(value: Any) -> bool:
+    type_id = getattr(value, "TypeId", None)
+    return type_id == _TECHDRAW_PROJECTION_GROUP_TYPE
+
+
+def _is_technical_drawing_view_part(value: Any) -> bool:
+    return is_derived_from(value, _TECHDRAW_VIEW_PART_TYPE)
+
+
+def _is_supported_technical_drawing_view(value: Any) -> bool:
+    return _is_technical_drawing_view_part(value) or (
+        _is_technical_drawing_projection_group(value)
+    )
+
+
+def _is_technical_drawing_view_container(value: Any) -> bool:
+    type_id = getattr(value, "TypeId", None)
+    return isinstance(type_id, str) and type_id in _TECHDRAW_VIEW_CONTAINER_TYPES
+
+
+def _linked_object(value: Any) -> Any | None:
+    try:
+        return getattr(value, "LinkedObject", None)
+    except Exception:
+        return None
+
+
+def _is_technical_drawing_link(value: Any) -> bool:
+    if not _is_link(value):
+        return False
+    target = _linked_object(value)
+    return target is not None and _is_technical_drawing(target)
+
+
 def _is_partdesign_feature(value: Any) -> bool:
     if _is_body(value) or _is_datum(value):
         return False
@@ -708,6 +842,8 @@ def _classify_object(
     if _is_datum(value):
         return None, None
     if _is_link(value):
+        if _is_technical_drawing_link(value):
+            return None, None
         return None, "unsupported_link"
     if _is_assembly_member(value):
         return None, "unsupported_assembly_member"
@@ -716,7 +852,7 @@ def _classify_object(
     if _is_spreadsheet(value):
         return None, "unsupported_parameter_group_type"
     if _is_technical_drawing(value):
-        return None, "unsupported_technical_drawing"
+        return None, None
     if _is_varset(value):
         return "parameter_group", None
 
@@ -1147,6 +1283,330 @@ def _build_metadata(
     return metadata
 
 
+def _build_drawing_pages(
+    document_name: str,
+    document: Any,
+    object_by_name: dict[str, Any],
+    component_names: set[str],
+    feature_names: set[str],
+    diagnostics: set[DiscoveryDiagnostic],
+) -> list[DrawingPageCandidate]:
+    handled: set[str] = set()
+    page_names = sorted(
+        name
+        for name, value in object_by_name.items()
+        if _is_technical_drawing_page(value)
+    )
+
+    drawings: list[DrawingPageCandidate] = []
+    for page_order, name in enumerate(page_names, start=1):
+        page = object_by_name[name]
+        handled.add(name)
+        _mark_technical_drawing_dependencies(page, handled)
+        targets = _drawing_page_targets(
+            document_name,
+            page,
+            object_by_name,
+            component_names,
+            feature_names,
+            handled,
+            diagnostics,
+        )
+        drawings.append(
+            DrawingPageCandidate(
+                native_ref=name,
+                native_label=native_label(page),
+                cad_type=native_type_id(page, native_ref=name),
+                page_order=page_order,
+                resource=_drawing_resource_evidence(
+                    document_name,
+                    document,
+                    page,
+                ),
+                targets=targets,
+            )
+        )
+
+    _diagnose_unhandled_technical_drawing_objects(
+        object_by_name,
+        handled,
+        diagnostics,
+    )
+    return drawings
+
+
+def _drawing_resource_evidence(
+    document_name: str,
+    document: Any,
+    page: Any,
+) -> DrawingResourceEvidence:
+    page_document_name = native_document_name(page)
+    if page_document_name is not None and page_document_name != document_name:
+        return DrawingResourceEvidence(
+            topology="separate",
+            document_name=page_document_name,
+            document_label=native_document_label(page),
+        )
+    return DrawingResourceEvidence(
+        topology="embedded",
+        document_name=document_name,
+        document_label=document_label(document),
+    )
+
+
+def _drawing_page_targets(
+    document_name: str,
+    page: Any,
+    object_by_name: dict[str, Any],
+    component_names: set[str],
+    feature_names: set[str],
+    handled: set[str],
+    diagnostics: set[DiscoveryDiagnostic],
+) -> tuple[DrawingTargetCandidate, ...]:
+    page_name = native_name_or_none(page)
+    views, available = linked_objects(page, "Views")
+    if not available:
+        diagnostics.add(
+            DiscoveryDiagnostic(
+                code="technical_drawing_views_unavailable",
+                native_ref=page_name,
+                detail=(
+                    "native Views is unavailable for technical drawing page discovery"
+                ),
+            )
+        )
+
+    target_kinds: dict[str, str] = {}
+    queue: deque[Any] = deque(views)
+    visited: set[str] = set()
+    while queue:
+        view = queue.popleft()
+        view_name = native_name_or_none(view)
+        if view_name is None:
+            diagnostics.add(
+                DiscoveryDiagnostic(
+                    code="invalid_technical_drawing_view",
+                    native_ref=page_name,
+                    detail=(
+                        "native page Views contains a view without a nonblank "
+                        "string Name"
+                    ),
+                )
+            )
+            continue
+        if view_name in visited:
+            continue
+        visited.add(view_name)
+        handled.add(view_name)
+        _mark_technical_drawing_dependencies(view, handled)
+
+        if _is_supported_technical_drawing_view(view):
+            _collect_drawing_view_sources(
+                document_name,
+                view,
+                object_by_name,
+                component_names,
+                feature_names,
+                target_kinds,
+                diagnostics,
+            )
+        elif not _is_technical_drawing_view_container(view):
+            diagnostics.add(
+                DiscoveryDiagnostic(
+                    code="unsupported_technical_drawing_view",
+                    native_ref=view_name,
+                    detail=(
+                        "technical drawing view subtype is outside supported "
+                        "model-source discovery"
+                    ),
+                )
+            )
+
+        nested, nested_available = linked_objects(view, "Views")
+        if nested_available:
+            queue.extend(nested)
+
+    return tuple(
+        DrawingTargetCandidate(
+            native_ref=ref,
+            cad_type=native_type_id(
+                object_by_name[ref],
+                native_ref=ref,
+            ),
+            kind=kind,
+        )
+        for ref, kind in sorted(target_kinds.items())
+    )
+
+
+def _collect_drawing_view_sources(
+    document_name: str,
+    view: Any,
+    object_by_name: dict[str, Any],
+    component_names: set[str],
+    feature_names: set[str],
+    target_kinds: dict[str, str],
+    diagnostics: set[DiscoveryDiagnostic],
+) -> None:
+    view_name = native_name_or_none(view) or ""
+    for attribute in ("Source", "XSource"):
+        sources, available = linked_objects(view, attribute)
+        if not available:
+            diagnostics.add(
+                DiscoveryDiagnostic(
+                    code="technical_drawing_source_unavailable",
+                    native_ref=view_name or None,
+                    detail=(
+                        f"native {attribute} is unavailable for technical "
+                        "drawing source discovery"
+                    ),
+                )
+            )
+        for source in sources:
+            _collect_drawing_source(
+                document_name,
+                view_name,
+                attribute,
+                source,
+                object_by_name,
+                component_names,
+                feature_names,
+                target_kinds,
+                diagnostics,
+            )
+
+
+def _collect_drawing_source(
+    document_name: str,
+    view_name: str,
+    attribute: str,
+    source: Any,
+    object_by_name: dict[str, Any],
+    component_names: set[str],
+    feature_names: set[str],
+    target_kinds: dict[str, str],
+    diagnostics: set[DiscoveryDiagnostic],
+) -> None:
+    source_name = native_name_or_none(source)
+    if source_name is None:
+        diagnostics.add(
+            DiscoveryDiagnostic(
+                code="unresolvable_technical_drawing_source",
+                native_ref=view_name or None,
+                detail=(
+                    f"native {attribute} contains a source without a nonblank "
+                    "string Name"
+                ),
+            )
+        )
+        return
+
+    source_document_name = native_document_name(source)
+    if source_document_name is None:
+        diagnostics.add(
+            DiscoveryDiagnostic(
+                code="unresolvable_technical_drawing_source",
+                native_ref=source_name,
+                detail=(
+                    f'drawing view "{view_name}" {attribute} source '
+                    f'"{source_name}" has no resolvable native document'
+                ),
+            )
+        )
+        return
+
+    if source_document_name != document_name:
+        diagnostics.add(
+            DiscoveryDiagnostic(
+                code="separate_technical_drawing_source",
+                native_ref=source_name,
+                detail=(
+                    f'drawing view "{view_name}" {attribute} source '
+                    f'"{source_name}" belongs to document '
+                    f'"{source_document_name}"; separate technical drawing '
+                    "sources are outside active-document capture scope"
+                ),
+            )
+        )
+        return
+
+    if source_name in component_names:
+        target_kinds[source_name] = "component"
+    elif source_name in feature_names:
+        target_kinds[source_name] = "feature"
+    else:
+        diagnostics.add(
+            DiscoveryDiagnostic(
+                code="unresolvable_technical_drawing_source",
+                native_ref=source_name,
+                detail=(
+                    f'drawing view "{view_name}" {attribute} source '
+                    f'"{source_name}" is not a captured component or feature'
+                ),
+            )
+        )
+
+
+def _mark_technical_drawing_dependencies(value: Any, handled: set[str]) -> None:
+    dependencies, available = linked_objects(value, "OutList")
+    if not available:
+        return
+    for dependency in dependencies:
+        name = native_name_or_none(dependency)
+        if name is not None and _is_technical_drawing(dependency):
+            handled.add(name)
+
+
+def _diagnose_unhandled_technical_drawing_objects(
+    object_by_name: dict[str, Any],
+    handled: set[str],
+    diagnostics: set[DiscoveryDiagnostic],
+) -> None:
+    for name in sorted(object_by_name):
+        if name in handled:
+            continue
+        value = object_by_name[name]
+        if not _is_technical_drawing(value):
+            continue
+        diagnostics.add(
+            DiscoveryDiagnostic(
+                code="unsupported_technical_drawing",
+                native_ref=name,
+                detail=_EXCLUDED_DIAGNOSTIC_DETAILS["unsupported_technical_drawing"],
+            )
+        )
+
+
+def _diagnose_technical_drawing_links(
+    object_by_name: dict[str, Any],
+    document_name: str,
+    diagnostics: set[DiscoveryDiagnostic],
+) -> None:
+    for name in sorted(object_by_name):
+        value = object_by_name[name]
+        if not _is_technical_drawing_link(value):
+            continue
+        target = _linked_object(value)
+        target_name = native_name_or_none(target) or ""
+        target_document_name = native_document_name(target)
+        if target_document_name is None:
+            topology = "unresolved"
+        elif target_document_name == document_name:
+            topology = "embedded"
+        else:
+            topology = "separate"
+        diagnostics.add(
+            DiscoveryDiagnostic(
+                code="unsupported_technical_drawing_resource",
+                native_ref=name,
+                detail=(
+                    f'linked technical drawing resource "{target_name}" '
+                    f"({topology}) is outside active-document capture scope"
+                ),
+            )
+        )
+
+
 def _empty_targetability() -> TargetabilityEvidence:
     return TargetabilityEvidence(
         suppress=False,
@@ -1321,6 +1781,9 @@ __all__ = [
     "ComponentCandidate",
     "DiscoveryDiagnostic",
     "DocumentEvidence",
+    "DrawingPageCandidate",
+    "DrawingResourceEvidence",
+    "DrawingTargetCandidate",
     "FeatureCandidate",
     "MetadataCandidate",
     "ParameterCandidate",

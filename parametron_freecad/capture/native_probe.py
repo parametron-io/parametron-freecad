@@ -384,18 +384,24 @@ def relationship_names(
     return tuple(sorted(set(names))), available
 
 
-def group_members(value: Any) -> tuple[tuple[Any, ...], bool]:
-    """Return native Group members in stable Name order and availability."""
+def linked_objects(value: Any, attribute: str) -> tuple[tuple[Any, ...], bool]:
+    """Return linked native objects from one link-list property.
+
+    Preserves native list order while removing duplicate Names. Availability is
+    False when the property is missing, unreadable, or contains an entry without
+    a nonblank native Name. Valid entries are still returned so callers can
+    report conservative diagnostics for the unusable remainder.
+    """
 
     try:
-        members = value.Group
+        related = getattr(value, attribute)
     except AttributeError:
         return (), False
     except Exception:
         return (), False
 
     try:
-        items = tuple(members)
+        items = tuple(related)
     except Exception:
         return (), False
 
@@ -408,7 +414,42 @@ def group_members(value: Any) -> tuple[tuple[Any, ...], bool]:
             available = False
             continue
         by_name.setdefault(name, linked)
-    return tuple(by_name[name] for name in sorted(by_name)), available
+    return tuple(by_name.values()), available
+
+
+def group_members(value: Any) -> tuple[tuple[Any, ...], bool]:
+    """Return native Group members in stable Name order and availability."""
+
+    members, available = linked_objects(value, "Group")
+    return (
+        tuple(
+            sorted(
+                members,
+                key=lambda item: native_name_or_none(item) or "",
+            )
+        ),
+        available,
+    )
+
+
+def native_document_name(value: Any) -> str | None:
+    """Return the owning native document Name, or None when unavailable."""
+
+    try:
+        document = getattr(value, "Document", None)
+    except Exception:
+        return None
+    return native_name_or_none(document)
+
+
+def native_document_label(value: Any) -> str:
+    """Return the owning native document Label, or an empty string."""
+
+    try:
+        document = getattr(value, "Document", None)
+    except Exception:
+        return ""
+    return native_label(document)
 
 
 __all__ = [
@@ -419,6 +460,9 @@ __all__ = [
     "has_property",
     "is_derived_from",
     "is_read_only_status",
+    "linked_objects",
+    "native_document_label",
+    "native_document_name",
     "native_label",
     "native_name_or_none",
     "native_type_id",

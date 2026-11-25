@@ -12,8 +12,15 @@ from capture_discovery_support import (
     app_part,
     assembly_object,
     body,
+    drawing_annotation,
+    drawing_page,
+    drawing_symbol,
+    drawing_view,
+    drawing_view_clip,
     pad,
     part_box,
+    projection_group,
+    projection_item,
     property_bool,
     property_float,
     property_integer,
@@ -574,7 +581,6 @@ class ExclusionAndHierarchyPolicyTests(unittest.TestCase):
         joint_group = FakeObject("Joints", "Assembly::JointGroup")
         group = FakeObject("Group01", "App::DocumentObjectGroup")
         sheet = FakeObject("Sheet", "Spreadsheet::Sheet")
-        drawing = FakeObject("Page", "TechDraw::DrawPage")
         unknown = FakeObject("Holder", "App::FeaturePython")
         origin = FakeObject("Origin", "App::Origin")
         axis = FakeObject("X_Axis", "App::Line")
@@ -589,7 +595,6 @@ class ExclusionAndHierarchyPolicyTests(unittest.TestCase):
                     joint_group,
                     group,
                     sheet,
-                    drawing,
                     unknown,
                     origin,
                     axis,
@@ -609,7 +614,7 @@ class ExclusionAndHierarchyPolicyTests(unittest.TestCase):
         self.assertIn("unsupported_object_group", codes)
         self.assertIn("unsupported_parameter_group_type", codes)
         self.assertIn("unsupported_object_type", codes)
-        self.assertIn("unsupported_technical_drawing", codes)
+        self.assertNotIn("unsupported_technical_drawing", codes)
         self.assertIn("Holder", [item.native_ref for item in discovery.diagnostics])
         self.assertNotIn("Origin", [item.native_ref for item in discovery.diagnostics])
         self.assertNotIn("X_Axis", [item.native_ref for item in discovery.diagnostics])
@@ -753,6 +758,355 @@ class ErrorAndDeterminismTests(unittest.TestCase):
         discover_capture_candidates(document)
 
         self.assertEqual(_document_snapshot(document), before)
+
+
+class DrawingDiscoveryTests(unittest.TestCase):
+    def _body_and_feature(self) -> tuple[object, object]:
+        pad_object = pad("Pad")
+        body_object = body("Body", group=[pad_object])
+        return body_object, pad_object
+
+    def test_document_without_pages_has_no_drawing_candidates(self) -> None:
+        body_object, pad_object = self._body_and_feature()
+        discovery = discover_capture_candidates(
+            FakeDocument("model", objects=[body_object, pad_object])
+        )
+
+        self.assertEqual(discovery.drawings, ())
+
+    def test_single_page_discovers_label_order_resource_and_targets(self) -> None:
+        body_object, pad_object = self._body_and_feature()
+        view = drawing_view("BodyView", source=[body_object])
+        page = drawing_page("Page", label="Main sheet", views=[view])
+
+        discovery = discover_capture_candidates(
+            FakeDocument(
+                "drawing_doc",
+                label="Drawing Document",
+                objects=[body_object, pad_object, view, page],
+            )
+        )
+        self.assertEqual([item.native_ref for item in discovery.drawings], ["Page"])
+        candidate = discovery.drawings[0]
+
+        self.assertEqual(candidate.native_label, "Main sheet")
+        self.assertEqual(candidate.cad_type, "TechDraw::DrawPage")
+        self.assertEqual(candidate.page_order, 1)
+        self.assertEqual(candidate.resource.topology, "embedded")
+        self.assertEqual(candidate.resource.document_name, "drawing_doc")
+        self.assertEqual(candidate.resource.document_label, "Drawing Document")
+        self.assertEqual(
+            [(item.native_ref, item.cad_type, item.kind) for item in candidate.targets],
+            [("Body", "PartDesign::Body", "component")],
+        )
+
+    def test_component_and_feature_targets_are_sorted_by_native_ref(self) -> None:
+        body_object, pad_object = self._body_and_feature()
+        view = drawing_view("View", source=[pad_object, body_object])
+        page = drawing_page("Page", views=[view])
+
+        discovery = discover_capture_candidates(
+            FakeDocument("drawing_doc", objects=[body_object, pad_object, view, page])
+        )
+        targets = discovery.drawings[0].targets
+
+        self.assertEqual(
+            [(item.native_ref, item.kind) for item in targets],
+            [("Body", "component"), ("Pad", "feature")],
+        )
+
+    def test_part_and_assembly_sources_resolve_as_components(self) -> None:
+        part = app_part("Part")
+        assembly = assembly_object("Assembly")
+        view = drawing_view("View", source=[part, assembly])
+        page = drawing_page("Page", views=[view])
+
+        discovery = discover_capture_candidates(
+            FakeDocument(
+                "drawing_doc",
+                objects=[part, assembly, view, page],
+            )
+        )
+
+        self.assertEqual(
+            [(item.native_ref, item.kind) for item in discovery.drawings[0].targets],
+            [("Assembly", "component"), ("Part", "component")],
+        )
+
+    def test_multiple_pages_are_ordered_by_native_selector(self) -> None:
+        page_b = drawing_page("PageB", label="Second sheet")
+        page_a = drawing_page("PageA", label="First sheet")
+
+        discovery = discover_capture_candidates(
+            FakeDocument("drawing_doc", objects=[page_b, page_a])
+        )
+
+        self.assertEqual(
+            [
+                (item.native_ref, item.native_label, item.page_order)
+                for item in discovery.drawings
+            ],
+            [
+                ("PageA", "First sheet", 1),
+                ("PageB", "Second sheet", 2),
+            ],
+        )
+
+    def test_projection_group_item_sources_are_collected(self) -> None:
+        body_object, pad_object = self._body_and_feature()
+        front = projection_item("Front", source=[body_object])
+        top = projection_item("Top", source=[body_object])
+        group = projection_group("Projections", views=[front, top])
+        page = drawing_page("Page", views=[group])
+
+        discovery = discover_capture_candidates(
+            FakeDocument(
+                "drawing_doc",
+                objects=[body_object, pad_object, group, page],
+            )
+        )
+
+        self.assertEqual(
+            [item.native_ref for item in discovery.drawings[0].targets],
+            ["Body"],
+        )
+        self.assertEqual(discovery.diagnostics, ())
+
+    def test_view_container_is_transparent_for_supported_views(self) -> None:
+        body_object, pad_object = self._body_and_feature()
+        view = drawing_view("BodyView", source=[body_object])
+        clip = drawing_view_clip("Clip", views=[view])
+        page = drawing_page("Page", views=[clip])
+
+        discovery = discover_capture_candidates(
+            FakeDocument(
+                "drawing_doc",
+                objects=[body_object, pad_object, clip, page],
+            )
+        )
+
+        self.assertEqual(
+            [item.native_ref for item in discovery.drawings[0].targets],
+            ["Body"],
+        )
+        codes = {item.code for item in discovery.diagnostics}
+        self.assertNotIn("unsupported_technical_drawing_view", codes)
+
+    def test_empty_page_is_still_a_candidate(self) -> None:
+        page = drawing_page("Page", views=[])
+
+        discovery = discover_capture_candidates(
+            FakeDocument("drawing_doc", objects=[page])
+        )
+
+        self.assertEqual(len(discovery.drawings), 1)
+        self.assertEqual(discovery.drawings[0].targets, ())
+        self.assertEqual(discovery.diagnostics, ())
+
+    def test_unsupported_view_subtype_is_diagnosed(self) -> None:
+        note = drawing_annotation("Note", label="Note")
+        page = drawing_page("Page", views=[note])
+
+        discovery = discover_capture_candidates(
+            FakeDocument("drawing_doc", objects=[note, page])
+        )
+
+        diagnostics = [
+            item
+            for item in discovery.diagnostics
+            if item.code == "unsupported_technical_drawing_view"
+        ]
+        self.assertEqual(len(diagnostics), 1)
+        self.assertEqual(diagnostics[0].native_ref, "Note")
+        self.assertEqual(discovery.drawings[0].targets, ())
+
+    def test_separate_document_source_is_diagnosed(self) -> None:
+        external_body = body("ExternalBody")
+        FakeDocument("external_model", objects=[external_body])
+        view = drawing_view("View", source=[external_body])
+        page = drawing_page("Page", views=[view])
+
+        discovery = discover_capture_candidates(
+            FakeDocument("drawing_doc", objects=[view, page])
+        )
+
+        diagnostics = [
+            item
+            for item in discovery.diagnostics
+            if item.code == "separate_technical_drawing_source"
+        ]
+        self.assertEqual(len(diagnostics), 1)
+        self.assertEqual(diagnostics[0].native_ref, "ExternalBody")
+        self.assertIn("external_model", diagnostics[0].detail)
+        self.assertEqual(discovery.drawings[0].targets, ())
+
+    def test_xsource_external_link_is_diagnosed(self) -> None:
+        external_body = body("ExternalBody")
+        FakeDocument("external_model", objects=[external_body])
+        view = drawing_view("View", x_source=[external_body])
+        page = drawing_page("Page", views=[view])
+
+        discovery = discover_capture_candidates(
+            FakeDocument("drawing_doc", objects=[view, page])
+        )
+
+        codes = {item.code for item in discovery.diagnostics}
+        self.assertIn("separate_technical_drawing_source", codes)
+        self.assertEqual(discovery.drawings[0].targets, ())
+
+    def test_source_without_document_is_unresolvable(self) -> None:
+        orphan_source = body("OrphanSource")
+        view = drawing_view("View", source=[orphan_source])
+        page = drawing_page("Page", views=[view])
+
+        discovery = discover_capture_candidates(
+            FakeDocument("drawing_doc", objects=[view, page])
+        )
+
+        diagnostics = [
+            item
+            for item in discovery.diagnostics
+            if item.code == "unresolvable_technical_drawing_source"
+        ]
+        self.assertEqual(len(diagnostics), 1)
+        self.assertEqual(diagnostics[0].native_ref, "OrphanSource")
+
+    def test_uncaptured_source_is_unresolvable(self) -> None:
+        sheet = FakeObject("SourceSheet", "Spreadsheet::Sheet")
+        view = drawing_view("View", source=[sheet])
+        page = drawing_page("Page", views=[view])
+
+        discovery = discover_capture_candidates(
+            FakeDocument("drawing_doc", objects=[sheet, view, page])
+        )
+
+        diagnostics = [
+            item
+            for item in discovery.diagnostics
+            if item.code == "unresolvable_technical_drawing_source"
+        ]
+        self.assertEqual(len(diagnostics), 1)
+        self.assertEqual(diagnostics[0].native_ref, "SourceSheet")
+
+    def test_unavailable_views_and_sources_are_diagnosed(self) -> None:
+        page = FakeObject("Page", "TechDraw::DrawPage")
+        view = FakeObject("View", "TechDraw::DrawViewPart")
+        page_with_view = drawing_page("PageWithView", views=[view])
+
+        discovery = discover_capture_candidates(
+            FakeDocument(
+                "drawing_doc",
+                objects=[page, view, page_with_view],
+            )
+        )
+
+        codes = {item.code for item in discovery.diagnostics}
+        self.assertIn("technical_drawing_views_unavailable", codes)
+        self.assertIn("technical_drawing_source_unavailable", codes)
+        self.assertEqual(len(discovery.drawings), 2)
+
+    def test_orphan_technical_drawing_object_is_diagnosed(self) -> None:
+        orphan = drawing_symbol("OrphanSymbol")
+
+        discovery = discover_capture_candidates(
+            FakeDocument("drawing_doc", objects=[orphan])
+        )
+
+        diagnostics = [
+            item
+            for item in discovery.diagnostics
+            if item.code == "unsupported_technical_drawing"
+        ]
+        self.assertEqual(len(diagnostics), 1)
+        self.assertEqual(diagnostics[0].native_ref, "OrphanSymbol")
+        self.assertEqual(discovery.drawings, ())
+
+    def test_linked_technical_drawing_resource_reports_topology(self) -> None:
+        page = drawing_page("Page")
+        FakeDocument("drawing_doc", objects=[page])
+        separate_link = FakeObject("SeparatePageLink", "App::Link")
+        separate_link.LinkedObject = page
+        local_page = drawing_page("LocalPage")
+        document = FakeDocument(
+            "model_doc",
+            objects=[separate_link, local_page],
+        )
+        local_link = FakeObject("LocalPageLink", "App::Link")
+        local_link.LinkedObject = local_page
+        local_link.Document = document
+        document.Objects.append(local_link)
+
+        discovery = discover_capture_candidates(document)
+
+        details = {
+            item.native_ref: item.detail
+            for item in discovery.diagnostics
+            if item.code == "unsupported_technical_drawing_resource"
+        }
+        self.assertIn("(separate)", details["SeparatePageLink"])
+        self.assertIn("(embedded)", details["LocalPageLink"])
+        self.assertEqual(
+            [item.native_ref for item in discovery.drawings], ["LocalPage"]
+        )
+
+    def test_drawing_mapping_has_no_semantic_identity(self) -> None:
+        body_object, pad_object = self._body_and_feature()
+        view = drawing_view("View", source=[body_object])
+        page = drawing_page("Page", views=[view])
+
+        mapping = discover_capture_candidates(
+            FakeDocument(
+                "drawing_doc",
+                objects=[body_object, pad_object, view, page],
+            )
+        ).to_mapping()
+
+        drawing = mapping["drawings"][0]
+        self.assertEqual(
+            set(drawing),
+            {
+                "nativeRef",
+                "nativeLabel",
+                "cadType",
+                "pageOrder",
+                "resource",
+                "targets",
+            },
+        )
+        self.assertEqual(
+            set(drawing["resource"]),
+            {"topology", "documentName", "documentLabel"},
+        )
+        self.assertEqual(
+            set(drawing["targets"][0]),
+            {"nativeRef", "cadType", "kind"},
+        )
+
+    def test_drawing_discovery_is_deterministic(self) -> None:
+        def build():
+            body_object, pad_object = self._body_and_feature()
+            first = drawing_view("ViewA", source=[body_object])
+            second = drawing_view("ViewB", source=[body_object])
+            page_b = drawing_page("PageB", views=[second])
+            page_a = drawing_page("PageA", views=[first])
+            return discover_capture_candidates(
+                FakeDocument(
+                    "drawing_doc",
+                    objects=[
+                        page_b,
+                        page_a,
+                        second,
+                        first,
+                        pad_object,
+                        body_object,
+                    ],
+                )
+            ).to_mapping()
+
+        self.assertEqual(
+            json.dumps(build(), sort_keys=True),
+            json.dumps(build(), sort_keys=True),
+        )
 
 
 def _document_snapshot(document: FakeDocument) -> object:

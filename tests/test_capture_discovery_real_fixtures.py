@@ -20,6 +20,7 @@ import pytest
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = Path(__file__).parent / "fixtures"
 RUNNER = Path(__file__).parent / "freecad_capture_discovery_fixture_runner.py"
+DRAWING_GENERATOR = REPOSITORY_ROOT / "scripts" / "generate_capture_drawing_fixtures.py"
 
 METADATA_SOURCE = FIXTURE_ROOT / "metadata_mutation" / "input" / "metadata-source.FCStd"
 METADATA_COEXISTENCE = (
@@ -27,6 +28,8 @@ METADATA_COEXISTENCE = (
 )
 CANONICAL_CUBE = FIXTURE_ROOT / "canonical_lifecycle" / "input" / "cube.FCStd"
 ASSEMBLY_ROOT = FIXTURE_ROOT / "assembly_occurrence" / "assembly-root.FCStd"
+DRAWING_SINGLE = FIXTURE_ROOT / "capture_drawings" / "single-page.FCStd"
+DRAWING_MULTIPLE = FIXTURE_ROOT / "capture_drawings" / "multiple-pages.FCStd"
 
 LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 
@@ -101,6 +104,10 @@ def _metadata(payload: dict) -> dict[str, dict]:
     return {item["nativeKey"]: item for item in payload["discovery"]["metadata"]}
 
 
+def _drawings(payload: dict) -> dict[str, dict]:
+    return {item["nativeRef"]: item for item in payload["discovery"]["drawings"]}
+
+
 def test_single_part_fixture_synthesizes_document_root(tmp_path: Path) -> None:
     payload = _run_discovery(METADATA_SOURCE, tmp_path)
     discovery = payload["discovery"]
@@ -140,6 +147,7 @@ def test_single_part_fixture_synthesizes_document_root(tmp_path: Path) -> None:
 
     assert discovery["parameterGroups"] == []
     assert discovery["parameters"] == []
+    assert discovery["drawings"] == []
 
     metadata = _metadata(payload)
     assert set(metadata) == {
@@ -189,6 +197,7 @@ def test_coexistence_fixture_discovers_parameters_and_delete_evidence(
     assert group["nativeRef"] == "Parameters"
     assert group["groupKind"] == "varset"
     assert group["ownerComponentNativeRef"] == "metadata_coexistence"
+    assert discovery["drawings"] == []
 
     parameters = _parameters(payload)
     assert set(parameters) == {"pilotValue"}
@@ -290,6 +299,7 @@ def test_cube_fixture_discovers_length_parameters_and_feature_set(
         assert candidate["writable"] is True
 
     assert discovery["metadata"] == []
+    assert discovery["drawings"] == []
 
 
 def test_assembly_fixture_discovers_assembly_components_and_excludes_links(
@@ -330,6 +340,7 @@ def test_assembly_fixture_discovers_assembly_components_and_excludes_links(
     assert discovery["parameterGroups"] == []
     assert discovery["parameters"] == []
     assert discovery["metadata"] == []
+    assert discovery["drawings"] == []
     assert not any(
         name.startswith(
             (
@@ -352,4 +363,130 @@ def test_repeated_real_discovery_is_byte_identical(tmp_path: Path) -> None:
 
     assert json.dumps(first_payload["discovery"], sort_keys=True) == json.dumps(
         second_payload["discovery"], sort_keys=True
+    )
+
+
+def test_single_page_fixture_discovers_embedded_sheet(tmp_path: Path) -> None:
+    payload = _run_discovery(DRAWING_SINGLE, tmp_path)
+    discovery = payload["discovery"]
+
+    assert payload["document"]["name"] == "single_page"
+    assert payload["document"]["label"] == "single-page"
+    assert payload["document"]["touchedBefore"] is False
+    assert payload["document"]["touchedAfter"] is False
+    assert discovery["rootComponentNativeRef"] == "single_page"
+    assert discovery["diagnostics"] == []
+
+    drawings = _drawings(payload)
+    assert set(drawings) == {"Page"}
+    page = drawings["Page"]
+    assert page["nativeLabel"] == "Assembly sheet"
+    assert page["cadType"] == "TechDraw::DrawPage"
+    assert page["pageOrder"] == 1
+    assert page["resource"] == {
+        "topology": "embedded",
+        "documentName": "single_page",
+        "documentLabel": "single-page",
+    }
+    assert page["targets"] == [
+        {
+            "nativeRef": "Body",
+            "cadType": "PartDesign::Body",
+            "kind": "component",
+        }
+    ]
+
+    components = _components(payload)
+    assert set(components) == {"single_page", "Body"}
+    features = _features(payload)
+    assert set(features) == {"BodyBox"}
+
+
+def test_multiple_page_fixture_discovers_ordered_sheets(tmp_path: Path) -> None:
+    payload = _run_discovery(DRAWING_MULTIPLE, tmp_path)
+    discovery = payload["discovery"]
+
+    assert payload["document"]["name"] == "multiple_pages"
+    assert payload["document"]["label"] == "multiple-pages"
+    assert payload["document"]["touchedBefore"] is False
+    assert payload["document"]["touchedAfter"] is False
+    assert discovery["rootComponentNativeRef"] == "multiple_pages"
+
+    drawings = _drawings(payload)
+    assert list(drawings) == ["PageA", "PageB"]
+
+    page_a = drawings["PageA"]
+    assert page_a["nativeLabel"] == "Sheet A"
+    assert page_a["cadType"] == "TechDraw::DrawPage"
+    assert page_a["pageOrder"] == 1
+    assert page_a["resource"]["topology"] == "embedded"
+    assert page_a["resource"]["documentName"] == "multiple_pages"
+    assert page_a["targets"] == [
+        {
+            "nativeRef": "Body",
+            "cadType": "PartDesign::Body",
+            "kind": "component",
+        },
+        {
+            "nativeRef": "BodyBox",
+            "cadType": "PartDesign::AdditiveBox",
+            "kind": "feature",
+        },
+    ]
+
+    page_b = drawings["PageB"]
+    assert page_b["nativeLabel"] == "Sheet B"
+    assert page_b["pageOrder"] == 2
+    assert page_b["resource"]["topology"] == "embedded"
+    assert page_b["targets"] == [
+        {
+            "nativeRef": "Body2",
+            "cadType": "PartDesign::Body",
+            "kind": "component",
+        }
+    ]
+
+    diagnostics = discovery["diagnostics"]
+    assert {(item["code"], item["nativeRef"]) for item in diagnostics} == {
+        ("unsupported_technical_drawing", "OrphanSymbol"),
+        ("unsupported_technical_drawing_view", "Note"),
+    }
+
+
+def test_repeated_drawing_discovery_is_byte_identical(tmp_path: Path) -> None:
+    first_payload = _run_discovery(DRAWING_MULTIPLE, tmp_path / "first")
+    second_payload = _run_discovery(DRAWING_MULTIPLE, tmp_path / "second")
+
+    assert json.dumps(first_payload["discovery"], sort_keys=True) == json.dumps(
+        second_payload["discovery"], sort_keys=True
+    )
+
+
+def test_generator_reproduces_committed_drawing_discovery(tmp_path: Path) -> None:
+    generated = tmp_path / "generated"
+    completed = subprocess.run(
+        [
+            _freecad_host(),
+            str(DRAWING_GENERATOR),
+            f"--pass={generated}",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+        cwd=str(tmp_path),
+    )
+    assert completed.returncode == 0, completed.stderr + completed.stdout
+    assert "Exception while processing file" not in completed.stderr
+    assert (generated / "single-page.FCStd").is_file()
+    assert (generated / "multiple-pages.FCStd").is_file()
+
+    committed = _run_discovery(DRAWING_MULTIPLE, tmp_path / "committed")
+    reproduced = _run_discovery(
+        generated / "multiple-pages.FCStd",
+        tmp_path / "reproduced",
+    )
+
+    assert json.dumps(reproduced["discovery"], sort_keys=True) == json.dumps(
+        committed["discovery"], sort_keys=True
     )
